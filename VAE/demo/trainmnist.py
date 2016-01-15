@@ -10,12 +10,11 @@ Otto Fabius - <ottofabius@gmail.com>
 
 #python trainmnist.py -s mnist.npy
 
-import VAE_cond_MF
+import VariationalAutoencoder
 import numpy as np
 import argparse
 import time
 import gzip, cPickle
-import progressbar
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d","--double", help="Train on hidden layer of previously trained AE - specify params", default = False)
@@ -30,19 +29,12 @@ f = gzip.open('../../mnist.pkl.gz', 'rb')
 f.close()
 
 data = x_train
-n_iter = 500
-
-[N,dimX] = data.shape
 
 dimZ = 20
-dimf = dimZ
-dimXf = dimf
-dimXu = np.around(0.1*dimX)
 HU_decoder = 400
 HU_encoder = HU_decoder
 
 batch_size = 100
-n_induce = 100
 L = 1
 learning_rate = 0.01
 
@@ -52,7 +44,8 @@ if args.double:
     data = (np.tanh(data.dot(prev_params[0].T) + prev_params[5].T) + 1) /2
     x_test = (np.tanh(x_test.dot(prev_params[0].T) + prev_params[5].T) +1) /2
 
-encoder = VAE_cond_MF.VA( HU_decoder, HU_encoder, N, dimX, dimZ, dimf, dimXf, dimXu, batch_size, n_induce, L, learning_rate)
+[N,dimX] = data.shape
+encoder = VariationalAutoencoder.VA(HU_decoder,HU_encoder,dimX,dimZ,batch_size,L,learning_rate)
 
 
 if args.double:
@@ -67,8 +60,7 @@ lowerbound = np.array([])
 testlowerbound = np.array([])
 
 begin = time.time()
-pbar = progressbar.ProgressBar(maxval=n_iter).start()
-for j in xrange(n_iter):
+for j in xrange(500):
     encoder.lowerbound = 0
     print 'Iteration:', j
     encoder.iterate(data)
@@ -81,8 +73,3 @@ for j in xrange(n_iter):
     if j % 5 == 0:
         print "Calculating test lowerbound"
         testlowerbound = np.append(testlowerbound,encoder.getLowerBound(x_test))
-
-    pbar.update()
-
-pbar.finish()
-
