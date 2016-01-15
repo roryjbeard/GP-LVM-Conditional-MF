@@ -1,0 +1,81 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[top=20mm, bottom=20mm, left=30mm, right=30mm]{geometry}
+\usepackage{soul}
+%Gummi|061|=)
+\usepackage{setspace}
+
+\doublespacing
+
+
+\title{\textbf{Derivations and Equations}}
+\date{}
+\begin{document}
+
+\maketitle
+
+
+\section{Deriving the bound} % (fold)
+\label{sec:derive_bound}
+The standard variational formulation is
+%
+\begin{align}
+    \log p(y) &= \int q(z)\log\frac{p(y|z)p(z)}{q(z)}\frac{q(z)}{p(z|y)} dz\notag\\
+    &= \underbrace{\mathbb{E}_{q(z)}\big[ \log p(y|z)p(z) - \log q(z) \big]}_{\mathcal{L}_1} + \text{KL}\big[ q(z)\Vert p(z|y) \big]\label{eq:logpy1}
+\end{align}
+%
+The GP-LVM-CMF variational joint in the augmented latent space is:
+%
+\begin{equation}
+    q(z,f,u,X) = \prod_{i=1}^N \{q(z_i|f(X_i))q(f(X_i)|u)\}q(u)q(X)
+\end{equation}
+%
+which induces an intractable variational marginal
+%
+\begin{equation}
+    q(z) = \int \prod_{i=1}^N \{q(z_i|f(X_i))q(f(X_i)|u)\}q(u)q(X) df du dX.
+\end{equation}
+%
+However we can apply the variational formulation again, noting that $q(z) = \frac{q(z|f,u,X)q(f,u,X)}{q(f,u,X|z)}$, and integrating \ref{eq:logpy1} wrt the auxiliary variables, to obtain a further lower bound:
+\begin{align}
+    \log p(y) &= \int q(z|f,u,X)q(f,u,X)\log \frac{p(y|z)p(z)r(f,u,X|z)}{q(z|f,u,X)q(f,u,X)}\frac{q(f,u,X|z)}{r(f,u,X|z)}\frac{q(z)}{p(z|y)} df du dX dz\notag\\
+    &= \mathbb{E}_{q(z,f,u,X)}\big[ \log p(y|z)p(z)r(f,u,X|z) - \log q(z|f,X)q(f,u,X) \big]\label{eq:L_aux}\\
+    &\qquad+ \mathbb{E}_q(z)\big[ \text{KL}[q(f,u,X|z)\Vert r(f,u,X|z)] \big] + \text{KL}\big[ q(z)\Vert p(z|y) \big]
+\end{align}
+%
+in which the new auxiliary lower bound, $\mathcal{L}_{aux}$ is given by the expression \ref{eq:L_aux}, and where we have introduced the auxiliary distribution $r(f,u,X|z)$ which serves to approximate the variational posterior, $q(f,u,X|z)$, of the auxiliary variables conditioned on the latent variables.\\
+We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical expression for the K-L divergence between two Gaussians, $q(f,u,x)$ and $r(f,u,X|z)$ and, in the case that the prior of the generative model, $p(z)$, is also Gaussian distributed - as is the case for the continuous latent variable MLP model we'll consider first - then the bound contains a second Guassian KL term:
+%
+\begin{equation}
+    \mathcal{L}_{aux} = \underbrace{\mathbb{E}_{q(z)}\big[ \log p(y|z) \big]}_{A} - \underbrace{\mathbb{E}_{q(f,u,X)}\big[ \text{KL}[q(z|f,X)\Vert p(z)] \big]}_{B} - \underbrace{\mathbb{E}_{q(z)}\big[ \text{KL}[q(f,u,X)\Vert r(f,u,X|z)] \big]}_{C}.
+\end{equation}
+%
+%
+\section{Expressions}
+\subsection{Generative model}
+%
+
+
+\subsection{Variational model}
+%
+\begin{align}
+    q(X) &= \prod_{i=1}^N \mathcal{N}(x_{i,:}\mid 0, I_R) = \prod_{i=1}^N \prod_{r=1}^R \mathcal{N}(x_{i,r}\mid 0,1)\\
+    q(u) &= \prod_{m=1}^M \mathcal{N}(u_{:,m}\mid 0, K_{X_uX_u})\\
+    q(f(X)|u) &= \mathcal{N}(f(X)\mid K_{XX_u}K_{X_uX_u}^{-1}u, K_{XX}-K_{XX_u}K_{X_uX_u}^{-1}K_{X_uX})\\
+    q(z|f(X)) &= \prod_{i=1}^N \mathcal{N}(z_i\mid f(X_i), \sigma^2)
+\end{align}
+
+
+\subsection{Auxiliary model}
+%
+\begin{align}
+    r(f,u,X|z) &= q(f(X)|u,X)r(u,X|z)\\
+    r(u,X|z) &=
+\end{align}
+
+
+
+
+\end{document}
