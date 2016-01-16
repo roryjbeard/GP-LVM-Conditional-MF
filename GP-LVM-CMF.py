@@ -32,34 +32,35 @@ class kernelFactory:
 
 class SGPDV:
 
-    def __init__( self, dataSize, induceSize, batchSize, dimLatent, learningRate, theta_init, sigma_init, kernelType_='RBF' ):
+    def __init__( self, dataSize, induceSize, batchSize, dimX, dimZ, learningRate, theta_init, sigma_init, kernelType_='RBF' ):
 
         self.N = dataSize   # number of observations
         self.M = induceSize # Number of inducing ponts
         self.B = batchSize    #
-        self.R = dimLatent # Dimensionality of the latent co-ordinates
+        self.R = dimX # Dimensionality of the latent co-ordinates
+        self.Q = dimZ
         
         self.lowerBound    = -np.inf      # Lower bound
         self.learningRate  = learningRate # Learning rate
         self.kernelType    = kernelType
         self.p_z_gaussian  = True
-
-        M_vec   = np.zeros((self.M,1))
-        N_vec   = np.zeros((self.N,1))       
-        N_R_vec = np.zeros((self.N,self.R))
-        N_R_mat = np.zeros((self.N,self.R,self.R))
-        M_R_vec = np.zeros((self.M,self.R))
-        B_R_vec = np.zeros((self.B,self.R))
-        B_R_mat = np.zeros((self.B,self.R,self.R))
-        B_vec   = np.zeros((self.B,1), dtype=int )        
-        
+   
+        N_R_mat = np.zeros((self.N,self.R))
+        M_R_mat = np.zeros((self.M,self.R))
+        B_R_mat = np.zeros((self.B,self.R))
+        R_R_ten = np.zeros((self.R,self.R))
+        Q_M_mat = np.zeros((self.Q,self.M))
+        Q_B_mat = np.zeros((self.Q,self.B))        
+        M_M_mat = np.zeros((self.M,self.M))
+        B_vec   = np.zeros((self.B,1), dtype=int )
         # variational and auxilery parameters
-        self.upsilon = T.shared( N_R_vec ) # mean of r(u|z)
-        self.Upsilon = T.shared( N_R_mat ) # variance of r(u|z)
-        self.tau     = T.shared( N_R_vec )
-        self.Tau     = T.shared( N_R_mat )
+        self.upsilon = T.shared( Q_M_mat ) # mean of r(u|z)
+        self.Upsilon = T.shared( M_M_mat ) # variance of r(u|z)
+        self.tau     = T.shared( N_R_mat )
+        self.Tau     = T.shared( R_R_mat )
         self.phi     = T.shared( N_R_vec )
-        self.Phi     = T.shared( N_R_mat )
+        self.Phi     = T.shared( R_R_mat )
+        self.kappa   = T.shared( Q_M_vec )        
         self.upsilon.name = 'upsilon'
         self.Upsilon.name = 'Upsilon'
         self.tau.name     = 'tau'
@@ -74,10 +75,10 @@ class SGPDV:
         self.sigma.name = 'sigma'
 
         # Random variables
-        self.alpha = T.shared( M_vec )
-        self.beta  = T.shared( B_R_vec )                
-        self.eta   = T.shared( B_vec )
-        self.xi    = T.shared( B_vec )
+        self.alpha = T.shared( Q_M_mat )
+        self.beta  = T.shared( B_R_mat )                
+        self.eta   = T.shared( Q_B_mat )
+        self.xi    = T.shared( Q_B_mat )
         self.alpha.name = 'alpha'
         self.beta.name  = 'beta'
         self.eta.name   = 'eta'
@@ -89,10 +90,11 @@ class SGPDV:
         self.Xu.name = 'Xu'
         self.Xf.name = 'Xf'
 
-        self.currentBatch = T.ivector( B_vec )        
+        self.currentBatch = T.ivector( B_vec )
+        cPhi = slinalg.cholesky( self.Phi )
         for n in range( self.B ):
             i = self.currentBatch[n]
-            self.Xf[n,:] = self.phi[i,:] + ( slinalg.cholesky( self.Phi[i,:,:] ) * self.beta[n] ).T
+            self.Xf[n,:] = self.phi[i,:] + ( cPhi  * self.beta[n,:].T ).T
         
         # Kernels
         kfactory = kernelFactory( self.kernelType )
@@ -100,12 +102,27 @@ class SGPDV:
         self.Kff = kfactory.kernel( self.Xf, self.Xf, self.theta, 'Kff' )
         self.Kfu = kfactory.kernel( self.Xf, self.Xu, self.theta, 'Kfu' )
         
+        cKuu = slinalg.cholesky( self.Kuu )
+        iKuu = nlinalg.matrix_inverse( self.Kuu )        
+        
         # Variational distribution        
-        self.u     = self.upsilon + slinalg.cholesky( self.Upsilon ) * self.alpha
-        self.Sigma = self.Kff - self.Kfu * nlinalg.matrix_inverse( self.Kuu ) * self.Kfu.T                 
-        self.mu    = self.Kfu * nlinalg.matrix_inverse( self.Kuu ) * self.u        
-        self.f     = self.mu + slinalg.cholesky( Sigma ) * self.xi        
-        self.z     = self.f + self.sigma * self.eta       
+        self.Sigma = self.Kff - self.Kfu * iKuu * self.Kfu.T                 
+        cSigma = slinalg.cholesky( Sigma )
+
+        self.u  = T.shared( Q_M_matc )
+        self.f  = T.shared( Q_B_mat )
+        self.mu = T.shared( Q_B_mat )
+
+        for i in range( self.Q ):
+            # Sample u_q from q(u) = N(u_q; kappa_q, Kuu )
+            self.u[i,:]  = self.kappa[i,:] + cKuu * self.alpha
+            # compute mean of f            
+            self.mu[i,:] = self.Kfu * ( iKuu * self.u[i,:].T ).T
+            # Sample f from q(f|u,X) = N( mu_q, Sigma )            
+            self.f[i,:]  = self.mu + ( cSigma * self.xi[i,:].T ).T        
+            # Sample z from q(z|f) = N(z,f,I*sigma^2)            
+            self.z[i,:]  = self.f + self.sigma * self.eta[i,:]
+        
         self.u.name     = 'u'
         self.Sigma.name = 'Sigma'
         self.mu.name    = 'mu'
@@ -136,7 +153,6 @@ class SGPDV:
         return l
 
 
-        
     def log_r_fuX_z(self):
         
     
@@ -152,10 +168,10 @@ class SGPDV:
     def sample( self ):
 
         # Compute z, f, u, X 
-        alpha_ = np.random.randn( self.M, 1 )
+        alpha_ = np.random.randn( self.Q, self.M )
         beta_  = np.random.randn( self.B, self.R )
-        eta_   = np.random.randn( self.B, 1)
-        xi_    = np.random.randn( self.B, 1 )
+        eta_   = np.random.randn( self.Q, self.B, 1)
+        xi_    = np.random.randn( self.Q, self.B, 1 )
         currentBatch_ = np.zeros( (this.B,1), dtype=int ) # TODO Fix this
 
         self.currentBatch.setvalue( currentBatch_ )
@@ -182,11 +198,17 @@ class SGPDV:
 class VA(SGPDV): 
     
     def __init__(self, induceSize, batchSize, dimLatent, learningRate, theta_init, sigma_init, kernelType_='RBF', data  ):
+
+        SGPDV.__init__( data.shape[0], induceSize, batchSize, dimLatent, learningRate, theta_init, sigma_init, kernelType )       
+
+        self.P = data.shape[1]
         
-        SGPDV.__init__( len(data), induceSize, batchSize, dimLatent, learningRate, theta_init, sigma_init, kernelType )       
-
         self.y = data
-
+        
+        P_Q_mat = np.zeros((self.P,self.R))        
+        
+        W1 = T.shared( P_Q_mat )
+    
 
 
     def log_p_y_z( self ):
@@ -195,7 +217,9 @@ class VA(SGPDV):
     def KL_qp( self ):
         
         
-        
+    
+    
+    
         
         
         W1 = np.random.normal(0,self.sigmaInit,(self.HU_decoder,self.dimZ))
