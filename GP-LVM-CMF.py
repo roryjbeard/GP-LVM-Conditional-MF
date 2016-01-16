@@ -8,9 +8,9 @@ from theano.tensor import slinalg, nlinalg
 
 class kernelFactory:
     def __init__(self, kernelType_, eps_=1e-4):
-        self.kernelType = kernelType_         
+        self.kernelType = kernelType_
         self.eps        = eps_
-    
+
     def kernel( self, X1, X2, theta, name_ ):
         _X2 = X1 if X2 is None else X2
         if self.kernelType == 'RBF':
@@ -20,7 +20,7 @@ class kernelFactory:
             K.name = name + '(RBF)'
         elif self.kernelType == 'RBFnn':
             K = theta[0] + self.eps
-            K.name = name + '(RBFnn)'            
+            K.name = name + '(RBFnn)'
         elif self.kernelType ==  'LIN':
             K = theta[0] * (X1.dot(_X2.T) + 1)
             (K + self.eps_y * T.eye(X1.shape[0])) if X2 is None else K
@@ -39,20 +39,20 @@ class SGPDV:
         self.B = batchSize    #
         self.R = dimX # Dimensionality of the latent co-ordinates
         self.Q = dimZ
-        
+
         self.lowerBound    = -np.inf      # Lower bound
         self.learningRate  = learningRate # Learning rate
         self.kernelType    = kernelType
         self.p_z_gaussian  = True
-   
+
         N_R_mat = np.zeros((self.N,self.R))
         M_R_mat = np.zeros((self.M,self.R))
         B_R_mat = np.zeros((self.B,self.R))
         R_R_ten = np.zeros((self.R,self.R))
         Q_M_mat = np.zeros((self.Q,self.M))
-        Q_B_mat = np.zeros((self.Q,self.B))        
+        Q_B_mat = np.zeros((self.Q,self.B))
         M_M_mat = np.zeros((self.M,self.M))
-        B_vec   = np.zeros((self.B,1), dtype=int )
+        B_vec   = np.zeros((self.B,1), dtype=np.int32 )
         # variational and auxilery parameters
         self.upsilon = T.shared( Q_M_mat ) # mean of r(u|z)
         self.Upsilon = T.shared( M_M_mat ) # variance of r(u|z)
@@ -60,14 +60,14 @@ class SGPDV:
         self.Tau     = T.shared( R_R_mat )
         self.phi     = T.shared( N_R_vec )
         self.Phi     = T.shared( R_R_mat )
-        self.kappa   = T.shared( Q_M_vec )        
+        self.kappa   = T.shared( Q_M_vec )
         self.upsilon.name = 'upsilon'
         self.Upsilon.name = 'Upsilon'
         self.tau.name     = 'tau'
         self.Tau.name     = 'Tau'
         self.phi.name     = 'tau'
         self.Phi.name     = 'Phi'
-        
+
         # Other parameters
         self.theta = T.shared(theta_init)  # kernel parameters
         self.sigma = T.shared(sigma_init)  # standard deviation of q(z|f)
@@ -76,59 +76,64 @@ class SGPDV:
 
         # Random variables
         self.alpha = T.shared( Q_M_mat )
-        self.beta  = T.shared( B_R_mat )                
+        self.beta  = T.shared( B_R_mat )
         self.eta   = T.shared( Q_B_mat )
         self.xi    = T.shared( Q_B_mat )
         self.alpha.name = 'alpha'
         self.beta.name  = 'beta'
         self.eta.name   = 'eta'
         self.xi.name    = 'xi'
-    
+
         # Latent co-ordinates
         self.Xu = T.shared( M_R_vec )
         self.Xf = T.shared( B_R_vec )
         self.Xu.name = 'Xu'
         self.Xf.name = 'Xf'
 
+        # Data minibatch
+        self.data_miniBatch = T.shared( N_R_vec )
+        self.data_miniBatch.name = 'data minibatch'
+
         self.currentBatch = T.ivector( B_vec )
         cPhi = slinalg.cholesky( self.Phi )
         for n in range( self.B ):
             i = self.currentBatch[n]
             self.Xf[n,:] = self.phi[i,:] + ( cPhi  * self.beta[n,:].T ).T
-        
+            self.data_miniBatch[n,:] = self.data[i,:]
+
         # Kernels
         kfactory = kernelFactory( self.kernelType )
-        self.Kuu = kfactory.kernel( self.Xu, self.Xu, self.theta, 'Kuu' )      
+        self.Kuu = kfactory.kernel( self.Xu, self.Xu, self.theta, 'Kuu' )
         self.Kff = kfactory.kernel( self.Xf, self.Xf, self.theta, 'Kff' )
         self.Kfu = kfactory.kernel( self.Xf, self.Xu, self.theta, 'Kfu' )
-        
+
         cKuu = slinalg.cholesky( self.Kuu )
-        iKuu = nlinalg.matrix_inverse( self.Kuu )        
-        
-        # Variational distribution        
-        self.Sigma = self.Kff - self.Kfu * iKuu * self.Kfu.T                 
+        iKuu = nlinalg.matrix_inverse( self.Kuu )
+
+        # Variational distribution
+        self.Sigma = self.Kff - self.Kfu * iKuu * self.Kfu.T
         cSigma = slinalg.cholesky( Sigma )
 
-        self.u  = T.shared( Q_M_matc )
+        self.u  = T.shared( Q_M_mat )
         self.f  = T.shared( Q_B_mat )
         self.mu = T.shared( Q_B_mat )
 
         for i in range( self.Q ):
             # Sample u_q from q(u) = N(u_q; kappa_q, Kuu )
-            self.u[i,:]  = self.kappa[i,:] + cKuu * self.alpha
-            # compute mean of f            
+            self.u[i,:]  = self.kappa[i,:] + cKuu * self.alpha[i,:].T
+            # compute mean of f
             self.mu[i,:] = self.Kfu * ( iKuu * self.u[i,:].T ).T
-            # Sample f from q(f|u,X) = N( mu_q, Sigma )            
-            self.f[i,:]  = self.mu + ( cSigma * self.xi[i,:].T ).T        
-            # Sample z from q(z|f) = N(z,f,I*sigma^2)            
-            self.z[i,:]  = self.f + self.sigma * self.eta[i,:]
-        
+            # Sample f from q(f|u,X) = N( mu_q, Sigma )
+            self.f[i,:]  = self.mu[i,:] + ( cSigma * self.xi[i,:].T ).T
+            # Sample z from q(z|f) = N(z,f,I*sigma^2)
+            self.z[i,:]  = self.f[i,:] + self.sigma * self.eta[i,:].T
+
         self.u.name     = 'u'
         self.Sigma.name = 'Sigma'
         self.mu.name    = 'mu'
         self.f.name     = 'f'
         self.z.name     = 'z'
-            
+
         # TODO add more stuff to this list
         self.gradientVariables = [ self.theta, self.sigma, self.upsilon, self.Upsilon ]
 
@@ -139,7 +144,7 @@ class SGPDV:
     #def log_p_z( z_np ):
         # Overload this function in the derived class
 
-    def L( self ):    
+    def L( self ):
 
         if self.p_z_gaussian:
             l = self.log_p_y_z()  + self.log_r_fuX_z() \
@@ -149,30 +154,30 @@ class SGPDV:
             l = self.log_p_y_z()  + self.log_p_z() + self.log_r_fuX_z() \
             - self.log_q_z_fX() - self.log_q_fX()  + self.log_q_fuX() \
             + self.KL_qr()
-    
+
         return l
 
 
     def log_r_fuX_z(self):
-        
-    
+
+
     def log_q_fX(self):
-        
-    
+
+
     def log_q_fuX(self):
-        
-        
+
+
     def KL_qr(self):
-        
-        
+
+
     def sample( self ):
 
-        # Compute z, f, u, X 
+        # Compute z, f, u, X
         alpha_ = np.random.randn( self.Q, self.M )
         beta_  = np.random.randn( self.B, self.R )
         eta_   = np.random.randn( self.Q, self.B, 1)
         xi_    = np.random.randn( self.Q, self.B, 1 )
-        currentBatch_ = np.zeros( (this.B,1), dtype=int ) # TODO Fix this
+        currentBatch_ = np.zeros( (self.B,1), dtype=int ) # TODO Fix this
 
         self.currentBatch.setvalue( currentBatch_ )
         self.alpha.setvalue( alpha_ )
@@ -181,7 +186,7 @@ class SGPDV:
         self.xi.setvalue( xi_ )
 
     def updateParams(self, totalGradients, current_batch_size):
-  
+
 
 
       """Update the parameters, taking into account AdaGrad and a prior"""
@@ -195,33 +200,58 @@ class SGPDV:
             self.params[i] += self.learning_rate/np.sqrt(self.h[i]) * (totalGradients[i] - prior*(current_batch_size/N))
 
 
-class VA(SGPDV): 
-    
+class VA(SGPDV):
+
     def __init__(self, induceSize, batchSize, dimLatent, learningRate, theta_init, sigma_init, kernelType_='RBF', data  ):
 
-        SGPDV.__init__( data.shape[0], induceSize, batchSize, dimLatent, learningRate, theta_init, sigma_init, kernelType )       
+        SGPDV.__init__( data.shape[0], induceSize, batchSize, dimLatent, learningRate, theta_init, sigma_init, kernelType )
 
         self.P = data.shape[1]
-        
+
         self.y = data
-        
-        P_Q_mat = np.zeros((self.P,self.R))        
-        
-        W1 = T.shared( P_Q_mat )
-    
+
+        HU_Q_mat = np.random.normal(0, self.sigmaInit, (self.HU_decoder,self.Q))
+        HU_vec   = np.random.normal(0, self.sigmaInit, (self.HU_decoder,1))
+        P_HU_mat = np.random.normal(0, self.sigmaInit, (self.P,self.HU_decoder))
+        P_vec    = np.random.normal(0, self.sigmaInit, (self.P,1))
+
+        W1 = T.shared( HU_Q_mat )
+        b1 = T.shared( HU_vec )
+        W2 = T.shared( P_HU_mat)
+        b2 = T.shared( P_vec )
+        W3 = T.shared( P_HU_mat )
+        b3 = T.shared( P_vec )
+
+        self.h = [0.01] * len(self.params)
+
 
 
     def log_p_y_z( self ):
-        
-        
-    def KL_qp( self ):
-        
-        
-    
-    
-    
-        
-        
+        if self.continuous:
+            h_decoder = T.nnet.softplus(T.dot(W1,z) + b1)
+            mu_decoder = T.nnet.sigmoid(T.dot(W2,h_decoder) + b2)
+            log_sigma_decoder = 0.5*(T.dot(W3,h_decoder) + b3)
+            self.logpyz = T.sum(-(0.5 * np.log(2 * np.pi) + log_sigma_decoder) - 0.5 * ((y - mu_decoder) / T.exp(log_sigma_decoder))**2)
+            self.gradientVariables += [W1,W2,W3,b1,b2,b3]
+        else:
+            h_decoder = T.tanh(T.dot(W1,z) + b1)
+            y_hat = T.nnet.sigmoid(T.dot(W2,h_decoder) + b2)
+            self.logpyz = -T.nnet.binary_crossentropy(y_hat,y).sum()
+            self.gradientVariables += [W1,W2,b1,b2]
+
+
+
+    if self.continuous:
+        def KL_qp( self ):
+            self.KL_qp = -0.5*self.B*(1. + 2*T.log(self.sigma) - sigma**2)\
+            +T.sum
+
+
+
+
+
+
+
         W1 = np.random.normal(0,self.sigmaInit,(self.HU_decoder,self.dimZ))
         b1 = np.random.normal(0,self.sigmaInit,(self.HU_decoder,1))
 
@@ -251,7 +281,7 @@ class VA(SGPDV):
         # To do: Better ways of paramterising the covariance (see: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.31.494&rep=rep1&type=pdf)
         X_u = np.random.randn(self.n_induce,self.dimX)
 
-        
+
 
 
 # Derive this from the base class, put all model specific stuff in here
