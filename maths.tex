@@ -8,8 +8,8 @@
 %Gummi|061|=)
 \usepackage{setspace}
 \usepackage[usenames, dvipsnames]{color}
- 
-\newcommand{\chris}[1]{\textcolor{ForestGreen}{#1}} 
+
+\newcommand{\chris}[1]{\textcolor{ForestGreen}{#1}}
 \newcommand{\Tau}{\mathcal{T}}
 \newcommand{\Kff}{K_{X_fX_f}}
 \newcommand{\Kuu}{K_{X_uX_u}}
@@ -67,8 +67,25 @@ We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical
 \section{Expressions}
 \subsection{Generative model}
 %
-
-
+\begin{equation}
+    p(z) = \mathcal{N}(z\mid 0, I)
+\end{equation}
+%
+\subsubsection{Continuous data $\implies$ Gaussian MLP likelihood}
+%
+\begin{align}
+    \log p(y|z) &= \log\mathcal{N}(x\mid \mu, \sigma^2 I)\\
+    \text{where } \mu &= W_2 h + b_2\\
+    \log\sigma^2 &= W_3 h + b_3\\
+    h &= \tanh(W_1 z + b_1)
+\end{align}
+%
+\subsubsection{Discrete data $\implies$ Bernoulli MLP likelihood}
+%
+\begin{align}
+    \log p(y|z) &= \sum_{p=1}^P y_p\log h_p + (1-y_p)\log (1-h_p)\\
+    \text{where } h &= f_{\sigma}(W_2 \tanh(W_1 z + b_1) + b2)
+\end{align}
 \subsection{Variational model}
 %
 \begin{align}
@@ -115,7 +132,7 @@ where $u = \upsilon + \chol(\Upsilon)\alpha$
 where $X_i = \tau_i + \chol(\Tau_i)\beta_i$
 
 
- 
+
 
 
 
