@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 
 import numpy as np
 import theano as th
@@ -21,31 +21,136 @@ class kernel:
     def LINnn(self, sl2, X):
         return sl2 * (T.sum(X**2, 1) + 1) + eps_y
 
-class VA:
+
+class SGPDV:
+
+    def __init__( self, N_, M_, dimX_, learningRate_, batchSize_ ):
+
+        self.N             = N_# number of observations
+        self.M             = M_# Number of inducing ponts
+        self.dimX          = dimX_ # Dimensionality of the latent co-ordinates
+
+        self.lowerBound    = -np.inf       # Lower bound
+        self.learningRate  = learningRate_ # Learning rate
+        self.batchSize     = batchSize_    # 
+
+        # Numpy values
+        self.upsilon_np    = [0]*self.N # mean of r(u|z)
+        self.Upsilon_np    = [0]*self.N # variance of r(u|z)
+
+        self.tau_np        = [0]*self.N # mean of r(X|z)
+        self.Tau_np        = [0]*self.N # variance of r(X|z)
+        self.phi_np        = [0]*self.N # mean of q(X)
+        self.Phi_np        = [0]*self.N # variance of q(X)
+        self.Xu_np         = [0]*self.N # These are the locations of the inducing points
+
+        for i in range( self.N ):
+            self.tau_np[i]  = np.zeros((self.dimX,1))  # mean of r(X|z)
+            self.Tau_np[i]  = np.eye(self.dimX)        # variance of r(X|z)
+            self.phi_np[i]  = np.zeros((self.dimX,1))  # mean of q(X)
+            self.Phi_np[i]  = np.eye(self.dimX)        # variance of q(X)
+            self.Xu_np[i]   = np.zeros(self.dimX)      # These are the locations of the inducing points
+
+        self.sigma_np      # standard deviation of q(z|f)
+        self.theta_np      # kernel parameters
+        
+        # Theano variables
+        self.upsilon_th    = T.dvector('upsilon')# mean of r(u|z)
+        self.Upsilon_th    = T.dmatrix('Upsilon')# variance of r(u|z)
+        self.tau_th        = [0]*self.N # mean of r(X|z)
+        self.Tau_th        = [0]*self.N # variance of r(X|z)
+        self.phi_th        = [0]*self.N # mean of q(X)
+        self.Phi_th        = [0]*self.N # variance of q(X)
+        self.Xf_th         = [0]*self.N # Locations of the function co-ordinates
+        for i in range( self.N ):
+            self.tau_th[i]  = T.dvector('tau(%d)' % i) 
+            self.Tau_th[i]  = T.dmatrix('Tau(%d)' % i)
+            self.phi_th[i]  = T.dvector('phi(%d)' % i)
+            self.Phi_th[i]  = T.dmatrix('Phi(%d)' % i)
+            self.Xf_th[i]   = T.dvector('Xf(%d)' % i)
+            
+        self.Xu_th = [0]*self.M     # Locations of the inducing points
+        for i in range( self.M ):
+            self.Xu_th[i]   = T.dvector('Xu(%d)' % i)
+
+        # These only exist in theano form
+        self.Kff        = T.dmatrix('Kff')
+        self.Kfu        = T.dmatrix('Kfu')
+        self.Kuu        = T.dmatrix('Kuu')
+
+        self.f          = T.dvector('f')
+        self.z          = T.dvector('z')
+        
+        self.sigma_th   = T.scalar('sigma') # standard deviation of q(z|f)
+        self.theta_th   = T.dvector('theta')
+    
+        # Other stuff
+        self.gradientVariables = [ self.theta_th, self.sigma_th, self.upsilon_th, self.Upsilon_np ]
+
+
+    #def log_p_y_z( z_np ):
+        # Overload this function in the derived classes
+
+    #def log_p_z( z_np ):
+        # Overload this function in the derived class
+
+
+    def L( self, z_np, f_np, u_np, Xf_np ):
+
+        l = 0
+        dl = []
+
+        return( l, dl )
+
+    #def KL_qr( f_np, u_np, Xf_np, z_np ):
+
+
+
+
+    def L_1( self, eta, xi, alpha, beta ):
+
+        # Compute z, f, u, X 
+        
+        z_np = 0
+        f_np = 0
+        u_np = 0
+        X_np = 0
+        (l,dl) = self.L( z_np, f_np, u_np, X_np ) 
+
+        return (l,dl)
+
+
+
+
+    def updateParams(self, totalGradients, current_batch_size):
+        """Update the parameters, taking into account AdaGrad and a prior"""
+        for i in xrange(len(self.params)):
+            self.h[i] += totalGradients[i]*totalGradients[i]
+            if i < 5 or (i < 6 and len(self.params) == 12):
+                prior = 0.5*self.params[i]
+            else:
+                prior = 0
+
+            self.params[i] += self.learning_rate/np.sqrt(self.h[i]) * (totalGradients[i] - prior*(current_batch_size/N))
+
+
+
+
+
+# Derive this from the base class, put all model specific stuff in here
+class VA(SGPDV): 
+    
     def __init__(self, HU_decoder, HU_encoder, N, dimY, dimZ, dimf, dimX, dimX, batch_size, n_induce, L=1, learning_rate=0.01):
         self.HU_decoder = HU_decoder
-
-        self.N = N
-        self.dimY = dimY
-        self.dimZ = dimZ # assume all latent variables have same dimensionality for now
-        self.dimf = dimf
-        self.dimX = dimX # default is 1 so that there is a seperate 1d function for each dim of each latent var§
-        self.n_induce = n_induce
-        self.L = L
-        self.learning_rate = learning_rate
+        
         self.batch_size = batch_size
 
-        self.sigmaInit = 0.01
-        self.lowerbound = 0
-
-        self.continuous_data = False
-
-        self.ker = kernel()
-
-        self.all_z = []
+        self.continuous_data 
         self.all_params = []
         self.all_bounds = []
         self.all_gradients = []
+
+
 
 
     def initParams(self):
@@ -217,15 +322,5 @@ class VA:
 
         return totalGradients
 
-    def updateParams(self,totalGradients,N,current_batch_size):
-        """Update the parameters, taking into account AdaGrad and a prior"""
-        for i in xrange(len(self.params)):
-            self.h[i] += totalGradients[i]*totalGradients[i]
-            if i < 5 or (i < 6 and len(self.params) == 12):
-                prior = 0.5*self.params[i]
-            else:
-                prior = 0
-
-            self.params[i] += self.learning_rate/np.sqrt(self.h[i]) * (totalGradients[i] - prior*(current_batch_size/N))
 
 
