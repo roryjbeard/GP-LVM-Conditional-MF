@@ -22,16 +22,14 @@ class kernel:
         return sl2 * (T.sum(X**2, 1) + 1) + eps_y
 
 class VA:
-    def __init__(self, HU_decoder, HU_encoder, N, dimX, dimZ, dimf, dimXf, dimXu, batch_size, n_induce, L=1, learning_rate=0.01):
+    def __init__(self, HU_decoder, HU_encoder, N, dimY, dimZ, dimf, dimX, dimX, batch_size, n_induce, L=1, learning_rate=0.01):
         self.HU_decoder = HU_decoder
-        self.HU_encoder = HU_encoder
 
         self.N = N
-        self.dimX = dimX
+        self.dimY = dimY
         self.dimZ = dimZ # assume all latent variables have same dimensionality for now
         self.dimf = dimf
-        self.dimXf = dimXf # default is 1 so that there is a seperate 1d function for each dim of each latent var
-        self.dimXu = dimXu # dimensionality of latent coordinate space
+        self.dimX = dimX # default is 1 so that there is a seperate 1d function for each dim of each latent var§
         self.n_induce = n_induce
         self.L = L
         self.learning_rate = learning_rate
@@ -52,39 +50,31 @@ class VA:
 
     def initParams(self):
         """Initialize weights and biases, depending on if continuous data is modeled an extra weight matrix is created"""
-        W1 = np.random.normal(0,self.sigmaInit,(self.HU_encoder,self.dimX))
-        b1 = np.random.normal(0,self.sigmaInit,(self.HU_encoder,1))
-
-        W2 = np.random.normal(0,self.sigmaInit,(self.dimZ,self.HU_encoder))
-        b2 = np.random.normal(0,self.sigmaInit,(self.dimZ,1))
-
-        W3 = np.random.normal(0,self.sigmaInit,(self.dimZ,self.HU_encoder))
-        b3 = np.random.normal(0,self.sigmaInit,(self.dimZ,1))
 
         W4 = np.random.normal(0,self.sigmaInit,(self.HU_decoder,self.dimZ))
         b4 = np.random.normal(0,self.sigmaInit,(self.HU_decoder,1))
 
-        W5 = np.random.normal(0,self.sigmaInit,(self.dimX,self.HU_decoder))
-        b5 = np.random.normal(0,self.sigmaInit,(self.dimX,1))
+        W5 = np.random.normal(0,self.sigmaInit,(self.dimY,self.HU_decoder))
+        b5 = np.random.normal(0,self.sigmaInit,(self.dimY,1))
 
-        W6 = np.random.normal(0,self.sigmaInit,(self.HU_auxiliary,self.dimX+self.dimZ))
+        W6 = np.random.normal(0,self.sigmaInit,(self.HU_auxiliary,self.dimY+self.dimZ))
         b6 = np.random.normal(0,self.sigmaInit,(self.HU_auxiliary,1))
 
         if self.continuous_data:
-            W7 = np.random.normal(0,self.sigmaInit,(self.dimX,self.HU_decoder))
-            b7 = np.random.normal(0,self.sigmaInit,(self.dimX,1))
-            W8 = np.random.normal(0,self.sigmaInit,(self.dimX+self.dimZ,self.HU_auxiliary))
-            b8 = np.random.normal(0,self.sigmaInit,(self.dimX+self.dimZ))
+            W7 = np.random.normal(0,self.sigmaInit,(self.dimY,self.HU_decoder))
+            b7 = np.random.normal(0,self.sigmaInit,(self.dimY,1))
+            W8 = np.random.normal(0,self.sigmaInit,(self.dimY+self.dimZ,self.HU_auxiliary))
+            b8 = np.random.normal(0,self.sigmaInit,(self.dimY+self.dimZ))
             self.params = [W1,W2,W3,W4,W5,W6,W7,W8,b1,b2,b3,b4,b5,b6,b7,b8]
         else:
             self.params = [W1,W2,W3,W4,W5,W6,b1,b2,b3,b4,b5,b6]
 
         log_sf2 = np.random.normal(0,1)
-        log_ell = np.random.normal(0,1,(self.dimXf,1))
+        log_ell = np.random.normal(0,1,(self.dimX,1))
         m_u = np.random.normal(0,1,(N,1))
         log_L_u = np.random.normal(0,1,(N,N))
         # To do: Better ways of paramterising the covariance (see: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.31.494&rep=rep1&type=pdf)
-        X_u = np.random.randn(self.n_induce,self.dimXu)
+        X_u = np.random.randn(self.n_induce,self.dimX)
 
         self.h = [0.01] * len(self.params)
 
@@ -158,7 +148,7 @@ class VA:
         #Compute KL terms
         # KL_qp = -0.5*T.sum(1.0 + 2*log_sigma_lhood - f**2 - T.exp(2*log_sigma_lhood))
         KL_qp = 0.5*(T.dot(f.T, f) + T.trace(sigma_var_lhood + T.log(T.eye(self.dimZ)) - T.log(sigma_var_lhood)) - self.dimZ)
-        KL_qr = 0.5*(T.dot((mu_auxiliary - mu_encoder).T, T.dot(T.diag(1.0/T.exp(log_sigma_auxiliary)), mu_auxiliary - mu_decoder)) + T.trace(T.dot(T.diag(1.0/T.exp(log_sigma_auxiliary)), T.dot(L_u,L_u.T)) + log_sigma_auxiliary - log_sigma_encoder) - self.dimXf - self.dimf)
+        KL_qr = 0.5*(T.dot((mu_auxiliary - mu_encoder).T, T.dot(T.diag(1.0/T.exp(log_sigma_auxiliary)), mu_auxiliary - mu_decoder)) + T.trace(T.dot(T.diag(1.0/T.exp(log_sigma_auxiliary)), T.dot(L_u,L_u.T)) + log_sigma_auxiliary - log_sigma_encoder) - self.dimX - self.dimf)
 
 
         #Compute bound and all the gradients
@@ -174,7 +164,7 @@ class VA:
 
     def iterate(self, data):
         """Main method, slices data in minibatches and performs an iteration"""
-        [N,dimX] = data.shape
+        [N,dimY] = data.shape
         batches = np.arange(0,N,self.batch_size)
         if batches[-1] != N:
             batches = np.append(batches,N)
@@ -191,7 +181,7 @@ class VA:
     def getLowerBound(self,data):
         """Use this method for example to compute lower bound on testset"""
         lowerbound = 0
-        [N,dimX] = data.shape
+        [N,dimY] = data.shape
         batches = np.arange(0,N,self.batch_size)
         if batches[-1] != N:
             batches = np.append(batches,N)
@@ -201,7 +191,7 @@ class VA:
             # e = np.random.normal(0,1,[self.dimZ,miniBatch.shape[0]])
             e_u = np.random.normal(0,1,[self.N,self.n_induce])
             e_z = np.random.normal(0,1, self.dim_z)
-            e_X = np.random.normal(0, 1, [1,dimXf])
+            e_X = np.random.normal(0, 1, [1,dimX])
             lowerbound += self.lowerboundfunction(*(self.params),x=miniBatch.T,eps_u=e_u,eps_z=e_z,X=e_X)
 
         return lowerbound/N
@@ -214,7 +204,7 @@ class VA:
             # eps = np.random.normal(0,1,[self.dimZ,miniBatch.shape[1]])
             e_u = np.random.normal(0,1,[self.dimf,self.n_induce])
             e_z = np.random.normal(0,1, self.dim_z)
-            e_X = np.random.normal(0, 1, [1,dimXf])
+            e_X = np.random.normal(0, 1, [1,dimX])
             gradients = self.gradientfunction(*(self.params),x=miniBatch,eps_u=e_u,eps_z=e_z,X=e_X)
             self.lowerbound += gradients[-1] # RB: this doesn't seem to have a function
             z = self.zfunction(*(self.params),x=miniBatch,eps_u=e_u,eps_z=e_z,X=e_X)

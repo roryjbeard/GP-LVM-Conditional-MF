@@ -57,7 +57,7 @@ However we can apply the variational formulation again, noting that $q(z) = \fra
 \end{align}
 %
 in which the new auxiliary lower bound, $\mathcal{L}_{aux}$ is given by the expression \ref{eq:L_aux}, and where we have introduced the auxiliary distribution $r(f,u,X|z)$ which serves to approximate the variational posterior, $q(f,u,X|z)$, of the auxiliary variables conditioned on the latent variables.\\
-We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical expression for the K-L divergence between two Gaussians, $q(f,u,x)$ and $r(f,u,X|z)$ and, in the case that the prior of the generative model, $p(z)$, is also Gaussian distributed - as is the case for the continuous latent variable MLP model we'll consider first - then the bound contains a second Guassian KL term:
+We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical expression for the K-L divergence between two Gaussians, $q(f,u,x)$ and $r(f,u,X|z)$ and, in the case that the prior of the generative model, $p(z)$, is also Gaussian distributed - as is the case for the continuous latent variable MLP model we'll consider first - then the bound contains a second Gaussian KL term:
 %
 \begin{equation}
     \mathcal{L}_{aux} = \underbrace{\mathbb{E}_{q(z)}\big[ \log p(y|z) \big]}_{A} - \underbrace{\mathbb{E}_{q(f,u,X)}\big[ \text{KL}[q(z|f,X)\Vert p(z)] \big]}_{B} - \underbrace{\mathbb{E}_{q(z)}\big[ \text{KL}[q(f,u,X)\Vert r(f,u,X|z)] \big]}_{C}.
