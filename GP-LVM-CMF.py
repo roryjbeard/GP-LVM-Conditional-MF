@@ -5,26 +5,34 @@ import theano as th
 import theano.tensor as T
 from theano.tensor import slinalg, nlinalg
 
-eps_y = 1e-4
-class kernel:
-    def RBF(self, sf2, l, X1, X2 = None):
-        _X2 = X1 if X2 is None else X2
-        dist = ((X1 / l)**2).sum(1)[:, None] + ((_X2 / l)**2).sum(1)[None, :] - 2*(X1 / l).dot((_X2 / l).T)
-        RBF = sf2 * T.exp(-dist / 2.0)
-        return (RBF + eps_y * T.eye(X1.shape[0])) if X2 is None else RBF
-    def RBFnn(self, sf2, l, X):
-        return sf2 + eps_y
-    def LIN(self, sl2, X1, X2 = None):
-        _X2 = X1 if X2 is None else X2
-        LIN = sl2 * (X1.dot(_X2.T) + 1)
-        return (LIN + eps_y * T.eye(X1.shape[0])) if X2 is None else LIN
-    def LINnn(self, sl2, X):
-        return sl2 * (T.sum(X**2, 1) + 1) + eps_y
 
+class kernelFactory:
+    def __init__(self, kernelType_, eps_=1e-4):
+        self.kernelType = kernelType_         
+        self.eps        = eps_
+    
+    def kernel( self, X1, X2, theta, name_ ):
+        _X2 = X1 if X2 is None else X2
+        if self.kernelType == 'RBF':
+            dist = ((X1 / theta[0])**2).sum(1)[:, None] + ((_X2 / theta[0])**2).sum(1)[None, :] - 2*(X1 / theta[0]).dot((_X2 / theta[0]).T)
+            K = theta[1] * T.exp(-dist / 2.0)
+            K (K + self.eps * T.eye(X1.shape[0])) if X2 is None else K
+            K.name = name + '(RBF)'
+        elif self.kernelType == 'RBFnn':
+            K = theta[0] + self.eps
+            K.name = name + '(RBFnn)'            
+        elif self.kernelType ==  'LIN':
+            K = theta[0] * (X1.dot(_X2.T) + 1)
+            (K + self.eps_y * T.eye(X1.shape[0])) if X2 is None else K
+            K.name = name + '(LIN)'
+        elif self.kernelType ==  'LINnn':
+            K * (T.sum(X1**2, 1) + 1) + self.eps
+            K.name = name + '(LINnn)'
+        return K
 
 class SGPDV:
 
-    def __init__( self, N_, M_, dimX_, learningRate_, batchSize_ ):
+    def __init__( self, N_, M_, dimX_, learningRate_, batchSize_, kernelType_='RBF', theta_init, sigma_init ):
 
         self.N             = N_# number of observations
         self.M             = M_# Number of inducing ponts
@@ -32,61 +40,46 @@ class SGPDV:
 
         self.lowerBound    = -np.inf       # Lower bound
         self.learningRate  = learningRate_ # Learning rate
-        self.batchSize     = batchSize_    # 
+        self.batchSize     = batchSize_    #
+        self.kernelType    = kernelType_
 
         # Numpy values
-        self.upsilon_np    = [0]*self.N # mean of r(u|z)
-        self.Upsilon_np    = [0]*self.N # variance of r(u|z)
+        upsilon_np    = [0]*self.N # mean of r(u|z)
+        Upsilon_np    = [0]*self.N # variance of r(u|z)
+        tau_np        = np.zeros((self.dimX,1))  # mean of r(X|z)
+        Tau_np      = np.eye(self.dimX)        # variance of r(X|z)
+        phi_np[i]  = np.zeros((self.dimX,1))  # mean of q(X)
+        Phi_np[i]  = np.eye(self.dimX)        # variance of q(X)
+        Xu_np[i]   = np.zeros((self.dimX,1))  # These are the locations of the inducing points
 
-        self.tau_np        = [0]*self.N # mean of r(X|z)
-        self.Tau_np        = [0]*self.N # variance of r(X|z)
-        self.phi_np        = [0]*self.N # mean of q(X)
-        self.Phi_np        = [0]*self.N # variance of q(X)
-        self.Xu_np         = [0]*self.N # These are the locations of the inducing points
-
-        for i in range( self.N ):
-            self.tau_np[i]  = np.zeros((self.dimX,1))  # mean of r(X|z)
-            self.Tau_np[i]  = np.eye(self.dimX)        # variance of r(X|z)
-            self.phi_np[i]  = np.zeros((self.dimX,1))  # mean of q(X)
-            self.Phi_np[i]  = np.eye(self.dimX)        # variance of q(X)
-            self.Xu_np[i]   = np.zeros(self.dimX)      # These are the locations of the inducing points
-
-        self.sigma_np      # standard deviation of q(z|f)
-        self.theta_np      # kernel parameters
+        sigma = T.sahred( np.array( sigma_init )) # standard deviation of q(z|f)
+        theta = np.array( theta_init) # kernel parameters
         
         # Theano variables
-        self.upsilon_th    = T.dvector('upsilon')# mean of r(u|z)
-        self.Upsilon_th    = T.dmatrix('Upsilon')# variance of r(u|z)
-        self.tau_th        = [0]*self.N # mean of r(X|z)
-        self.Tau_th        = [0]*self.N # variance of r(X|z)
-        self.phi_th        = [0]*self.N # mean of q(X)
-        self.Phi_th        = [0]*self.N # variance of q(X)
-        self.Xf_th         = [0]*self.N # Locations of the function co-ordinates
+        self.upsilon = T.shared( upsilon_np ) # mean of r(u|z)
+        self.Upsilon = T.shared( Upsilon_np )# variance of r(u|z)
+        self.tau     = [0]*self.N # mean of r(X|z)
+        self.Tau     = [0]*self.N # variance of r(X|z)
+        self.phi     = [0]*self.N # mean of q(X)
+        self.Phi     = [0]*self.N # variance of q(X)
         for i in range( self.N ):
-            self.tau_th[i]  = T.dvector('tau(%d)' % i) 
-            self.Tau_th[i]  = T.dmatrix('Tau(%d)' % i)
-            self.phi_th[i]  = T.dvector('phi(%d)' % i)
-            self.Phi_th[i]  = T.dmatrix('Phi(%d)' % i)
-            self.Xf_th[i]   = T.dvector('Xf(%d)' % i)
-            
+            self.tau_th[i] = T.shared(tau.np) 'tau(%d)' % i) 
+            self.Tau_th[i] = T.dmatrix('Tau(%d)' % i)
+            self.phi_th[i] = T.dvector('phi(%d)' % i)
+            self.Phi_th[i] = T.dmatrix('Phi(%d)' % i)
+
         self.Xu_th = [0]*self.M     # Locations of the inducing points
         for i in range( self.M ):
             self.Xu_th[i]   = T.dvector('Xu(%d)' % i)
-
-        # These only exist in theano form
-        self.Kff        = T.dmatrix('Kff')
-        self.Kfu        = T.dmatrix('Kfu')
-        self.Kuu        = T.dmatrix('Kuu')
-
-        self.f          = T.dvector('f')
-        self.z          = T.dvector('z')
         
-        self.sigma_th   = T.scalar('sigma') # standard deviation of q(z|f)
-        self.theta_th   = T.dvector('theta')
-    
-        # Other stuff
-        self.gradientVariables = [ self.theta_th, self.sigma_th, self.upsilon_th, self.Upsilon_np ]
+        self.Kuu = kfactory.kernel( self.Xu_th, self.Xu_th, self.theta_th, 'Kuu' )
 
+        self.theta_th   = T.dvector('theta') # kernel parameters
+        self.sigma_th   = T.scalar('sigma')  # standard deviation of q(z|f)
+
+        # Other stuff
+        # append model specific stuff to this list
+        self.gradientVariables = [ self.theta_th, self.sigma_th, self.upsilon_th, self.Upsilon_np ]
 
     #def log_p_y_z( z_np ):
         # Overload this function in the derived classes
@@ -94,8 +87,11 @@ class SGPDV:
     #def log_p_z( z_np ):
         # Overload this function in the derived class
 
+    
 
-    def L( self, z_np, f_np, u_np, Xf_np ):
+
+
+    def L( self, z, f, u, Xf, Kff, Kfu,  currentBatch ):
 
         l = 0
         dl = []
@@ -107,15 +103,35 @@ class SGPDV:
 
 
 
-    def L_1( self, eta, xi, alpha, beta ):
+    def L_1( self, eta, xi, alpha, beta, currentBatch  ):
 
         # Compute z, f, u, X 
+
+        u = self.upsilon + slinalg.cholesky(self.Upsilon) * alpha
+
+        Xf = [0]*len( currentBatch )
+        for n in range( len(currentBatch) )        
+            i = currentBatch[i]
+            Xf[n]      = self.phi[i] + slinalg.cholesky( self.Phi[i] ) * beta[i]
+            Xf[n].name = 'Xf n = %d, i = %d' % i % d
+            
+        kfactory = kernelFactory( self.kernelType )
+      
+        Kff = kfactory.kernel( Xf, Xf,         self.theta_th, 'Kff' )
+        Kfu = kfactory.kernel( Xf, self.Xu_th, self.theta_th, 'Kfu' )
+      
+        Sigma = Kff - Kfu * nlinalg.matrix_inverse( self.Kuu ) * Kfu.T                 
+        mu    = Kfu * nlinalg.matrix_inverse( self.Kuu )
         
+        Sigma.name = 'Sigma'
+        self.f = T.dvector('f')
+        self.z = T.dvector('z')
+
         z_np = 0
         f_np = 0
         u_np = 0
         X_np = 0
-        (l,dl) = self.L( z_np, f_np, u_np, X_np ) 
+        (l,dl) = self.L( z, f, u, X, currentBatch ) 
 
         return (l,dl)
 
@@ -135,6 +151,21 @@ class SGPDV:
 
 
 
+
+class kernel:
+    def RBF(self, sf2, l, X1, X2 = None):
+        _X2 = X1 if X2 is None else X2
+        dist = ((X1 / l)**2).sum(1)[:, None] + ((_X2 / l)**2).sum(1)[None, :] - 2*(X1 / l).dot((_X2 / l).T)
+        RBF = sf2 * T.exp(-dist / 2.0)
+        return (RBF + eps_y * T.eye(X1.shape[0])) if X2 is None else RBF
+    def RBFnn(self, sf2, l, X):
+        return sf2 + eps_y
+    def LIN(self, sl2, X1, X2 = None):
+        _X2 = X1 if X2 is None else X2
+        LIN = sl2 * (X1.dot(_X2.T) + 1)
+        return (LIN + eps_y * T.eye(X1.shape[0])) if X2 is None else LIN
+    def LINnn(self, sl2, X):
+        return sl2 * (T.sum(X**2, 1) + 1) + eps_y
 
 
 # Derive this from the base class, put all model specific stuff in here
