@@ -60,7 +60,7 @@ in which the new auxiliary lower bound, $\mathcal{L}_{aux}$ is given by the expr
 We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical expression for the K-L divergence between two Gaussians, $q(f,u,x)$ and $r(f,u,X|z)$ and, in the case that the prior of the generative model, $p(z)$, is also Gaussian distributed - as is the case for the continuous latent variable MLP model we'll consider first - then the bound contains a second Gaussian KL term:
 %
 \begin{equation}
-    \mathcal{L}_{aux} = \underbrace{\mathbb{E}_{q(z)}\big[ \log p(y|z) \big]}_{A} - \underbrace{\mathbb{E}_{q(f,u,X)}\big[ \text{KL}[q(z|f,X)\Vert p(z)] \big]}_{B} - \underbrace{\mathbb{E}_{q(z)}\big[ \text{KL}[q(f,u,X)\Vert r(f,u,X|z)] \big]}_{C}.
+    \mathcal{L}_{aux} = \underbrace{\mathbb{E}_{q(z)}\big[ \log p(y|z) \big]}_{A} - \underbrace{\mathbb{E}_{q(f,u,X)}\big[ \text{KL}[q(z|f,X)\Vert p(z)] \big]}_{B} - \underbrace{\mathbb{E}_{q(z)}\big[ \text{KL}[q(f,u,X)\Vert r(f,u,X|z)] \big]}_{C}.\label{eq:L_aux_ABC}
 \end{equation}
 %
 %
@@ -78,6 +78,20 @@ We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical
     \text{where } \mu &= W_2 h + b_2\\
     \log\sigma^2 &= W_3 h + b_3\\
     h &= \tanh(W_1 z + b_1)
+\end{align}
+Term $B$ in (\ref{eq:L_aux_ABC}) then becomes:
+%
+\begin{align}
+    &\frac{1}{2}\sum_{i=1}^N \mathbb{E}_{q(f,u,X)}\big[ 1 + \log\sigma^2 - f(X_i)^2 - \sigma^2 \big]\\
+    &= \frac{1}{2}\sum_{i=1}^N \mathbb{E}_{q(u)q(X)}\big[ 1 + \log\sigma^2 - (K_{f_iu}K_{uu}^{-1}u)^2 - k_{f_if_i} + K_{f_iu}K_{uu}^{-1}K_{uf_i}-\sigma^2 \big]\\
+    &= \frac{N}{2}(1 + \log\sigma^2 - \sigma^2) - \frac{1}{2}\sum_{i=1}^N\mathbb{E}_{q(X)}\big[ K_{f_iu}K_{uu}^{-1}\big( \kappa\kappa^\top + K_{uu} \big)K_{uu}^{-1}K_{uf_i} + K_{f_if_i} - K_{f_iu}K_{uu}^{-1}K_{uf_i} \big]\\
+    &= \frac{N}{2}(1 + \log\sigma^2 - \sigma^2) - \frac{1}{2}\psi_0 + \frac{1}{2}\text{tr}\big( K_{uu}^{-1}\Psi_2 \big) - \frac{1}{2}\text{tr}\big( K_{uu}^{-1}(\kappa\kappa^\top + K_{uu})K_{uu}^{-1}\Psi_2 \big)
+\end{align}
+%
+where
+\begin{align}
+    \psi_0 &= \text{tr}\big( \langle K_{ff}\rangle_{q(X)} \big)\\
+    \Psi_2 &= \langle K_{uf}K_{fu}\rangle_{q(X)}
 \end{align}
 %
 \subsubsection{Discrete data $\implies$ Bernoulli MLP likelihood}
@@ -129,7 +143,15 @@ where $f = \mu + \chol(\Sigma)\xi $
 
 where $u = \upsilon + \chol(\Upsilon)\alpha$
 
-where $X_i = \tau_i + \chol(\Tau_i)\beta_i$
+where $X_i = \tau_i + \chol(\Tau_i)\beta_i$.
+
+Term $C$ in (\ref{eq:L_aux_ABC}) then becomes:
+%
+\begin{align}
+    &-\mathbb{E}_{q(z)}\big[ \text{KL}[q(u)\Vert r(u|z)] \big] - \mathbb{E}_{q(z)}\big[ \text{KL}[\prod_{i=1}^Nq(X_i)\Vert \prod_{i=1}^Nr(X_i|z)] \big]\\
+    &= -\frac{1}{2}\mathbb{E}_{q(z)}\big[ (\upsilon - \kappa)^\top\Upsilon^{-1}(\upsilon - \kappa) + \text{tr}\big( \Upsilon^{-1}K_{uu} + \log\Upsilon - \log K_{uu} \big) \big] + M\\
+    &-\frac{1}{2}\sum_{i=1}^N \big\{ \mathbb{E}_{q(z)}\big[ (\phi_i - \tau_i)^\top\Tau_i^{-1}(\phi_i - \tau_i) + \text{tr}\big( \Tau_i^{-1}\Phi_i + \log\Tau_i - \log\Phi_i \big) \big] \big\} + NR.
+\end{align}
 
 
 
