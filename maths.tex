@@ -4,9 +4,20 @@
 \usepackage{amssymb}
 \usepackage[top=20mm, bottom=20mm, left=30mm, right=30mm]{geometry}
 \usepackage{soul}
+\usepackage{bbm}
 %Gummi|061|=)
 \usepackage{setspace}
-
+\usepackage[usenames, dvipsnames]{color}
+ 
+\newcommand{\chris}[1]{\textcolor{ForestGreen}{#1}} 
+\newcommand{\Tau}{\mathcal{T}}
+\newcommand{\Kff}{K_{X_fX_f}}
+\newcommand{\Kuu}{K_{X_uX_u}}
+\newcommand{\Kuf}{K_{X_uX_f}}
+\newcommand{\Kfu}{K_{X_fX_u}}
+\newcommand{\Ex}{\mathbb{E}}
+\newcommand{\No}{\mathcal{N}}
+\newcommand{\chol}{\mathrm{chol}}
 \doublespacing
 
 
@@ -61,19 +72,50 @@ We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical
 \subsection{Variational model}
 %
 \begin{align}
-    q(X) &= \prod_{i=1}^N \mathcal{N}(x_{i,:}\mid 0, I_R) = \prod_{i=1}^N \prod_{r=1}^R \mathcal{N}(x_{i,r}\mid 0,1)\\
-    q(u) &= \prod_{m=1}^M \mathcal{N}(u_{:,m}\mid 0, K_{X_uX_u})\\
-    q(f(X)|u) &= \mathcal{N}(f(X)\mid K_{XX_u}K_{X_uX_u}^{-1}u, K_{XX}-K_{XX_u}K_{X_uX_u}^{-1}K_{X_uX})\\
+q(X) &= \prod_{i=1}^N \mathcal{N}(x_{:,n}\mid 0, I_R) = \prod_{n=1}^N \mathcal{N}(x_{n,:}\mid 0,1)
+     \\
+    q(u) &= \prod_{m=1}^M \mathcal{N}(u_{:,m}\mid \kappa_{:,m}, \Kuu)\\
+    q(f(X)|u) &= \mathcal{N}(f(X)\mid \Kfu\Kuu^{-1}u, \Kff-\Kuf\Kuu^{-1}\Kuf)\\
     q(z|f(X)) &= \prod_{i=1}^N \mathcal{N}(z_i\mid f(X_i), \sigma^2)
 \end{align}
 
+\chris{I think the variational distributions need to have variational parameters. Also there is a single guassian process, right? If so q(u) is just one gaussian, not a product of gaussians}
+\begin{align}
+    q(X) &= \prod_{i=1}^N \mathcal{N}(X_i\mid \lambda_i, \Lambda_i)\\
+    q(u) &= \mathcal{N}(u \mid \kappa, K_{X_uX_u})\\
+\end{align}
 
 \subsection{Auxiliary model}
 %
 \begin{align}
     r(f,u,X|z) &= q(f(X)|u,X)r(u,X|z)\\
-    r(u,X|z) &=
+    r(u,X|z) &= r(u| z) \prod_i r(X_i|z) = \mathcal{N}(u; \upsilon, \Upsilon ) \prod_i \mathcal{N}( X_i, \tau_i, \Tau_i )
 \end{align}
+
+
+
+\subsection{}
+
+\begin{align}
+\Ex_q(z) \mathcal{L}(z) &= \Ex_q(z,f,u,X) \mathcal{L}(z,f,u,X) \\
+&= \Ex_{\No(\eta;0,1)\No(\xi;0,1)\No(\alpha;0,1)\prod\No(\beta_i,0,1)} \mathcal{L}((f,\sigma^2),(\mu,\Sigma)(\upsilon,\Upsilon),(\tau,\Tau))
+\end{align}
+
+where  $z = f + \mathbf{I}\sigma\eta $
+
+where $\Sigma = \Kff - \Kfu\Kuu^{-1}\Kuf$
+
+where $\mu   = \Kfu\Kuu^{-1}u$
+
+where $f = \mu + \chol(\Sigma)\xi $
+
+where $u = \upsilon + \chol(\Upsilon)\upsilon$
+
+where $X_i = \tau_i + \chol(\Tau_i)\beta_i$
+
+
+ 
+
 
 
 
