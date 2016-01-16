@@ -1,0 +1,163 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[top=20mm, bottom=20mm, left=30mm, right=30mm]{geometry}
+\usepackage{soul}
+\usepackage{bbm}
+%Gummi|061|=)
+\usepackage{setspace}
+\usepackage[usenames, dvipsnames]{color}
+
+\newcommand{\chris}[1]{\textcolor{ForestGreen}{#1}}
+\newcommand{\Tau}{\mathcal{T}}
+\newcommand{\Kff}{K_{X_fX_f}}
+\newcommand{\Kuu}{K_{X_uX_u}}
+\newcommand{\Kuf}{K_{X_uX_f}}
+\newcommand{\Kfu}{K_{X_fX_u}}
+\newcommand{\Ex}{\mathbb{E}}
+\newcommand{\No}{\mathcal{N}}
+\newcommand{\chol}{\mathrm{chol}}
+\doublespacing
+
+
+\title{\textbf{Derivations and Equations}}
+\date{}
+\begin{document}
+
+\maketitle
+
+
+\section{Deriving the bound} % (fold)
+\label{sec:derive_bound}
+The standard variational formulation is
+%
+\begin{align}
+    \log p(y) &= \int q(z)\log\frac{p(y|z)p(z)}{q(z)}\frac{q(z)}{p(z|y)} dz\notag\\
+    &= \underbrace{\mathbb{E}_{q(z)}\big[ \log p(y|z)p(z) - \log q(z) \big]}_{\mathcal{L}_1} + \text{KL}\big[ q(z)\Vert p(z|y) \big]\label{eq:logpy1}
+\end{align}
+%
+The GP-LVM-CMF variational joint in the augmented latent space is:
+%
+\begin{equation}
+    q(z,f,u,X) = \prod_{i=1}^N \{q(z_i|f(X_i))q(f(X_i)|u)\}q(u)q(X)
+\end{equation}
+%
+which induces an intractable variational marginal
+%
+\begin{equation}
+    q(z) = \int \prod_{i=1}^N \{q(z_i|f(X_i))q(f(X_i)|u)\}q(u)q(X) df du dX.
+\end{equation}
+%
+However we can apply the variational formulation again, noting that $q(z) = \frac{q(z|f,u,X)q(f,u,X)}{q(f,u,X|z)}$, and integrating \ref{eq:logpy1} wrt the auxiliary variables, to obtain a further lower bound:
+\begin{align}
+    \log p(y) &= \int q(z|f,u,X)q(f,u,X)\log \frac{p(y|z)p(z)r(f,u,X|z)}{q(z|f,u,X)q(f,u,X)}\frac{q(f,u,X|z)}{r(f,u,X|z)}\frac{q(z)}{p(z|y)} df du dX dz\notag\\
+    &= \mathbb{E}_{q(z,f,u,X)}\big[ \log p(y|z)p(z)r(f,u,X|z) - \log q(z|f,X)q(f,u,X) \big]\label{eq:L_aux}\\
+    &\qquad+ \mathbb{E}_q(z)\big[ \text{KL}[q(f,u,X|z)\Vert r(f,u,X|z)] \big] + \text{KL}\big[ q(z)\Vert p(z|y) \big]
+\end{align}
+%
+in which the new auxiliary lower bound, $\mathcal{L}_{aux}$ is given by the expression \ref{eq:L_aux}, and where we have introduced the auxiliary distribution $r(f,u,X|z)$ which serves to approximate the variational posterior, $q(f,u,X|z)$, of the auxiliary variables conditioned on the latent variables.\\
+We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical expression for the K-L divergence between two Gaussians, $q(f,u,x)$ and $r(f,u,X|z)$ and, in the case that the prior of the generative model, $p(z)$, is also Gaussian distributed - as is the case for the continuous latent variable MLP model we'll consider first - then the bound contains a second Gaussian KL term:
+%
+\begin{equation}
+    \mathcal{L}_{aux} = \underbrace{\mathbb{E}_{q(z)}\big[ \log p(y|z) \big]}_{A} - \underbrace{\mathbb{E}_{q(f,u,X)}\big[ \text{KL}[q(z|f,X)\Vert p(z)] \big]}_{B} - \underbrace{\mathbb{E}_{q(z)}\big[ \text{KL}[q(f,u,X)\Vert r(f,u,X|z)] \big]}_{C}.\label{eq:L_aux_ABC}
+\end{equation}
+%
+%
+\section{Expressions}
+\subsection{Generative model}
+%
+\begin{equation}
+    p(z) = \mathcal{N}(z\mid 0, I)
+\end{equation}
+%
+\subsubsection{Continuous data $\implies$ Gaussian MLP likelihood}
+%
+\begin{align}
+    \log p(y|z) &= \log\mathcal{N}(x\mid \mu, \sigma^2 I)\\
+    \text{where } \mu &= W_2 h + b_2\\
+    \log\sigma^2 &= W_3 h + b_3\\
+    h &= \tanh(W_1 z + b_1)
+\end{align}
+Term $B$ in (\ref{eq:L_aux_ABC}) then becomes:
+%
+\begin{align}
+    &\frac{1}{2}\sum_{i=1}^N \mathbb{E}_{q(f,u,X)}\big[ 1 + \log\sigma^2 - f(X_i)^2 - \sigma^2 \big]\\
+    &= \frac{1}{2}\sum_{i=1}^N \mathbb{E}_{q(u)q(X)}\big[ 1 + \log\sigma^2 - (K_{f_iu}K_{uu}^{-1}u)^2 - k_{f_if_i} + K_{f_iu}K_{uu}^{-1}K_{uf_i}-\sigma^2 \big]\\
+    &= \frac{N}{2}(1 + \log\sigma^2 - \sigma^2) - \frac{1}{2}\sum_{i=1}^N\mathbb{E}_{q(X)}\big[ K_{f_iu}K_{uu}^{-1}\big( \kappa\kappa^\top + K_{uu} \big)K_{uu}^{-1}K_{uf_i} + K_{f_if_i} - K_{f_iu}K_{uu}^{-1}K_{uf_i} \big]\\
+    &= \frac{N}{2}(1 + \log\sigma^2 - \sigma^2) - \frac{1}{2}\psi_0 + \frac{1}{2}\text{tr}\big( K_{uu}^{-1}\Psi_2 \big) - \frac{1}{2}\text{tr}\big( K_{uu}^{-1}(\kappa\kappa^\top + K_{uu})K_{uu}^{-1}\Psi_2 \big)
+\end{align}
+%
+where
+\begin{align}
+    \psi_0 &= \text{tr}\big( \langle K_{ff}\rangle_{q(X)} \big)\\
+    \Psi_2 &= \langle K_{uf}K_{fu}\rangle_{q(X)}
+\end{align}
+%
+\subsubsection{Discrete data $\implies$ Bernoulli MLP likelihood}
+%
+\begin{align}
+    \log p(y|z) &= \sum_{p=1}^P y_p\log h_p + (1-y_p)\log (1-h_p)\\
+    \text{where } h &= f_{\sigma}(W_2 \tanh(W_1 z + b_1) + b2)
+\end{align}
+\subsection{Variational model}
+%
+\begin{align}
+q(X) &= \prod_{i=1}^N \mathcal{N}(x_{:,n}\mid 0, I_R) = \prod_{n=1}^N \mathcal{N}(x_{n,:}\mid 0,1)
+     \\
+    q(u) &= \prod_{m=1}^M \mathcal{N}(u_{:,m}\mid \kappa_{:,m}, \Kuu)\\
+    q(f(X)|u) &= \mathcal{N}(f(X)\mid \Kfu\Kuu^{-1}u, \Kff-\Kuf\Kuu^{-1}\Kuf)\\
+    q(z|f(X)) &= \prod_{i=1}^N \mathcal{N}(z_i\mid f(X_i), \sigma^2)
+\end{align}
+
+\chris{I think the variational distributions need to have variational parameters. Also there is a single guassian process, right? If so q(u) is just one gaussian, not a product of gaussians}
+\begin{align}
+    q(X) &= \prod_{i=1}^N \mathcal{N}(X_i\mid \phi_i, \Phi_i)\\
+    q(u) &= \mathcal{N}(u \mid \kappa, K_{X_uX_u})\\
+\end{align}
+
+\subsection{Auxiliary model}
+%
+\begin{align}
+    r(f,u,X|z) &= q(f(X)|u,X)r(u,X|z)\\
+    r(u,X|z) &= r(u| z) \prod_i r(X_i|z) = \mathcal{N}(u; \upsilon, \Upsilon ) \prod_i \mathcal{N}( X_i, \tau_i, \Tau_i )
+\end{align}
+
+
+
+\subsection{}
+
+\begin{align}
+\Ex_q(z) \mathcal{L}(z) &= \Ex_q(z,f,u,X) \mathcal{L}(z,f,u,X) \\
+&= \Ex_{\No(\eta;0,1)\No(\xi;0,1)\No(\alpha;0,1)\prod\No(\beta_i,0,1)} \mathcal{L}_1(\eta,\xi,\alpha,\beta) \\
+\mathcal{L}_1(\eta,\xi,\alpha,\beta) &=  \mathcal{L}(z,f,u,X)
+\end{align}
+
+where  $z = f + \mathbf{I}\sigma\eta $
+
+where $\Sigma = \Kff - \Kfu\Kuu^{-1}\Kuf$
+
+where $\mu   = \Kfu\Kuu^{-1}u$
+
+where $f = \mu + \chol(\Sigma)\xi $
+
+where $u = \upsilon + \chol(\Upsilon)\alpha$
+
+where $X_i = \tau_i + \chol(\Tau_i)\beta_i$.
+
+Term $C$ in (\ref{eq:L_aux_ABC}) then becomes:
+%
+\begin{align}
+    &-\mathbb{E}_{q(z)}\big[ \text{KL}[q(u)\Vert r(u|z)] \big] - \mathbb{E}_{q(z)}\big[ \text{KL}[\prod_{i=1}^Nq(X_i)\Vert \prod_{i=1}^Nr(X_i|z)] \big]\\
+    &= -\frac{1}{2}\mathbb{E}_{q(z)}\big[ (\upsilon - \kappa)^\top\Upsilon^{-1}(\upsilon - \kappa) + \text{tr}\big( \Upsilon^{-1}K_{uu} + \log\Upsilon - \log K_{uu} \big) \big] + M\\
+    &-\frac{1}{2}\sum_{i=1}^N \big\{ \mathbb{E}_{q(z)}\big[ (\phi_i - \tau_i)^\top\Tau_i^{-1}(\phi_i - \tau_i) + \text{tr}\big( \Tau_i^{-1}\Phi_i + \log\Tau_i - \log\Phi_i \big) \big] \big\} + NR.
+\end{align}
+
+
+
+
+
+
+
+
+\end{document}
