@@ -81,7 +81,7 @@ q(X) &= \prod_{i=1}^N \mathcal{N}(x_{:,n}\mid 0, I_R) = \prod_{n=1}^N \mathcal{N
 
 \chris{I think the variational distributions need to have variational parameters. Also there is a single guassian process, right? If so q(u) is just one gaussian, not a product of gaussians}
 \begin{align}
-    q(X) &= \prod_{i=1}^N \mathcal{N}(X_i\mid \lambda_i, \Lambda_i)\\
+    q(X) &= \prod_{i=1}^N \mathcal{N}(X_i\mid \phi_i, \Phi_i)\\
     q(u) &= \mathcal{N}(u \mid \kappa, K_{X_uX_u})\\
 \end{align}
 
@@ -98,7 +98,8 @@ q(X) &= \prod_{i=1}^N \mathcal{N}(x_{:,n}\mid 0, I_R) = \prod_{n=1}^N \mathcal{N
 
 \begin{align}
 \Ex_q(z) \mathcal{L}(z) &= \Ex_q(z,f,u,X) \mathcal{L}(z,f,u,X) \\
-&= \Ex_{\No(\eta;0,1)\No(\xi;0,1)\No(\alpha;0,1)\prod\No(\beta_i,0,1)} \mathcal{L}((f,\sigma^2),(\mu,\Sigma)(\upsilon,\Upsilon),(\tau,\Tau))
+&= \Ex_{\No(\eta;0,1)\No(\xi;0,1)\No(\alpha;0,1)\prod\No(\beta_i,0,1)} \mathcal{L}_1(\eta,\xi,\alpha,\beta) \\
+\mathcal{L}_1(\eta,\xi,\alpha,\beta) &=  \mathcal{L}(z,f,u,X)
 \end{align}
 
 where  $z = f + \mathbf{I}\sigma\eta $
@@ -109,7 +110,7 @@ where $\mu   = \Kfu\Kuu^{-1}u$
 
 where $f = \mu + \chol(\Sigma)\xi $
 
-where $u = \upsilon + \chol(\Upsilon)\upsilon$
+where $u = \upsilon + \chol(\Upsilon)\alpha$
 
 where $X_i = \tau_i + \chol(\Tau_i)\beta_i$
 
