@@ -85,16 +85,14 @@ class SGPDV:
         self.xi.name    = 'xi'
     
         # Latent co-ordinates
-        self.Xu = T.shared( M_R_vec )
+        self.Xu = T.dmatrix( M_R_vec )
         self.Xf = T.shared( B_R_vec )
         self.Xu.name = 'Xu'
         self.Xf.name = 'Xf'
 
         self.currentBatch = T.ivector( B_vec )
         cPhi = slinalg.cholesky( self.Phi )
-        for n in range( self.B ):
-            i = self.currentBatch[n]
-            self.Xf[n,:] = self.phi[i,:] + ( cPhi  * self.beta[n,:].T ).T
+        self.Xf = self.phi[self.currentBatch,:] + ( cPhi  * self.beta.T ).T
         
         # Kernels
         kfactory = kernelFactory( self.kernelType )
@@ -113,15 +111,14 @@ class SGPDV:
         self.f  = T.shared( Q_B_mat )
         self.mu = T.shared( Q_B_mat )
 
-        for i in range( self.Q ):
-            # Sample u_q from q(u) = N(u_q; kappa_q, Kuu )
-            self.u[i,:]  = self.kappa[i,:] + cKuu * self.alpha
-            # compute mean of f            
-            self.mu[i,:] = self.Kfu * ( iKuu * self.u[i,:].T ).T
-            # Sample f from q(f|u,X) = N( mu_q, Sigma )            
-            self.f[i,:]  = self.mu + ( cSigma * self.xi[i,:].T ).T        
-            # Sample z from q(z|f) = N(z,f,I*sigma^2)            
-            self.z[i,:]  = self.f + self.sigma * self.eta[i,:]
+        # Sample u_q from q(u) = N(u_q; kappa_q, Kuu )
+        self.u  = self.kappa[i,:] + cKuu * self.alpha
+        # compute mean of f            
+        self.mu = self.Kfu * ( iKuu * self.u.T ).T
+        # Sample f from q(f|u,X) = N( mu_q, Sigma )            
+        self.f  = self.mu + ( cSigma * self.xi.T ).T        
+        # Sample z from q(z|f) = N(z,f,I*sigma^2)            
+        self.z  = self.f + self.sigma * self.eta[i,:]
         
         self.u.name     = 'u'
         self.Sigma.name = 'Sigma'
@@ -131,7 +128,6 @@ class SGPDV:
             
         # TODO add more stuff to this list
         self.gradientVariables = [ self.theta, self.sigma, self.upsilon, self.Upsilon ]
-
 
     #def log_p_y_z( z_np ):
         # Overload this function in the derived classes
