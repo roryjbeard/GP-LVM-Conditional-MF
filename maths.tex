@@ -150,8 +150,8 @@ Term $C$ in (\ref{eq:L_aux_ABC}) then becomes:
 %
 \begin{align}
     &\mathbb{E}_{q(z)}\big[ \text{KL}[q(u)\Vert r(u|z)] \big] = \mathbb{E}_{q(z)}\big[ \text{KL}[\prod_{i=1}^Nq(X_i)\Vert \prod_{i=1}^Nr(X_i|z)] \big]\\
-    &= \frac{1}{2}\mathbb{E}_{q(z)}\big[ (\upsilon - \kappa)^\top\Upsilon^{-1}(\upsilon - \kappa) + \text{tr}\big( \Upsilon^{-1}K_{uu} + \log\Upsilon - \log K_{uu} \big) \big] - MQ\\
-    &\frac{1}{2}\sum_{i=1}^N \big\{ \mathbb{E}_{q(z)}\big[ (\phi_i - \tau_i)^\top\Tau_i^{-1}(\phi_i - \tau_i) + \text{tr}\big( \Tau_i^{-1}\Phi_i + \log\Tau_i - \log\Phi_i \big) \big] \big\} - NR.
+    &= \frac{1}{2}\mathbb{E}_{q(z)}\big[ (\upsilon - \kappa)^\top\Upsilon^{-1}(\upsilon - \kappa) + \text{tr}\big( \Upsilon^{-1}K_{uu} + \log\Upsilon - \log K_{uu} \big) \big] - \frac{MQ}{2}\\
+    &\frac{1}{2}\sum_{i=1}^N \big\{ \mathbb{E}_{q(z)}\big[ (\phi_i - \tau_i)^\top\Tau_i^{-1}(\phi_i - \tau_i) + \text{tr}\big( \Tau_i^{-1}\Phi_i + \log\Tau_i - \log\Phi_i \big) \big] \big\} - \frac{NR}{2}.
 \end{align}
 
 
