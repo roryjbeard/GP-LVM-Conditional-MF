@@ -82,23 +82,24 @@ We may re-express $\mathcal{L}_{aux}$ in a way which makes use of the analytical
 Term $B$ in (\ref{eq:L_aux_ABC}) then becomes:
 %
 \begin{align}
-    &\frac{1}{2}\sum_{i=1}^N \mathbb{E}_{q(f,u,X)}\big[ 1 + \log\sigma^2 - f(X_i)^2 - \sigma^2 \big]\\
-    &= \frac{1}{2}\sum_{i=1}^N \mathbb{E}_{q(u)q(X)}\big[ 1 + \log\sigma^2 - (K_{f_iu}K_{uu}^{-1}u)^2 - k_{f_if_i} + K_{f_iu}K_{uu}^{-1}K_{uf_i}-\sigma^2 \big]\\
-    &= \frac{N}{2}(1 + \log\sigma^2 - \sigma^2) - \frac{1}{2}\sum_{i=1}^N\mathbb{E}_{q(X)}\big[ K_{f_iu}K_{uu}^{-1}\big( \kappa\kappa^\top + K_{uu} \big)K_{uu}^{-1}K_{uf_i} + K_{f_if_i} - K_{f_iu}K_{uu}^{-1}K_{uf_i} \big]\\
-    &= \frac{N}{2}(1 + \log\sigma^2 - \sigma^2) - \frac{1}{2}\psi_0 + \frac{1}{2}\text{tr}\big( K_{uu}^{-1}\Psi_2 \big) - \frac{1}{2}\text{tr}\big( K_{uu}^{-1}(\kappa\kappa^\top + K_{uu})K_{uu}^{-1}\Psi_2 \big)
+    &-\frac{1}{2}\sum_{i=1}^N \mathbb{E}_{q(f,u,X)}\big[ 1 + \log\sigma^2 - f(X_i)^2 - \sigma^2 \big]\\
+    &= -\frac{1}{2}\sum_{i=1}^N \mathbb{E}_{q(u)q(X)}\big[ 1 + \log\sigma^2 - (K_{f_iu}K_{uu}^{-1}u)^2 - k_{f_if_i} + K_{f_iu}K_{uu}^{-1}K_{uf_i}-\sigma^2 \big]\\
+    &= -\frac{N}{2}(1 + \log\sigma^2 - \sigma^2) + \frac{1}{2}\sum_{i=1}^N\mathbb{E}_{q(X)}\big[ K_{f_iu}K_{uu}^{-1}\big( \kappa\kappa^\top + K_{uu} \big)K_{uu}^{-1}K_{uf_i} + K_{f_if_i} - K_{f_iu}K_{uu}^{-1}K_{uf_i} \big]\\
+    %&= -\frac{N}{2}(1 + \log\sigma^2 - \sigma^2) + \frac{1}{2}\psi_0 - \frac{1}{2}\text{tr}\big( K_{uu}^{-1}\Psi_2 \big) + \frac{1}{2}\text{tr}\big( K_{uu}^{-1}(\kappa\kappa^\top + K_{uu})K_{uu}^{-1}\Psi_2 \big)
 \end{align}
 %
-where
-\begin{align}
-    \psi_0 &= \text{tr}\big( \langle K_{ff}\rangle_{q(X)} \big)\\
-    \Psi_2 &= \langle K_{uf}K_{fu}\rangle_{q(X)}
-\end{align}
+%where
+%\begin{align}
+%    \psi_0 &= \text{tr}\big( \langle K_{ff}\rangle_{q(X)} \big)\\
+%    \Psi_2 &= \langle K_{uf}K_{fu}\rangle_{q(X)}
+%\end{align}
 %
 \subsubsection{Discrete data $\implies$ Bernoulli MLP likelihood}
 %
 \begin{align}
-    \log p(y|z) &= \sum_{p=1}^P y_p\log h_p + (1-y_p)\log (1-h_p)\\
-    \text{where } h &= f_{\sigma}(W_2 \tanh(W_1 z + b_1) + b2)
+    \log p(y|z) &= \sum_{p=1}^P y_p\log \hat{z}_p + (1-y_p)\log (1-\hat{z}_p)\\
+    \text{where } \hat{z} &= f_\sigma(W_2 h + b2)\\
+     h &= \tanh(W_1 z + b_1).
 \end{align}
 \subsection{Variational model}
 %
@@ -148,9 +149,9 @@ where $X_i = \tau_i + \chol(\Tau_i)\beta_i$.
 Term $C$ in (\ref{eq:L_aux_ABC}) then becomes:
 %
 \begin{align}
-    &-\mathbb{E}_{q(z)}\big[ \text{KL}[q(u)\Vert r(u|z)] \big] - \mathbb{E}_{q(z)}\big[ \text{KL}[\prod_{i=1}^Nq(X_i)\Vert \prod_{i=1}^Nr(X_i|z)] \big]\\
-    &= -\frac{1}{2}\mathbb{E}_{q(z)}\big[ (\upsilon - \kappa)^\top\Upsilon^{-1}(\upsilon - \kappa) + \text{tr}\big( \Upsilon^{-1}K_{uu} + \log\Upsilon - \log K_{uu} \big) \big] + M\\
-    &-\frac{1}{2}\sum_{i=1}^N \big\{ \mathbb{E}_{q(z)}\big[ (\phi_i - \tau_i)^\top\Tau_i^{-1}(\phi_i - \tau_i) + \text{tr}\big( \Tau_i^{-1}\Phi_i + \log\Tau_i - \log\Phi_i \big) \big] \big\} + NR.
+    &\mathbb{E}_{q(z)}\big[ \text{KL}[q(u)\Vert r(u|z)] \big] = \mathbb{E}_{q(z)}\big[ \text{KL}[\prod_{i=1}^Nq(X_i)\Vert \prod_{i=1}^Nr(X_i|z)] \big]\\
+    &= \frac{1}{2}\mathbb{E}_{q(z)}\big[ (\upsilon - \kappa)^\top\Upsilon^{-1}(\upsilon - \kappa) + \text{tr}\big( \Upsilon^{-1}K_{uu} + \log\Upsilon - \log K_{uu} \big) \big] - MQ\\
+    &\frac{1}{2}\sum_{i=1}^N \big\{ \mathbb{E}_{q(z)}\big[ (\phi_i - \tau_i)^\top\Tau_i^{-1}(\phi_i - \tau_i) + \text{tr}\big( \Tau_i^{-1}\Phi_i + \log\Tau_i - \log\Phi_i \big) \big] \big\} - NR.
 \end{align}
 
 
