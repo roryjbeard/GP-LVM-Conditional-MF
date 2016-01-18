@@ -145,8 +145,9 @@ class SGPDV(object):
         phi_     = np.random.normal( 0, sig, (self.N, self.R) )
         Phi_     = np.random.normal( 0, sig, (self.R, self.R) )
         kappa_   = np.random.normal( 0, sig, (self.Q, self.M) )
-        theta_   = np.random.normal( 0, sig, (self.numberOfHyperparameters, 1))
+        theta_   = np.random.normal( 0, sig, (self.numberOfHyperparameters, 1))**2
         sigma_   = np.random.normal( 0, sig )
+        Xu_      = np.random.normal( 0, sig, (self.M, self.R) )
 
         self.upsilon.set_value( upsilon_ )
         self.Upsilon.set_value( Upsilon_ )
@@ -157,6 +158,7 @@ class SGPDV(object):
         self.kappa.set_value( kappa_ )
         self.theta.set_value( theta_ )
         self.sigma.set_value( sigma_ )
+        self.Xu.set_value( Xu_ )
 
     #def log_p_z():
         # Overload this function in the derived class if p_z_gaussian==False
@@ -192,23 +194,23 @@ class SGPDV(object):
                     - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Sigma), T.dot((self.f - self.mu).T, (self.f - self.mu))))
         return _log_q_f_uX
 
-    def log_q_uX(self):
-        log_q_u = -0.5*self.Q*self.M*np.log(2*np.pi) - 0.5*self.Q*T.log(nlinalg.Det()(self.Kuu))\
-                - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Kuu, T.dot((self.u - self.kappa).T, (self.u - self.kappa)))))
-        X_m_phi = self.Xf - self.phi[self.currentBatch,:]
-        log_q_X = -0.5*self.B*self.R*np.log(2*np.pi) - 0.5*self.B(T.log(nlinalg.Det()(self.Phi))) \
-                - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Phi), T.dot(X_m_phi.T, X_m_phi)))
-        return log_q_u + log_q_X
+    # def log_q_uX(self):
+    #     log_q_u = -0.5*self.Q*self.M*np.log(2*np.pi) - 0.5*self.Q*T.log(nlinalg.Det()(self.Kuu))\
+    #             - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Kuu, T.dot((self.u - self.kappa).T, (self.u - self.kappa)))))
+    #     X_m_phi = self.Xf - self.phi[self.currentBatch,:]
+    #     log_q_X = -0.5*self.B*self.R*np.log(2*np.pi) - 0.5*self.B(T.log(nlinalg.Det()(self.Phi))) \
+    #             - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Phi), T.dot(X_m_phi.T, X_m_phi)))
+    #     return log_q_u + log_q_X
 
-    def KL_qr(self):
+    # def KL_qr(self):
 
-        KL_qr_u = 0.5 *( T.dot((self.upsilon - self.kappa), T.dot(nlinalg.matrix_inverse(self.Upsilon), (self.upsilon - self.kappa)))\
-                + nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Upsilon), self.Kuu))\
-                + T.log(nlinalg.Det()(self.Upsilon)) - T.log(nlinalg.Det()(self.Kuu)) - self.Q*self.M)
-        KL_qr_X = 0.5 *( T.dot((self.phi - self.tau), T.dot(nlinalg.matrix_inverse(self.Tau), (self.phi - self.tau)))\
-                + nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Tau), self.Phi))\
-                + T.log(nlinalg.Det()(self.Tau)) - T.log(nlinalg.Det()(self.Phi)) - self.B*self.R)
-        return KL_qr_u + KL_qr_X
+    #     KL_qr_u = 0.5 *( T.dot((self.upsilon - self.kappa), T.dot(nlinalg.matrix_inverse(self.Upsilon), (self.upsilon - self.kappa)))\
+    #             + nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Upsilon), self.Kuu))\
+    #             + T.log(nlinalg.Det()(self.Upsilon)) - T.log(nlinalg.Det()(self.Kuu)) - self.Q*self.M)
+    #     KL_qr_X = 0.5 *( T.dot((self.phi - self.tau), T.dot(nlinalg.matrix_inverse(self.Tau), (self.phi - self.tau)))\
+    #             + nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Tau), self.Phi))\
+    #             + T.log(nlinalg.Det()(self.Tau)) - T.log(nlinalg.Det()(self.Phi)) - self.B*self.R)
+    #     return KL_qr_u + KL_qr_X
 
     def sample( self ):
         # generate standard gaussian random varibales
@@ -334,11 +336,14 @@ class VA(SGPDV):
 
 if __name__ == "__main__":
 
-    va = VA( 0,1,1,1,np.zeros((3,1),dtype=np.float64),1.0,np.zeros((4,3),dtype=np.float64),1 )
+    va = VA( 1,1,1,1,np.ones((3,1),dtype=np.float64),1.0,np.random.rand(4,3),1 )
 
     va.randomise()
 
     va.randomise_VA()
+
+    Phi_psd_ = np.random.normal( 0, 0.1, (va.R, va.R) ) + 5*np.eye(va.R)
+    va.Phi.set_value(Phi_psd_)
 
     va.sample()
 
@@ -346,7 +351,7 @@ if __name__ == "__main__":
 
     va.log_q_f_uX()
 
-    va.log_q_uX()
+    # va.log_q_uX()
 
     #va.KL_qr()
 
