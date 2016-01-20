@@ -17,10 +17,11 @@ class kernelFactory(object):
         else:
             _X2 = X2
         if self.kernelType == 'RBF':
-            dist = (((X1 / theta[0])**2).sum(1)) + (((_X2 / theta[0])**2).sum(1)).T - 2*T.dot( X1 / theta[0], _X2.T / theta[0] )
+            # dist = (((X1 / theta[0])**2).sum(1)) + (((_X2 / theta[0])**2).sum(1)).T - 2*T.dot( X1 / theta[0], _X2.T / theta[0] )
+            dist = ((X1 / theta[0])**2).sum(1)[:, None] + ((_X2 / theta[0])**2).sum(1)[None, :] - 2*(X1 / theta[0]).dot((_X2 / theta[0]).T)
             K = theta[1] * T.exp( -dist / 2.0 )
             if X2 is None:
-                K = (K + self.eps * T.eye(X1.shape[0]))
+                K = K + self.eps * T.eye(X1.shape[0])
             K.name = name_ + '(RBF)'
         elif self.kernelType == 'RBFnn':
             K = theta[0] + self.eps
@@ -120,7 +121,7 @@ class SGPDV(object):
         # Sample u_q from q(u_q) = N(u_q; kappa_q, Kuu )
         self.u  = self.kappa + ( T.dot(self.cKuu, self.alpha.T) ).T
         # compute mean of f
-        self.mu = T.dot( self.Kfu, ( T.dot(self.iKuu, self.u.T) ).T )
+        self.mu = T.dot( self.Kfu,  T.dot(self.iKuu, self.u.T ) )
         # Sample f from q(f|u,X) = N( mu_q, Sigma )
         self.f  = self.mu + ( T.dot(self.cSigma,self.xi.T) ).T
         # Sample z from q(z|f) = N(z,f,I*sigma^2)
@@ -140,10 +141,10 @@ class SGPDV(object):
 
         upsilon_ = np.random.normal( 0, sig, (self.Q, self.M) )
         Upsilon_ = np.random.normal( 0, sig, (self.M, self.M) )
-        Upsilon_ = np.dot( Upsilon_, Upsilon_.T )        
+        Upsilon_ = np.dot( Upsilon_, Upsilon_.T )
         tau_     = np.random.normal( 0, sig, (self.N, self.R) )
         Tau_     = np.random.normal( 0, sig, (self.R, self.R) )
-        Tau_     = np.dot( Tau_, Tau_.T )         
+        Tau_     = np.dot( Tau_, Tau_.T )
         phi_     = np.random.normal( 0, sig, (self.N, self.R) )
         Phi_     = np.random.normal( 0, sig, (self.R, self.R) )
         Phi_     = np.dot( Phi_, Phi_.T )
@@ -179,17 +180,16 @@ class SGPDV(object):
         if p_z_gaussian and q_f_Xu_equals_r_f_Xuz:
             L += -self.KL_qp()
         else:
-            L += +self.log_p_z() -self.log_q_z_fX() 
-        
+            L += +self.log_p_z() -self.log_q_z_fX()
+
         if r_uX_z_gaussian and q_f_Xu_equals_r_f_Xuz:
-             #L += -self.KL_qr()
-            pass
+            L += -self.KL_qr()
         else:
-             L += +self.log_r_uX_z() -self.log_q_uX()    
-             
+             L += +self.log_r_uX_z() -self.log_q_uX()
+
         if not q_f_Xu_equals_r_f_Xuz:
              assert(False) # Case not implemented
-             
+
         L.name = 'L'
         dL = T.grad( L, self.gradientVariables )
 
@@ -208,10 +208,10 @@ class SGPDV(object):
         _log_q_f_uX = -0.5*self.Q*self.B*np.log(2*np.pi) - 0.5*self.Q*T.log( nlinalg.Det()( self.Sigma ))\
                     - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Sigma), T.dot((self.f - self.mu).T, (self.f - self.mu))))
         return _log_q_f_uX
-        
+
     def log_q_z_fX(self):
          assert(False)
-        
+
     def log_q_uX(self):
          log_q_u = -0.5*self.Q*self.M*np.log(2*np.pi) - 0.5*self.Q*T.log(nlinalg.Det()(self.Kuu)) \
                  - 0.5 * nlinalg.trace(T.dot( self.iKuu, T.dot((self.u - self.kappa).T, (self.u - self.kappa)) ))
@@ -221,14 +221,18 @@ class SGPDV(object):
          return log_q_u + log_q_X
 
     def KL_qr(self):
+        iUpsilon = nlinalg.matrix_inverse(self.Upsilon)
+        upsilon_m_kapa = self.upsilon - self.kappa
+        KL_qr_u = 0.5 * ( nlinalg.trace( T.dot(iUpsilon, (T.dot(upsilon_m_kapa.T, upsilon_m_kapa))) ) ) \
+                + nlinalg.trace(T.dot(iUpsilon, self.Kuu)) \
+                + T.log(nlinalg.Det()(self.Upsilon)) - T.log(nlinalg.Det()(self.Kuu)) - self.Q*self.M
+        iTau = nlinalg.matrix_inverse(self.Tau)
+        phi_m_tau = self.phi - self.tau
+        KL_qr_X = 0.5 * ( nlinalg.trace( T.dot(iTau, (T.dot(phi_m_tau.T, phi_m_tau))) ) ) \
+                + nlinalg.trace(T.dot(iTau, self.Phi)) \
+                + T.log(nlinalg.Det()(self.Tau)) - T.log(nlinalg.Det()(self.Phi)) - self.N*self.R
 
-         KL_qr_u = 0.5 *( T.dot((self.upsilon - self.kappa), T.dot(nlinalg.matrix_inverse(self.Upsilon), (self.upsilon - self.kappa)))\
-                 + nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Upsilon), self.Kuu))\
-                 + T.log(nlinalg.Det()(self.Upsilon)) - T.log(nlinalg.Det()(self.Kuu)) - self.Q*self.M)
-         KL_qr_X = 0.5 *( T.dot((self.phi - self.tau), T.dot(nlinalg.matrix_inverse(self.Tau), (self.phi - self.tau)))\
-                 + nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Tau), self.Phi))\
-                 + T.log(nlinalg.Det()(self.Tau)) - T.log(nlinalg.Det()(self.Phi)) - self.B*self.R)
-         return KL_qr_u + KL_qr_X
+        return KL_qr_u + KL_qr_X
 
     def sample( self ):
         # generate standard gaussian random varibales
@@ -324,7 +328,7 @@ class VA(SGPDV):
 
     def log_p_y_z( self ):
         if self.continuous:
-            h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z) + self.b1)
+            h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z.T) + self.b1)
             h_decoder.name ='h_decoder'
             mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)
             mu_decoder.name = 'mu_decoder'
@@ -333,7 +337,7 @@ class VA(SGPDV):
             log_pyz = T.sum(-(0.5 * np.log(2 * np.pi) + log_sigma_decoder) - 0.5 * ((self.y_miniBatch - mu_decoder) / T.exp(log_sigma_decoder))**2)
             log_pyz.name = 'log_p_y_z'
         else:
-            h_decoder = T.tanh(T.dot(self.W1,self.z) + self.b1)
+            h_decoder = T.tanh(T.dot(self.W1,self.z.T) + self.b1)
             h_decoder.name = 'h_decoder'
             y_hat = T.nnet.sigmoid(T.dot(self.W2,h_decoder) + self.b2)
             y_hat.name = 'y_hat'
@@ -342,20 +346,29 @@ class VA(SGPDV):
         return log_pyz
 
 
+    # def KL_qp( self ):
+    #     E_uu_T_term = nlinalg.trace(T.dot( self.Kfu.T, T.dot(self.Kfu,self.iKuu) ) ) \
+    #     + T.dot(self.kappa.T, T.dot(self.iKuu, T.dot(self.Kfu.T, T.dot(self.Kfu, T.dot(self.iKuu, self.kappa)))))
+    #     if self.continuous:
+    #         KL = -0.5*self.B*(1. + 2*T.log(self.sigma) - self.sigma**2) \
+    #         + 0.5 * nlinalg.trace(E_uu_T_term + self.Sigma)
+    #     else:
+    #         KL = 0 # TODO
+    #     return KL
+
     def KL_qp( self ):
-        E_uu_T_term = nlinalg.trace(T.dot( self.Kfu.T, T.dot(self.Kfu,self.iKuu) ) ) \
-        + T.dot(self.kappa.T, T.dot(self.iKuu, T.dot(self.Kfu.T, T.dot(self.Kfu, T.dot(self.iKuu, self.kappa)))))
         if self.continuous:
-            KL = -0.5*self.B*(1. + 2*T.log(self.sigma) - self.sigma**2) \
-            + 0.5 * nlinalg.trace(E_uu_T_term + self.Sigma)
-        else:
+            Kuf_Kfu_iKuu = T.dot(self.Kfu.T, T.dot(self.Kfu, self.iKuu))
+            KL = -0.5*self.B*self.Q*(1 + self.sigma**2 - 2*T.log(self.sigma)) \
+                 +0.5*nlinalg.trace(T.dot( self.iKuu, T.dot( Kuf_Kfu_iKuu, (T.dot(self.kappa.T, self.kappa) + self.iKuu) ) )) \
+                 +0.5*self.Q*( nlinalg.trace(self.Kff) - nlinalg.trace(Kuf_Kfu_iKuu) )
             KL = 0 # TODO
         return KL
 
 
 if __name__ == "__main__":
 
-    va = VA( 1,1,1,1,np.ones((3,1),dtype=np.float64),1.0,np.random.rand(4,3),1 )
+    va = VA( 3,20,1,2,np.ones((3,1),dtype=np.float64),1.0,np.random.rand(40,3),1 )
 
     va.randomise()
 
@@ -375,6 +388,6 @@ if __name__ == "__main__":
 
     va.log_r_uX_z()
 
-    va.log_q_uX()  
+    va.log_q_uX()
 
     va.construct_L()

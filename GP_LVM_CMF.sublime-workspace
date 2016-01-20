@@ -1,0 +1,567 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"Phi_",
+				"Phi_psd_	statement"
+			],
+			[
+				"K",
+				"Kuu"
+			],
+			[
+				"u",
+				"u	statement"
+			],
+			[
+				"X",
+				"Xf	statement"
+			],
+			[
+				"up",
+				"upsilon	statement"
+			],
+			[
+				"det",
+				"Det	class"
+			],
+			[
+				"gradie",
+				"gradientVariables	statement"
+			],
+			[
+				"gradi",
+				"gradientVariables	statement"
+			],
+			[
+				"data",
+				"data_miniBatch	statement"
+			],
+			[
+				"N",
+				"N_R_vec"
+			],
+			[
+				"P",
+				"P_vec	statement"
+			],
+			[
+				"sigm",
+				"sigmaInit"
+			],
+			[
+				"sig",
+				"sigmaInit"
+			],
+			[
+				"HU",
+				"HU_decoder"
+			],
+			[
+				"log",
+				"log_L_u"
+			],
+			[
+				"n",
+				"n_induce	statement"
+			],
+			[
+				"KL",
+				"KL_qr	statement"
+			],
+			[
+				"log_sigma",
+				"log_sigma_lhood	statement"
+			],
+			[
+				"mat",
+				"matrix_inverse	statement"
+			],
+			[
+				"mu",
+				"mu_decoder	statement"
+			],
+			[
+				"h",
+				"h_auxiliary	statement"
+			],
+			[
+				"dim",
+				"dimZ	statement"
+			],
+			[
+				"z",
+				"zfunction	statement"
+			],
+			[
+				"al",
+				"all_gradients	statement"
+			],
+			[
+				"Y_",
+				"Y_"
+			],
+			[
+				"tra",
+				"trigamma	statement"
+			],
+			[
+				"fl",
+				"floatX"
+			],
+			[
+				"NotI",
+				"NotImplementedError	class"
+			],
+			[
+				"out",
+				"outputs_gradients	param"
+			],
+			[
+				"Si",
+				"Sigma_Chol	statement"
+			],
+			[
+				"co",
+				"constrain_positive"
+			],
+			[
+				"taup",
+				"taup_vec_restarts"
+			],
+			[
+				"num",
+				"num_good_restarts"
+			],
+			[
+				"comp",
+				"compress_ratio"
+			],
+			[
+				"ci",
+				"compress_ratio"
+			],
+			[
+				"La",
+				"Lambdastar"
+			],
+			[
+				"Lamd",
+				"Lambdastar_inv"
+			],
+			[
+				"triu",
+				"triu_index_matrix	statement"
+			],
+			[
+				"triu_index",
+				"triu_index_matrix_	statement"
+			],
+			[
+				"d_L_d_X",
+				"d_L_d_Xp_"
+			],
+			[
+				"d_L_d_L",
+				"d_L_d_Lambda_"
+			],
+			[
+				"d_L_dm",
+				"d_L_d_m_f	statement"
+			],
+			[
+				"logpw",
+				"logpw_yp	statement"
+			],
+			[
+				"stoch",
+				"stoch_loss	function"
+			],
+			[
+				"Lam",
+				"Lambda_	statement"
+			],
+			[
+				"mut",
+				"multivariate_normal	function"
+			],
+			[
+				"pa",
+				"parameters"
+			],
+			[
+				"Lambda",
+				"Lambda_proj_"
+			],
+			[
+				"d_loss",
+				"d_loss_d_eta_	statement"
+			],
+			[
+				"d_loss_d",
+				"d_loss_d_theta_	statement"
+			],
+			[
+				"samp",
+				"samp_grad_bound_phi_f	statement"
+			],
+			[
+				"logpy",
+				"logpy_gradients_eta_f	statement"
+			],
+			[
+				"inte",
+				"integrand_f	statement"
+			],
+			[
+				"logq",
+				"logqyp_gradients_phi_f	statement"
+			],
+			[
+				"logp",
+				"logpyp	statement"
+			],
+			[
+				"q",
+				"q_w_mean"
+			],
+			[
+				"K_tilde",
+				"K_tilde_evals	statement"
+			],
+			[
+				"K_",
+				"K_tilde_evals	statement"
+			]
+		]
+	},
+	"buffers":
+	[
+	],
+	"build_system": "",
+	"command_palette":
+	{
+		"height": 327.0,
+		"selected_items":
+		[
+			[
+				"anaconda",
+				"Anaconda: Vagrant Enable"
+			],
+			[
+				"packa c l",
+				"Package Control: List Packages"
+			],
+			[
+				"lint",
+				"Anaconda: Disable linting on this file"
+			],
+			[
+				"",
+				"About"
+			],
+			[
+				"dli",
+				"Anaconda: Disable linting on this file"
+			],
+			[
+				"anaconda:di",
+				"Anaconda: Disable linting on this file"
+			],
+			[
+				"ancadon",
+				"Anaconda: Disable linting on this file"
+			],
+			[
+				"Package Control: INSTALL",
+				"Package Control: Install Package"
+			],
+			[
+				"latex",
+				"LaTeXTools: Reconfigure and migrate settings"
+			],
+			[
+				"Package Control: Ins",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 449.0
+	},
+	"console":
+	{
+		"height": 126.0,
+		"history":
+		[
+			"import urllib.request,os,hashlib; h = 'eb2297e1a458f27d836c04bb0cbaf282' + 'd0e7a3098092775ccb37ca9d6b2e4b7d'; pf = 'Package Control.sublime-package'; ipp = sublime.installed_packages_path(); urllib.request.install_opener( urllib.request.build_opener( urllib.request.ProxyHandler()) ); by = urllib.request.urlopen( 'http://packagecontrol.io/' + pf.replace(' ', '%20')).read(); dh = hashlib.sha256(by).hexdigest(); print('Error validating download (got %s instead of %s), please try manual install' % (dh, h)) if dh != h else open(os.path.join( ipp, pf), 'wb' ).write(by)"
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"file_history":
+	[
+		"/Users/roryjbeard/Library/Application Support/Sublime Text 3/Packages/User/Python.sublime-settings",
+		"/Users/roryjbeard/Library/Application Support/Sublime Text 3/Packages/User/Anaconda.sublime-settings",
+		"/Users/roryjbeard/DPhil/GP-LVM-Conditional MF/README.md",
+		"/Users/roryjbeard/DPhil/GP-LVM-Conditional MF/GP-LVM-CMF.py",
+		"/Users/roryjbeard/Library/Application Support/Sublime Text 3/Packages/Default/Preferences.sublime-settings",
+		"/Users/roryjbeard/Library/Application Support/Sublime Text 3/Packages/Anaconda/Anaconda.sublime-settings",
+		"/Users/roryjbeard/DPhil/GP-LVM-Conditional MF/trainmnist_cond_MF.py",
+		"/Users/roryjbeard/DPhil/Code/iwae/optimizers.py",
+		"/Users/roryjbeard/DPhil/Code/Variational-Autoencoder/Theano/demo/trainmnist.py",
+		"/Users/roryjbeard/DPhil/Code/iwae/config.py",
+		"/Users/roryjbeard/DPhil/Variational Compression/mixture_theano.py",
+		"/Users/roryjbeard/DPhil/Variational Compression/IBP_autoencoder_reparam_theano.py",
+		"/Users/roryjbeard/DPhil/Variational-Compression-Github/compression_noise_expt.py",
+		"/Users/roryjbeard/DPhil/Variational-Compression-Github/logistic_sgd",
+		"/Users/roryjbeard/DPhil/Variational-Compression-Github/BLR_MC.py",
+		"/Users/roryjbeard/DPhil/Variational-Compression-Github/linreg.py",
+		"/Users/roryjbeard/Theano/Theano/theano/scalar/basic_scipy.py",
+		"/Users/roryjbeard/Theano/Theano/theano/scalar/basic_scipy.pyc",
+		"/Users/roryjbeard/DPhil/Variational Compression/digamma_for_theano.py",
+		"/Users/roryjbeard/DPhil/Variational Compression/IBP_autoencoder_quad.py",
+		"/Users/roryjbeard/DPhil/Variational Compression/IBP_autoencoder_reparam.py",
+		"/Users/roryjbeard/DPhil/Variational-Compression-Github/compression_noise_expt",
+		"/Users/roryjbeard/DPhil/Confirmation/Plan for remainder.tex",
+		"/Users/roryjbeard/DPhil/Variational-Compression-Github/gradient_bound.tex",
+		"/Users/roryjbeard/DPhil/Confirmation/README.md",
+		"/Users/roryjbeard/DPhil/Variational-Compression-Github/linregARD.py",
+		"/Users/roryjbeard/DPhil/Variational-Compression-Github/ARD_VC_GP.tex",
+		"/Users/roryjbeard/DPhil/Variational Compression/blr_derivation.tex",
+		"/Users/roryjbeard/DPhil/Confirmation/refs.bib",
+		"/Users/roryjbeard/DPhil/Confirmation/Chapter cuttings.tex",
+		"/Users/roryjbeard/DPhil/Confirmation/Chapter.tex",
+		"/Users/roryjbeard/Library/Application Support/Sublime Text 3/Packages/User/Preferences.sublime-settings",
+		"/Users/roryjbeard/DPhil/Variational Compression/blr_derivation",
+		"/Users/roryjbeard/Dropbox/Community Switching SSM/Documents/VBEMsuppmat.tex",
+		"/Users/roryjbeard/Dropbox/pargsvn/rory/transfer/test.tex",
+		"/Users/roryjbeard/DPhil/Code/GPy/GPy/GPy/core/parameterization/param.py",
+		"/Users/roryjbeard/DPhil/Code/GPy/GPy/GPy/core/model.py",
+		"/Users/roryjbeard/Documents/Tea talks/MCMC VB bridge gap/tea_talk_Salimans.tex",
+		"/Users/roryjbeard/Dropbox/pargsvn/rory/transfer/Literature Review/litrev.tex",
+		"/Users/roryjbeard/Documents/tea_talk_Salimans.tex",
+		"/Users/roryjbeard/DPhil/Variational Compression/old.ipynb"
+	],
+	"find":
+	{
+		"height": 22.0
+	},
+	"find_in_files":
+	{
+		"height": 0.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": true,
+		"find_history":
+		[
+			"self",
+			"Phi",
+			"self.Xu",
+			"Xu.T",
+			"kappa",
+			"upsilon",
+			"Kuu",
+			"Upsilon",
+			"xi",
+			"prior",
+			"log_q_f_u",
+			"log_q_fX",
+			"log_q_fuX",
+			"log_r_fuX_z",
+			"self.currentBatch",
+			"self.current",
+			"alpha",
+			"Q_M_matc",
+			"Q_M_mat",
+			"dimXu",
+			"dimXf",
+			"dimX",
+			"mu_encoder",
+			"lint",
+			"mu_encoder",
+			"W1",
+			"eps_u",
+			"dimXf",
+			"dimX",
+			"N",
+			"T.tril",
+			"tril",
+			"ls",
+			"n_induce",
+			"m_u",
+			"W8",
+			"W7",
+			"W6",
+			"epoch",
+			"data",
+			"eps_z",
+			"dimX",
+			"X",
+			"sigma_var_lhood",
+			"L_z",
+			"\n        ",
+			"eps_z",
+			"dimXf",
+			"sigma_lhood",
+			"L_u",
+			"mu_decoder",
+			"continuous",
+			"eps_f",
+			"eps",
+			"b6",
+			"W6",
+			"self.all_gradients",
+			"all_bounds",
+			"create",
+			"gradientfun",
+			"self.lowerbound",
+			"self.L",
+			"X2",
+			"X1",
+			"lincomp",
+			"phi",
+			"open",
+			"equation",
+			".\n",
+			"equation",
+			"mat",
+			")",
+			"]",
+			"yp",
+			"	",
+			"flat_to_psd_mat",
+			"flat",
+			"Lambda",
+			"tau",
+			"tau,",
+			"tau",
+			"taup",
+			"tau",
+			"Lamda",
+			"section",
+			"equation",
+			"num_restarts",
+			"q_w_mean",
+			"Y",
+			"taup",
+			"()\n",
+			"w",
+			"path",
+			",\\",
+			"Y",
+			"\\mathbf{x}",
+			"text"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			"    "
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": true,
+		"wrap": false
+	},
+	"groups":
+	[
+		{
+			"sheets":
+			[
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 22.0
+	},
+	"input":
+	{
+		"height": 0.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"project": "GP_LVM_CMF.sublime-project",
+	"replace":
+	{
+		"height": 40.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 150.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
