@@ -273,20 +273,27 @@ class SGPDV(object):
 #
 
 class VA(SGPDV):
-            #                                               []                       []
-    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, data, numHiddenUnits, kernelType_='RBF', continuous_=True ):
-                       #self, dataSize, induceSize, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_='RBF'
-        SGPDV.__init__( self, len(data), numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_ )
 
-        data = np.array(data)
-        self.P = data.shape[1]
-        self.y = th.shared( data )
-        self.y.name = 'y'
-        self.y_miniBatch = self.y[self.currentBatch,:]
-        self.y_miniBatch.name = 'y_minibatch'
+    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, 
+                 data, numHiddenUnits, kernelType_='RBF', continuous_=True ):
+
+        SGPDV.__init__( self, len(data), numberOfInducingPoints, batchSize, 
+                       dimX, dimZ, theta_init, sigma_init, kernelType_ )
+
+        # Set the 
         self.HU_decoder = numHiddenUnits
         self.continuous = continuous_
-
+        
+        # set the data
+        data             = np.array(data)
+        self.P           = data.shape[1]
+        self.y           = th.shared( data )
+        self.y_miniBatch = self.y[self.currentBatch,:]
+        
+        self.y.name           = 'y'        
+        self.y_miniBatch.name = 'y_minibatch'
+        
+        # Construct appropriately sized matrices to initialise theano shares
         HU_Q_mat = np.zeros( (self.HU_decoder, self.Q))
         HU_vec   = np.zeros( (self.HU_decoder ,1 ))
         P_HU_mat = np.zeros( (self.P ,self.HU_decoder))
@@ -324,21 +331,24 @@ class VA(SGPDV):
 
     def log_p_y_z( self ):
         if self.continuous:
-            h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z) + self.b1)
-            h_decoder.name ='h_decoder'
-            mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)
-            mu_decoder.name = 'mu_decoder'
+            h_decoder         = T.nnet.softplus(T.dot(self.W1,self.z) + self.b1)
+            mu_decoder        = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)
             log_sigma_decoder = 0.5*(T.dot(self.W3, h_decoder) + self.b3)
+            log_pyz           = T.sum(-(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
+                              - 0.5 * ((self.y_miniBatch - mu_decoder) / T.exp(log_sigma_decoder))**2)
+
             log_sigma_decoder.name = 'log_sigma_decoder'
-            log_pyz = T.sum(-(0.5 * np.log(2 * np.pi) + log_sigma_decoder) - 0.5 * ((self.y_miniBatch - mu_decoder) / T.exp(log_sigma_decoder))**2)
-            log_pyz.name = 'log_p_y_z'
+            mu_decoder.name        = 'mu_decoder'
+            h_decoder.name         = 'h_decoder'            
+            log_pyz.name           = 'log_p_y_z'
         else:
             h_decoder = T.tanh(T.dot(self.W1,self.z) + self.b1)
+            y_hat     = T.nnet.sigmoid(T.dot(self.W2,h_decoder) + self.b2)
+            log_pyz   = -T.nnet.binary_crossentropy(y_hat,self.y_miniBatch).sum()
+            
             h_decoder.name = 'h_decoder'
-            y_hat = T.nnet.sigmoid(T.dot(self.W2,h_decoder) + self.b2)
-            y_hat.name = 'y_hat'
-            log_pyz = -T.nnet.binary_crossentropy(y_hat,self.y_miniBatch).sum()
-            log_pyz.name = 'log_p_y_z'
+            y_hat.name     = 'y_hat'                        
+            log_pyz.name   = 'log_p_y_z'
         return log_pyz
 
 
@@ -351,7 +361,6 @@ class VA(SGPDV):
         else:
             KL = 0 # TODO
         return KL
-
 
 if __name__ == "__main__":
 
@@ -377,4 +386,10 @@ if __name__ == "__main__":
 
     va.log_q_uX()  
 
-    va.construct_L()
+    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+    #va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+    #va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+    #va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+    
+    
+    
