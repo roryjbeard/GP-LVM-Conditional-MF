@@ -1,14 +1,4 @@
-"""
-Authors:
-Joost van Amersfoort - <joost.van.amersfoort@gmail.com>
-Otto Fabius - <ottofabius@gmail.com>
 
-#License: MIT
-"""
-
-"""This script trains an auto-encoder on the MNIST dataset and keeps track of the lowerbound"""
-
-#python trainmnist.py -s mnist.npy
 
 import VAE_cond_MF
 import numpy as np
@@ -18,7 +8,6 @@ import gzip, cPickle
 import progressbar
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-d","--double", help="Train on hidden layer of previously trained AE - specify params", default = False)
 
 args = parser.parse_args()
 
@@ -35,54 +24,42 @@ n_iter = 500
 [N,dimX] = data.shape
 
 dimZ = 20
-dimf = dimZ
-dimXf = dimf
-dimXu = np.around(0.1*dimX)
+dimX = 5
 HU_decoder = 400
-HU_encoder = HU_decoder
+
 
 batch_size = 100
 n_induce = 100
-L = 1
 learning_rate = 0.01
 
-if args.double:
-    print 'computing hidden layer to train new AE on'
-    prev_params = np.load(args.double)
-    data = (np.tanh(data.dot(prev_params[0].T) + prev_params[5].T) + 1) /2
-    x_test = (np.tanh(x_test.dot(prev_params[0].T) + prev_params[5].T) +1) /2
+print "Initialising"
+va = VA(n_induce, batch_size, dimX, dimZ, np.ones((3,1), dtype=np.float64), 1.0, x_train, HU_decoder, kernelType_='RBF', continuous_=True )
 
-encoder = VAE_cond_MF.VA( HU_decoder, HU_encoder, N, dimX, dimZ, dimf, dimXf, dimXu, batch_size, n_induce, L, learning_rate)
+print "Training"
 
 
-if args.double:
-    encoder.continuous = True
 
-print "Creating Theano functions"
-encoder.createGradientFunctions()
 
-print "Initializing weights and biases"
-encoder.initParams()
-lowerbound = np.array([])
-testlowerbound = np.array([])
+# lowerbound = np.array([])
+# testlowerbound = np.array([])
 
-begin = time.time()
-pbar = progressbar.ProgressBar(maxval=n_iter).start()
-for j in xrange(n_iter):
-    encoder.lowerbound = 0
-    print 'Iteration:', j
-    encoder.iterate(data)
-    end = time.time()
-    print("Iteration %d, lower bound = %.2f,"
-          " time = %.2fs"
-          % (j, encoder.lowerbound/N, end - begin))
-    begin = end
+# begin = time.time()
+# pbar = progressbar.ProgressBar(maxval=n_iter).start()
+# for j in xrange(n_iter):
+#     va.lowerbound = 0
+#     print 'Iteration:', j
+#     va.iterate(data)
+#     end = time.time()
+#     print("Iteration %d, lower bound = %.2f,"
+#           " time = %.2fs"
+#           % (j, va.lowerbound/N, end - begin))
+#     begin = end
 
-    if j % 5 == 0:
-        print "Calculating test lowerbound"
-        testlowerbound = np.append(testlowerbound,encoder.getLowerBound(x_test))
+#     if j % 5 == 0:
+#         print "Calculating test lowerbound"
+#         testlowerbound = np.append(testlowerbound,va.getTestLowerBound(x_test))
 
-    pbar.update()
+#     pbar.update()
 
-pbar.finish()
+# pbar.finish()
 

@@ -4,6 +4,7 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 from theano.tensor import slinalg, nlinalg
+import progressbar
 
 
 class kernelFactory(object):
@@ -247,44 +248,85 @@ class SGPDV(object):
         self.beta.set_value( beta_ )
         self.eta.set_value( eta_ )
         self.xi.set_value( xi_ )
-#
-#    def train_ada( self, tol, numberOfIterations, learningRate ):
-#
-#        # Evaluate the objective function
-#        f_last = self.L_func()
-#        # For each iteration...
-#        for it in range( numberOfIterations ):
-#            #...generate and set value for a minibatch...
-#            self.sample()
-#            #...compute the gradient for this mini-batch
-#            grad = self.dL_func()
-#            # For each gradient variable returned by the gradient function
-#            for i in range( len( self.gradientVariables) ):
-#                # Compute the new setting for the ith gradient variable using
-#                # adagrad equations
-#                # TODO finish this
-#                h = grad[i]*grad[i]
-#                newVariableValue = learningRate/np.sqrt(h) * (totalGradients[i] - (self.B/self.N))
-#                # Set the new variable value
-#                self.gradientVariables[i].setvalue( newVariableValue )
-#
-#            # Check exit  conditions
-#            f_new = self.L_func()
-#            if np.abs( f_last - f_new) < tol:
-#                break
-#            else:
-#                f_last = f_new
-#
+
+    def getTestLowerBound( self, test_data ):
+        """Use this method for example to compute lower bound on testset"""
+        self.sample()
+
+        lowerbound = 0
+        [N,dimX] = test_data.shape
+        batches = np.arange(0,N,self.batch_size)
+        if batches[-1] != N:
+            batches = np.append(batches,N)
+
+        for i in xrange(0,len(batches)-2):
+            testBatch = test_data[batches[i]:batches[i+1]]
+            self.currentBatch.set_value( testBatch ) # overwrite this member variable which gets a batch from the TRAIN set by default
+            lowerbound += self.L_func()
+
+        return lowerbound/N
+
+
+    def train_adagrad( self, tol, numberOfIterations, learningRate ):
+
+        lowerbound = np.array([])
+        testlowerbound = np.array([])
+
+        begin = time.time()
+        pbar = progressbar.ProgressBar(maxval=numberOfIterations).start()
+
+        # Evaluate the objective function
+        f_last = self.L_func()
+        # For each iteration...
+        for it in range( numberOfIterations ):
+            #...generate and set value for a minibatch...
+            print 'Iteration:', it
+
+            self.sample()
+            #...compute the gradient for this mini-batch
+            grad = self.dL_func()
+            self.all_gradients.append(totalGradients)
+            # For each gradient variable returned by the gradient function
+            for i in range( len( self.gradientVariables) ):
+                # Compute the new setting for the ith gradient variable using
+                # adagrad equations
+                # TODO finish this
+                h = grad[i]*grad[i]
+                newVariableValue = learningRate/np.sqrt(h) * (totalGradients[i] - (self.B/self.N))
+                # Set the new variable value
+                self.gradientVariables[i].setvalue( newVariableValue )
+
+            f_new = self.L_func()
+            end = time.time()
+            print("Iteration %d, lower bound = %.2f,"
+                  " time = %.2fs"
+                  % (it, f_new/self.N, end - begin))
+            begin = end
+            lowerbound = np.appenx(lowerbound,f_new)
+
+            if it % 5 == 0:
+                print "Calculating test lowerbound"
+                testlowerbound = np.append(testlowerbound,self.getTestLowerBound(self.test_data))
+
+            # Check exit conditions
+            self.all_bounds.append(self.f_new/self.N)
+            if np.abs( f_last - f_new) < tol:
+                break
+            else:
+                f_last = f_new
+
+            pbar.update()
+        pbar.finsh()
 
 class VA(SGPDV):
             #                                               []                       []
-    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, data, numHiddenUnits, kernelType_='RBF', continuous_=True ):
+    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, train_data, test_data, numHiddenUnits, kernelType_='RBF', continuous_=True ):
                        #self, dataSize, induceSize, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_='RBF'
-        SGPDV.__init__( self, len(data), numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_ )
+        SGPDV.__init__( self, len(train_data), numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_ )
 
-        data = np.array(data)
-        self.P = data.shape[1]
-        self.y = th.shared( data )
+        train_data = np.array(train_data)
+        self.P = tain_data.shape[1]
+        self.y = th.shared( tain_data )
         self.y.name = 'y'
         self.y_miniBatch = self.y[self.currentBatch,:]
         self.y_miniBatch.name = 'y_minibatch'
@@ -310,7 +352,11 @@ class VA(SGPDV):
         self.W3.name = 'W3'
         self.b3.name = 'b3'
 
-        #self.gradientVariables += [self.W1,self.W2,self.W3,self.b1,self.b2,self.b3]
+        self.gradientVariables += [self.W1,self.W2,self.W3,self.b1,self.b2,self.b3]
+
+        # Keep track of bounds and gradients for post analysis
+        self.all_bounds = []
+        self.all_gradients = []
 
     def randomise_VA( self, sig=1 ):
 
@@ -368,7 +414,7 @@ class VA(SGPDV):
 
 if __name__ == "__main__":
 
-    va = VA( 3,20,1,2,np.ones((3,1),dtype=np.float64),1.0,np.random.rand(40,3),1 )
+    va = VA( 3,20,1,2,np.ones((3,1),dtype=np.float64),1.0,np.random.rand(40,3),np.random,rand(40,3),1 )
 
     va.randomise()
 
