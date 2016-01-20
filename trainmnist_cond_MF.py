@@ -36,7 +36,7 @@ print "Initialising"
 va = VA(n_induce, batch_size, dimX, dimZ, np.ones((3,1), dtype=np.float64), 1.0, x_train, HU_decoder, kernelType_='RBF', continuous_=True )
 
 print "Training"
-
+va.train_adagrad(tol, n_iter, learning_rate )
 
 
 
