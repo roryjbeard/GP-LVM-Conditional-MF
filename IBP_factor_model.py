@@ -15,6 +15,16 @@ class IBP_Factor(SGPDV):
 
     self.K = K # max number of features
     self.D = D # dimensionality of features
+    self.continuous = continuous_
+
+    # set the data
+    train_data             = np.array(train_data)
+    test_data              = np.array(test_data)
+    self.P                 = train_data.shape[1]
+    self.y                 = th.shared( train_data )
+    self.y_miniBatch       = self.y[self.currentBatch,:]
+    self.y_train           = th.shared( test_data )
+    self.y_train_miniBatch = self.y_train[self.currentBatch,:]
 
     # Suitably sized zero matrices
     K_D_mat   = np.zeros((self.K,self.D), dtype=np.float64)
@@ -22,27 +32,13 @@ class IBP_Factor(SGPDV):
     K_2_mat   = np.zeros((self.K,2), dtype=np.float64)
     N_K_mat   = np.zeros((self.N,self.K_, dtype=np.float64))
 
-
-    train_data = np.array(train_data)
-    self.P = tain_data.shape[1]
-    self.y = th.shared( tain_data )
-    self.y.name = 'y'
-    self.y_miniBatch = self.y[self.currentBatch,:]
-    self.y_miniBatch.name = 'y_minibatch'
-    self.HU_decoder = numHiddenUnits
-    self.continuous = continuous_
-
-    HU_Q_mat = np.zeros( (self.HU_decoder, self.Q))
-    HU_vec   = np.zeros( (self.HU_decoder ,1 ))
-    P_HU_mat = np.zeros( (self.P ,self.HU_decoder))
-    P_vec    = np.zeros( (self.P, 1) )
-
-    self.A       = th.shared( K_D_mat )
+    #self.A       = th.shared( K_D_mat )
     self.Phi_IBP = th.shared( D_D_K_ten )
     self.phi_IBP = th.shared( K_D_mat)
     self.tau_IBP = th.shared( K_2_mat )
     self.mu_IBP  = th.shared( N_K_mat )
-    self.S = th.shared(  )
+    self.S_IBP = th.shared(  )
+    self.nu_IBP  = th.shared(  )
 
     self.A.name = 'A'
     self.b1.name = 'b1'
@@ -51,4 +47,4 @@ class IBP_Factor(SGPDV):
     self.W3.name = 'W3'
     self.b3.name = 'b3'
 
-    self.gradientVariables += [self.W1,self.W2,self.W3,self.b1,self.b2,self.b3]
+    self.gradientVariables.extend([self.A,self.Phi_IBP,self.phi_IBP,self.mu_IBP,self.S_IBP])
