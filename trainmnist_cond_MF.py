@@ -13,7 +13,7 @@ args = parser.parse_args()
 print "Loading MNIST data"
 #Retrieved from: http://deeplearning.net/data/mnist/mnist.pkl.gz
 
-f = gzip.open('../../mnist.pkl.gz', 'rb')
+f = gzip.open('mnist.pkl.gz', 'rb')
 (x_train, t_train), (x_valid, t_valid), (x_test, t_test)  = cPickle.load(f)
 f.close()
 
