@@ -457,7 +457,9 @@ class VA(SGPDV):
         self.all_bounds = []
         self.all_gradients = []
 
-    def randomise_VA( self, sig=1 ):
+    def randomise( self, sig=1 ):
+
+        super(VA,self).randomise( sig )
 
         HU_Q_mat = sig * np.random.randn( self.HU_decoder, self.Q )
         HU_vec   = sig * np.random.randn( self.HU_decoder, 1 )
