@@ -4,7 +4,7 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 from theano.tensor import slinalg, nlinalg
-#import progressbar
+import progressbar
 import time
 from copy import deepcopy
 
