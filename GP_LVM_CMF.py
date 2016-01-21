@@ -4,8 +4,9 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 from theano.tensor import slinalg, nlinalg
-#import progressbar
+import progressbar
 import time
+from copy import deepcopy
 
 
 class kernelFactory(object):
@@ -58,7 +59,7 @@ class SGPDV(object):
         B_R_mat = np.zeros((self.B,self.R), dtype=np.float64)
         R_R_mat = np.zeros((self.R,self.R), dtype=np.float64)
         Q_M_mat = np.zeros((self.Q,self.M), dtype=np.float64)
-        B_Q_mat = np.zeros((self.B,self.Q), dtype=np.float64)
+        Q_B_mat = np.zeros((self.Q,self.B), dtype=np.float64)
         M_M_mat = np.zeros((self.M,self.M), dtype=np.float64)
         B_vec   = np.zeros((self.B,), dtype=np.int32 )
 
@@ -78,6 +79,11 @@ class SGPDV(object):
         self.Phi.name     = 'Phi'
         self.kappa.name   = 'kappa'
 
+        # lower triangular versions
+        self.Upsilon_lower = np.tril( M_M_mat )
+        self.Phi_lower     = np.tril( R_R_mat )
+        self.Tau_lower     = np.tril( R_R_mat )
+        
         # Other parameters
         self.theta = th.shared(np.array(theta_init,dtype=np.float64).flatten())  # kernel parameters
         self.sigma = th.shared( np.float64( sigma_init ) )  # standard deviation of q(z|f)
@@ -87,8 +93,8 @@ class SGPDV(object):
         # Random variables
         self.alpha = th.shared( Q_M_mat )
         self.beta  = th.shared( B_R_mat )
-        self.eta   = th.shared( B_Q_mat )
-        self.xi    = th.shared( B_Q_mat )
+        self.eta   = th.shared( Q_B_mat )
+        self.xi    = th.shared( Q_B_mat )
         self.alpha.name = 'alpha'
         self.beta.name  = 'beta'
         self.eta.name   = 'eta'
@@ -126,7 +132,7 @@ class SGPDV(object):
         # Sample u_q from q(u_q) = N(u_q; kappa_q, Kuu )
         self.u  = self.kappa + ( T.dot(self.cKuu, self.alpha.T) ).T
         # compute mean of f
-        self.mu = T.dot( self.Kfu,  T.dot(self.iKuu, self.u.T ) )
+        self.mu = T.dot( self.Kfu,  T.dot(self.iKuu, self.u.T ) ).T
         # Sample f from q(f|u,X) = N( mu_q, Sigma )
         self.f  = self.mu + ( T.dot(self.cSigma,self.xi.T) ).T
         # Sample z from q(z|f) = N(z,f,I*sigma^2)
@@ -155,19 +161,21 @@ class SGPDV(object):
 
     def randomise( self, sig=1 ):
 
-        upsilon_ = np.random.normal( 0, sig, (self.Q, self.M) )
-        Upsilon_ = np.random.normal( 0, sig, (self.M, self.M) )
-        Upsilon_ = np.dot( Upsilon_, Upsilon_.T )
-        tau_     = np.random.normal( 0, sig, (self.N, self.R) )
-        Tau_     = np.random.normal( 0, sig, (self.R, self.R) )
-        Tau_     = np.dot( Tau_, Tau_.T )
-        phi_     = np.random.normal( 0, sig, (self.N, self.R) )
-        Phi_     = np.random.normal( 0, sig, (self.R, self.R) )
-        Phi_     = np.dot( Phi_, Phi_.T )
-        kappa_   = np.random.normal( 0, sig, (self.Q, self.M) )
-        theta_   = np.random.normal( 0, sig, (self.numberOfHyperparameters,))**2
-        sigma_   = np.exp( np.random.normal( 0, sig ) )
-        Xu_      = np.random.normal( 0, sig, (self.M, self.R) )
+        self.Upsilon_lower = np.tril( sig*np.random.randn(self.R, self.R) )
+        self.Phi_lower     = np.tril( sig*np.random.randn(self.R, self.R) )
+        self.Tau_lower     = np.tril( sig*np.random.randn(self.R, self.R) )
+
+        Upsilon_ = np.dot( self.Upsilon_lower, self.Upsilon_lower.T )
+        Tau_     = np.dot( self.Tau_lower,     self.Tau_lower.T )
+        Phi_     = np.dot( self.Phi_lower,     self.Phi_lower.T )
+
+        upsilon_ = sig*np.random.randn( self.Q, self.M )
+        tau_     = sig*np.random.randn( self.N, self.R )
+        phi_     = sig*np.random.randn( self.N, self.R )
+        kappa_   = sig*np.random.randn( self.Q, self.M )
+        theta_   = sig*np.random.randn( self.numberOfHyperparameters )**2
+        sigma_   = sig*np.exp( np.random.randn() )
+        Xu_      = sig*np.random.randn( self.M, self.R )
 
         self.upsilon.set_value( upsilon_ )
         self.Upsilon.set_value( Upsilon_ )
@@ -276,8 +284,8 @@ class SGPDV(object):
         # generate standard gaussian random varibales
         alpha_ = np.random.randn( self.Q, self.M )
         beta_  = np.random.randn( self.B, self.R )
-        eta_   = np.random.randn( self.B, self.Q )
-        xi_    = np.random.randn( self.B, self.Q )
+        eta_   = np.random.randn( self.Q, self.B )
+        xi_    = np.random.randn( self.Q, self.B )
         currentBatch_ = np.int32( np.sort( np.random.choice(self.N,self.B,replace=False) ) )
 
         self.currentBatch.set_value( currentBatch_ )
@@ -286,93 +294,152 @@ class SGPDV(object):
         self.eta.set_value( eta_ )
         self.xi.set_value( xi_ )
 
-    def train_adagrad( self, tol, numberOfIterations, learningRate ):
+    def train_adagrad( self, numberOfIterations, learningRate=1e-2, fudgeFactor=1e-6 ):
 
-        lowerbound = np.array([])
-        testlowerbound = np.array([])
+        lowerBounds = []
 
-        begin = time.time()
         pbar = progressbar.ProgressBar(maxval=numberOfIterations).start()
 
-        # Evaluate the objective function
-        f_last = self.L_func()
+        startTime    = time.time()
+        wallClockOld = startTime
         # For each iteration...
+        variableValues = self.getVariableValues()
+        totalGradients = [0.0]*len( self.gradientVariables )
         for it in range( numberOfIterations ):
             #...generate and set value for a minibatch...
-            print 'Iteration:', it
-
             self.sample()
             #...compute the gradient for this mini-batch
-            grad = self.dL_func()
-            self.all_gradients.append(totalGradients)
+            grads = self.lowerTriangularGradients( self.dL_func() )
             # For each gradient variable returned by the gradient function
             for i in range( len( self.gradientVariables) ):
-                # Compute the new setting for the ith gradient variable using
-                # adagrad equations
-                # TODO finish this
-                h = grad[i]*grad[i]
-                newVariableValue = learningRate/np.sqrt(h) * (totalGradients[i] - (self.B/self.N))
-                # Set the new variable value
-                self.gradientVariables[i].setvalue( newVariableValue )
+                if totalGradients[i] == 0:
+                    totalGradients[i] =  grads[i]**2
+                else:
+                    totalGradients[i] += grads[i]**2
+                        
+                adjustedGrad = grads[i] / ( fudgeFactor + np.sqrt( totalGradients[i] ) )
                 
+                variableValues[i] = variableValues[i] + learningRate * adjustedGrad
+            
+            # Set the new variable value
+            self.setVariableValues( variableValues )            
             self.lowerBound = self.L_func()
-            f_new = self.lowerBound
-            end = time.time()
-            print("Iteration %d, lower bound = %.2f,"
-                  " time = %.2fs"
-                  % (it, f_new/self.B, end - begin))
-            begin = end
-            lowerbound = np.appenx(lowerbound,f_new)
-
-            if it % 5 == 0:
-                print "Calculating test lowerbound"
-                testlowerbound = np.append( testlowerbound, self.getTestLowerBound() )
-
-            # Check exit conditions
-            self.all_bounds.append(self.f_new/self.N)
-            if np.abs( f_last - f_new) < tol:
-                break
-            else:
-                f_last = f_new
+            
+            currentTime  = time.time()
+            wallClock    = currentTime - startTime           
+            stepTime     = wallClock - wallClockOld
+            wallClockOld = wallClock
+            
+            print("It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f" 
+                  % (it, wallClock, stepTime, self.lowerBound))
+            
+            lowerBounds.append( (self.lowerBound,wallClock) )
 
             pbar.update()
         pbar.finsh()
         
+        return lowerBounds
+        
+        
+    def lowerTriangularGradients( self, gradients ):
+
+        for i in range( len( self.gradientVariables) ):
+            
+            if self.gradientVariables[i] == self.Upsilon:
+                dUpsilon       = gradients[i]
+                dUpsilon_lower = 2*np.tril( np.dot( dUpsilon, self.Upsilon_lower ) )
+                gradients[i]   = dUpsilon_lower
+            elif self.gradientVariables[i] == self.Phi:
+                dPhi           = gradients[i]
+                dPhi_lower     = 2*np.tril( np.dot( dPhi, self.Phi_lower ) )
+                gradients[i]   = dPhi_lower
+            elif self.gradientVariables[i] == self.Tau:
+                dTau           = gradients[i]
+                dTau_lower     = 2*np.tril( np.dot( dTau, self.Tau_lower ) )
+                gradients[i]   = dTau_lower
+                
+        return gradients
+        
+    def setVariableValues( self, values ):
+        
+        for i in range( len( self.gradientVariables) ):
+            
+            if self.gradientVariables[i] == self.Upsilon:
+                self.Upsilon_lower = values[i]
+                self.Upsilon.set_value( np.dot( self.Upsilon_lower, self.Upsilon_lower.T ) )
+            elif self.gradientVariables[i] == self.Phi:
+                self.Phi_lower = values[i]
+                self.Phi.set_value( np.dot( self.Phi_lower, self.Phi_lower.T ) )
+            elif self.gradientVariables[i] == self.Tau:
+                self.Tau_lower = values[i]
+                self.Tau.set_value( np.dot( self.Tau_lower, self.Tau_lower.T ) )
+            else:
+                self.gradientVariables[i].set_value( values[i] )
+            
+    def getVariableValues( self ):
+
+        values = [0]*len(self.gradientVariables)
+        for i in range( len( self.gradientVariables) ):
+            
+            if self.gradientVariables[i] == self.Upsilon:
+                values[i] = deepcopy( self.Upsilon_lower )
+            elif self.gradientVariables[i] == self.Phi:
+                values[i] = deepcopy( self.Phi_lower )
+            elif self.gradientVariables[i] == self.Tau:
+                values[i] = deepcopy( self.Tau_lower )
+            else:
+                values[i] = self.gradientVariables[i].get_value()
+            
     def getTestLowerBound(self):
         return 0        
+    
+    def copyParameters( self, other ):
+        
+        if self.R == other.R and self.Q == other.Q and self.M == other.M:
+            
+            self.Upsilon_lower = deepcopy( other.Upsilon_lower )
+            self.Phi_lower     = deepcopy( other.Phi_lower )
+            self.Tau_lower     = deepcopy( other.Tau_lower )
+            
+            self.upsilon.set_value( other.upsilon.get_value() )
+            self.Upsilon.set_value( other.Upsilon.get_value() )
+            self.kappa.set_value( other.kappa.get_value() )
+            self.theta.set_value( other.kappa.get_value() )
+            self.sigma.set_value( other.sigma.get_value() )
+
+            self.Xu.set_value( other.Xu_get_value() )
+
+        else:
+            raise RuntimeError('In compatible model dimensions')
 
 class VA(SGPDV):
 
             #                                               []                       []
-    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, train_data, test_data, numHiddenUnits, kernelType_='RBF', continuous_=True ):
+    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, data, numHiddenUnits, kernelType_='RBF', continuous_=True ):
                        #self, dataSize, induceSize, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_='RBF'
-        SGPDV.__init__( self, len(train_data), numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_ )
+        SGPDV.__init__( self, len(data), numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_ )
         
-
         self.HU_decoder = numHiddenUnits
         self.continuous = continuous_
         
         # set the data
-        train_data             = np.array(train_data)
-        test_data              = np.array(test_data)        
-        self.P                 = train_data.shape[1]
-        self.y                 = th.shared( train_data )
-        self.y_miniBatch       = self.y[self.currentBatch,:]
-        self.y_train           = th.shared( test_data )
-        self.y_train_miniBatch = self.y_train[self.currentBatch,:]
+        data             = np.array(data)
+        self.P           = data.shape[1]
+        self.y           = th.shared(data)
+        self.y_miniBatch = self.y[self.currentBatch,:]
         
         self.y.name           = 'y'
         self.y_miniBatch.name = 'y_minibatch'
         
         # Construct appropriately sized matrices to initialise theano shares
-        HU_Q_mat = np.zeros( (self.HU_decoder, self.Q))
-        HU_vec   = np.zeros( (self.HU_decoder ,1 ))
-        P_HU_mat = np.zeros( (self.P ,self.HU_decoder))
+        HU_Q_mat = np.zeros( (self.HU_decoder, self.Q) )
+        HU_vec   = np.zeros( (self.HU_decoder ,1 ) )
+        P_HU_mat = np.zeros( (self.P ,self.HU_decoder) )
         P_vec    = np.zeros( (self.P, 1) )
 
         self.W1 = th.shared( HU_Q_mat )
         self.b1 = th.shared( HU_vec )
-        self.W2 = th.shared( P_HU_mat)
+        self.W2 = th.shared( P_HU_mat )
         self.b2 = th.shared( P_vec )
         self.W3 = th.shared( P_HU_mat )
         self.b3 = th.shared( P_vec )
@@ -390,7 +457,9 @@ class VA(SGPDV):
         self.all_bounds = []
         self.all_gradients = []
 
-    def randomise_VA( self, sig=1 ):
+    def randomise( self, sig=1 ):
+
+        super(VA,self).randomise( sig )
 
         HU_Q_mat = sig * np.random.randn( self.HU_decoder, self.Q )
         HU_vec   = sig * np.random.randn( self.HU_decoder, 1 )
@@ -404,19 +473,14 @@ class VA(SGPDV):
         self.W3 = th.shared( P_HU_mat )
         self.b3 = th.shared( P_vec )
 
-    def log_p_y_z( self, test=False ):
+    def log_p_y_z( self ):
         if self.continuous:
             h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z.T) + self.b1)
             mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)            
             log_sigma_decoder = 0.5*(T.dot(self.W3, h_decoder) + self.b3)
+            log_pyz    = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
+                                - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
 
-            if not test:
-                log_pyz = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
-                        - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
-            else:
-                log_pyz = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
-                        - 0.5 * ((self.y_test_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
-            
             log_sigma_decoder.name = 'log_sigma_decoder'
             mu_decoder.name        = 'mu_decoder'
             h_decoder.name         = 'h_decoder'            
@@ -430,11 +494,27 @@ class VA(SGPDV):
             log_pyz.name   = 'log_p_y_z'
         return log_pyz
 
-    def getTestLowerBound( self ):
-        """Use this method for example to compute lower bound on testset"""
-        self.sample()
-        return self.lowerBound -self.log_p_y_z() +self.log_p_y_z( test=True )
 
+    def copyParameters( self, other ):
+
+        if self.HU_decoder == other.HU_decoder and self.numHiddenUnits == other.numHiddenUnits \
+            and self.continuous == other.continuous:
+            
+            super(VA,self).copyParameters( other )
+
+            self.W1.set_value( other.W1.get_value() )
+            self.b1.set_value( other.b1.get_value() )
+            self.W2.set_value( other.W2.get_value() )
+            self.b2.set_value( other.b2.get_value() )
+            self.W3.set_value( other.W3.get_value() )
+            self.b3.set_value( other.b3.get_value() )
+        
+        else:
+            raise RuntimeError('In compatible model dimensions')
+        
+        
+    def optimiseLatentCoordinates( self ):
+        assert(False)
 
 
     # def KL_qp( self ):
@@ -456,34 +536,34 @@ class VA(SGPDV):
         return KL
 
 if __name__ == "__main__":
+    
+        #numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, data, numHiddenUnits
+    va = VA( 3,20,1,2,np.ones((2,),dtype=np.float64),1.0,np.random.rand(40,3),2 )
 
-             #numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, train_data, test_data, numHiddenUnits
-    va = VA( 3,20,1,2,np.ones((2,),dtype=np.float64),1.0,np.random.rand(40,3),np.random.rand(40,3),2 )
+    tmp1 = va.log_p_y_z()
+    T.grad( tmp1,  [va.Xu, va.theta, va.sigma, va.phi, va.Phi, va.kappa, va.W1,va.W2,va.W3,va.b1,va.b2,va.b3] )
 
-#    tmp1 = va.log_p_y_z()
-#    T.grad( tmp1,  [va.Xu, va.theta, va.sigma, va.phi, va.Phi, va.kappa, va.W1,va.W2,va.W3,va.b1,va.b2,va.b3] )
-#
-#    # va.log_p_z() No implmented in va
-#
-#    tmp2 = va.KL_qp()
-#    T.grad( tmp2, [va.Xu, va.theta, va.phi, va.Phi, va.kappa] )
-#
-#    # va.log_q_z_fX() not implmented yet
-#
-#    tmp3 = va.KL_qr()
-#    T.grad( tmp3, [va.Xu, va.theta, va.phi, va.Phi, va.kappa, va.tau, va.Tau, va.upsilon, va.Upsilon] )
-#
-#
-#    tmp4 = va.log_r_uX_z()
-#    T.grad( tmp4, [va.Xu, va.theta, va.kappa, va.phi, va.Phi, va.tau, va.Tau, va.upsilon, va.Upsilon] )
-#
-#    tmp5 = va.log_q_uX()
-#    T.grad( tmp5, [va.theta, va.kappa, va.phi, va.Phi, va.Xu ] )
-#
-#    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+    # va.log_p_z() No implmented in va
+
+    tmp2 = va.KL_qp()
+    T.grad( tmp2, [va.Xu, va.theta, va.phi, va.Phi, va.kappa] )
+
+    # va.log_q_z_fX() not implmented yet
+
+    tmp3 = va.KL_qr()
+    T.grad( tmp3, [va.Xu, va.theta, va.phi, va.Phi, va.kappa, va.tau, va.Tau, va.upsilon, va.Upsilon] )
+
+
+    tmp4 = va.log_r_uX_z()
+    T.grad( tmp4, [va.Xu, va.theta, va.kappa, va.phi, va.Phi, va.tau, va.Tau, va.upsilon, va.Upsilon] )
+
+    tmp5 = va.log_q_uX()
+    T.grad( tmp5, [va.theta, va.kappa, va.phi, va.Phi, va.Xu ] )
+
+    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
 
     va.randomise()
     

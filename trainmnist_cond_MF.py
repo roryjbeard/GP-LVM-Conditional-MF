@@ -1,11 +1,10 @@
 
 
-import VAE_cond_MF
+from GP_LVM_CMF import VA
 import numpy as np
 import argparse
-import time
 import gzip, cPickle
-import progressbar
+
 
 parser = argparse.ArgumentParser()
 
@@ -35,8 +34,13 @@ learning_rate = 0.01
 print "Initialising"
 va = VA(n_induce, batch_size, dimX, dimZ, np.ones((3,1), dtype=np.float64), 1.0, x_train, HU_decoder, kernelType_='RBF', continuous_=True )
 
+va.construct_L()
+
+va.randomise()
+
 print "Training"
-va.train_adagrad(tol, n_iter, learning_rate )
+lowerBounds = va.train_adagrad( n_iter, learning_rate )
+
 
 
 
