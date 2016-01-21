@@ -4,7 +4,8 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 from theano.tensor import slinalg, nlinalg
-import progressbar
+#import progressbar
+import time
 
 
 class kernelFactory(object):
@@ -34,13 +35,15 @@ class kernelFactory(object):
         elif self.kernelType ==  'LINnn':
             K * (T.sum(X1**2, 1) + 1) + self.eps
             K.name = name_ + '(LINnn)'
+        else:
+            assert(False)
         return K
 
 class SGPDV(object):
 
     def __init__(self, numberOfDataPoints, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType='RBF' ):
 
-        self.N = numberOfDataPoints # Number of observations
+        self.N = numberOfDataPoints # Number of observations        
         self.M = numberOfInducingPoints # Number of inducing ponts in sparse GP
         self.B = batchSize # Size of mini batch
         self.R = dimX # Dimensionality of the latent co-ordinates
@@ -55,7 +58,7 @@ class SGPDV(object):
         B_R_mat = np.zeros((self.B,self.R), dtype=np.float64)
         R_R_mat = np.zeros((self.R,self.R), dtype=np.float64)
         Q_M_mat = np.zeros((self.Q,self.M), dtype=np.float64)
-        Q_B_mat = np.zeros((self.Q,self.B), dtype=np.float64)
+        B_Q_mat = np.zeros((self.B,self.Q), dtype=np.float64)
         M_M_mat = np.zeros((self.M,self.M), dtype=np.float64)
         B_vec   = np.zeros((self.B,), dtype=np.int32 )
 
@@ -73,18 +76,19 @@ class SGPDV(object):
         self.Tau.name     = 'Tau'
         self.phi.name     = 'phi'
         self.Phi.name     = 'Phi'
+        self.kappa.name   = 'kappa'
 
         # Other parameters
-        self.theta = th.shared(theta_init)  # kernel parameters
-        self.sigma = th.shared(np.float64( sigma_init ) )  # standard deviation of q(z|f)
+        self.theta = th.shared(np.array(theta_init,dtype=np.float64).flatten())  # kernel parameters
+        self.sigma = th.shared( np.float64( sigma_init ) )  # standard deviation of q(z|f)
         self.theta.name = 'theta'
         self.sigma.name = 'sigma'
 
         # Random variables
         self.alpha = th.shared( Q_M_mat )
         self.beta  = th.shared( B_R_mat )
-        self.eta   = th.shared( Q_B_mat )
-        self.xi    = th.shared( Q_B_mat )
+        self.eta   = th.shared( B_Q_mat )
+        self.xi    = th.shared( B_Q_mat )
         self.alpha.name = 'alpha'
         self.beta.name  = 'beta'
         self.eta.name   = 'eta'
@@ -135,8 +139,19 @@ class SGPDV(object):
         self.f.name      = 'f'
         self.z.name      = 'z'
 
+        # Other useful quantities
+        self.logDetKuu     = T.log(nlinalg.Det()(self.Kuu))
+        self.logDetPhi     = T.log(nlinalg.Det()(self.Phi))
+        self.logDetTau     = T.log(nlinalg.Det()(self.Tau))
+        self.logDetUpsilon = T.log(nlinalg.Det()(self.Upsilon))
+        self.logDetSigma   = T.log(nlinalg.Det()(self.Sigma))
+
+        self.iPhi     = nlinalg.matrix_inverse(self.Phi)
+        self.iUpsilon = nlinalg.matrix_inverse(self.Upsilon)
+        self.iTau     = nlinalg.matrix_inverse(self.Tau)
+
         # This should be all the th.shared variables
-        self.gradientVariables = [ self.theta, self.sigma, self.phi, self.Phi, self.kappa ] # self.tau, self.Tau, self.upsilon, self.Upsilon
+        self.gradientVariables = [self.Xu ,self.theta, self.sigma, self.phi, self.Phi, self.kappa, self.tau, self.Tau, self.upsilon, self.Upsilon]
 
     def randomise( self, sig=1 ):
 
@@ -150,7 +165,7 @@ class SGPDV(object):
         Phi_     = np.random.normal( 0, sig, (self.R, self.R) )
         Phi_     = np.dot( Phi_, Phi_.T )
         kappa_   = np.random.normal( 0, sig, (self.Q, self.M) )
-        theta_   = np.random.normal( 0, sig, (self.numberOfHyperparameters, 1))**2
+        theta_   = np.random.normal( 0, sig, (self.numberOfHyperparameters,))**2
         sigma_   = np.exp( np.random.normal( 0, sig ) )
         Xu_      = np.random.normal( 0, sig, (self.M, self.R) )
 
@@ -165,73 +180,95 @@ class SGPDV(object):
         self.sigma.set_value( sigma_ )
         self.Xu.set_value( Xu_ )
 
-    #def log_p_y_z()
+    def log_p_y_z(self):
         # This always needs overloading (specifying) in the derived class
+        return 0.0
 
-    #def log_p_z():
+    def log_p_z(self):
         # Overload this function in the derived class if p_z_gaussian==False
+        return 0.0
 
-    #def KL_qp():
+    def KL_qp(self):
         # Overload this function in the derived classes if p_z_gaussian==True
+        return 0.0
 
     def construct_L( self, p_z_gaussian=True, r_uX_z_gaussian=True, q_f_Xu_equals_r_f_Xuz=True ):
 
         L = self.log_p_y_z()
+        L.name = 'L'
 
         if p_z_gaussian and q_f_Xu_equals_r_f_Xuz:
             L += -self.KL_qp()
         else:
-            L += +self.log_p_z() -self.log_q_z_fX()
+            L += self.log_p_z() -self.log_q_z_fX()
 
         if r_uX_z_gaussian and q_f_Xu_equals_r_f_Xuz:
             L += -self.KL_qr()
         else:
-             L += +self.log_r_uX_z() -self.log_q_uX()
+            L += self.log_r_uX_z() -self.log_q_uX()
 
         if not q_f_Xu_equals_r_f_Xuz:
              assert(False) # Case not implemented
-
-        L.name = 'L'
+        
         dL = T.grad( L, self.gradientVariables )
 
         self.L_func  = th.function( [], L )
         self.dL_func = th.function( [], dL )
 
     def log_r_uX_z(self):
-        log_ruz = -0.5*self.Q*self.M*np.log(2*np.pi) - 0.5*self.Q*T.log(nlinalg.Det()(self.Upsilon))\
-                - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Upsilon), T.dot((self.u - self.upsilon).T, (self.u - self.upsilon))))
+
         X_m_tau = self.Xf - self.tau[self.currentBatch,:]
-        log_rXz = -0.5*self.B*self.R*np.log(2*np.pi) - 0.5*self.B*T.log(nlinalg.Det()(self.Tau))\
-                - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Tau), T.dot(X_m_tau.T, X_m_tau)))
+        xOuter = T.dot(X_m_tau.T, X_m_tau)
+        uOuter = T.dot((self.u - self.upsilon).T, (self.u - self.upsilon))
+
+        log2pi  = np.log(2*np.pi)
+
+        log_ruz = -0.5 * self.Q*self.M*log2pi - 0.5*self.Q*self.logDetUpsilon \
+                  -0.5 * nlinalg.trace( T.dot(self.iUpsilon, uOuter ) )
+        log_rXz = -0.5 * self.B*self.R*log2pi - 0.5*self.B*self.logDetTau \
+                  -0.5 * nlinalg.trace( T.dot( self.iTau, xOuter) )
+                
         return log_ruz + log_rXz
 
     def log_q_f_uX(self):
-        _log_q_f_uX = -0.5*self.Q*self.B*np.log(2*np.pi) - 0.5*self.Q*T.log( nlinalg.Det()( self.Sigma ))\
-                    - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Sigma), T.dot((self.f - self.mu).T, (self.f - self.mu))))
+        _log_q_f_uX = -0.5*self.Q*self.B*np.log(2*np.pi) - 0.5*self.Q*self.logDetSigma \
+                    - 0.5 * nlinalg.trace(T.dot(self.iSigma, T.dot((self.f - self.mu).T, (self.f - self.mu))))
         return _log_q_f_uX
 
     def log_q_z_fX(self):
-         assert(False)
+        # TODO: implement this function        
+        return 0
 
     def log_q_uX(self):
-         log_q_u = -0.5*self.Q*self.M*np.log(2*np.pi) - 0.5*self.Q*T.log(nlinalg.Det()(self.Kuu)) \
-                 - 0.5 * nlinalg.trace(T.dot( self.iKuu, T.dot((self.u - self.kappa).T, (self.u - self.kappa)) ))
+        
+         log2pi  = np.log(2*np.pi)
+               
          X_m_phi = self.Xf - self.phi[self.currentBatch,:]
-         log_q_X = -0.5*self.B*self.R*np.log(2*np.pi) - 0.5*self.B*(T.log(nlinalg.Det()(self.Phi))) \
-                 - 0.5 * nlinalg.trace(T.dot(nlinalg.matrix_inverse(self.Phi), T.dot(X_m_phi.T, X_m_phi)))
+         xOuter  = T.dot(X_m_phi.T, X_m_phi)         
+         uOuter  = T.dot((self.u - self.kappa).T, (self.u - self.kappa))        
+        
+         log_q_u = -0.5 * self.Q*self.M*log2pi - 0.5*self.Q*self.logDetKuu \
+                   -0.5 * nlinalg.trace( T.dot( self.iKuu, uOuter ) )
+         log_q_X = -0.5 * self.B*self.R*log2pi - 0.5*self.B*self.logDetPhi \
+                   -0.5 * nlinalg.trace( T.dot( self.iPhi, xOuter ) )
+                   
          return log_q_u + log_q_X
 
     def KL_qr(self):
-        iUpsilon = nlinalg.matrix_inverse(self.Upsilon)
+                
         upsilon_m_kapa = self.upsilon - self.kappa
-        KL_qr_u = 0.5 * ( nlinalg.trace( T.dot(iUpsilon, (T.dot(upsilon_m_kapa.T, upsilon_m_kapa))) ) ) \
-                + nlinalg.trace(T.dot(iUpsilon, self.Kuu)) \
-                + T.log(nlinalg.Det()(self.Upsilon)) - T.log(nlinalg.Det()(self.Kuu)) - self.Q*self.M
-        iTau = nlinalg.matrix_inverse(self.Tau)
-        phi_m_tau = self.phi - self.tau
-        KL_qr_X = 0.5 * ( nlinalg.trace( T.dot(iTau, (T.dot(phi_m_tau.T, phi_m_tau))) ) ) \
-                + nlinalg.trace(T.dot(iTau, self.Phi)) \
-                + T.log(nlinalg.Det()(self.Tau)) - T.log(nlinalg.Det()(self.Phi)) - self.N*self.R
+        phi_m_tau      = self.phi     - self.tau
+        
+        uOuter = T.dot(upsilon_m_kapa.T, upsilon_m_kapa)
+        xOuter = T.dot(phi_m_tau.T, phi_m_tau)
+        
+        KL_qr_u = 0.5 * ( nlinalg.trace( T.dot(self.iUpsilon, uOuter ) ) ) \
+                + nlinalg.trace( T.dot( self.iUpsilon, self.Kuu) ) \
+                + self.logDetUpsilon - self.logDetKuu - self.Q*self.M
+        
+        KL_qr_X = 0.5 * ( nlinalg.trace( T.dot( self.iTau, xOuter ) ) ) \
+                + nlinalg.trace(T.dot(self.iTau, self.Phi)) \
+                + self.logDetTau - self.logDetPhi - self.N*self.R
 
         return KL_qr_u + KL_qr_X
 
@@ -239,33 +276,15 @@ class SGPDV(object):
         # generate standard gaussian random varibales
         alpha_ = np.random.randn( self.Q, self.M )
         beta_  = np.random.randn( self.B, self.R )
-        eta_   = np.random.randn( self.Q, self.B )
-        xi_    = np.random.randn( self.Q, self.B )
-        currentBatch_ = np.int32( np.random.choice(self.N,self.B,replace=False) )
+        eta_   = np.random.randn( self.B, self.Q )
+        xi_    = np.random.randn( self.B, self.Q )
+        currentBatch_ = np.int32( np.sort( np.random.choice(self.N,self.B,replace=False) ) )
 
         self.currentBatch.set_value( currentBatch_ )
         self.alpha.set_value( alpha_ )
         self.beta.set_value( beta_ )
         self.eta.set_value( eta_ )
         self.xi.set_value( xi_ )
-
-    def getTestLowerBound( self, test_data ):
-        """Use this method for example to compute lower bound on testset"""
-        self.sample()
-
-        lowerbound = 0
-        [N,dimX] = test_data.shape
-        batches = np.arange(0,N,self.batch_size)
-        if batches[-1] != N:
-            batches = np.append(batches,N)
-
-        for i in xrange(0,len(batches)-2):
-            testBatch = test_data[batches[i]:batches[i+1]]
-            self.currentBatch.set_value( testBatch ) # overwrite this member variable which gets a batch from the TRAIN set by default
-            lowerbound += self.L_func()
-
-        return lowerbound/N
-
 
     def train_adagrad( self, tol, numberOfIterations, learningRate ):
 
@@ -295,18 +314,19 @@ class SGPDV(object):
                 newVariableValue = learningRate/np.sqrt(h) * (totalGradients[i] - (self.B/self.N))
                 # Set the new variable value
                 self.gradientVariables[i].setvalue( newVariableValue )
-
-            f_new = self.L_func()
+                
+            self.lowerBound = self.L_func()
+            f_new = self.lowerBound
             end = time.time()
             print("Iteration %d, lower bound = %.2f,"
                   " time = %.2fs"
-                  % (it, f_new/self.N, end - begin))
+                  % (it, f_new/self.B, end - begin))
             begin = end
             lowerbound = np.appenx(lowerbound,f_new)
 
             if it % 5 == 0:
                 print "Calculating test lowerbound"
-                testlowerbound = np.append(testlowerbound,self.getTestLowerBound(self.test_data))
+                testlowerbound = np.append( testlowerbound, self.getTestLowerBound() )
 
             # Check exit conditions
             self.all_bounds.append(self.f_new/self.N)
@@ -317,22 +337,34 @@ class SGPDV(object):
 
             pbar.update()
         pbar.finsh()
+        
+    def getTestLowerBound(self):
+        return 0        
 
 class VA(SGPDV):
+
             #                                               []                       []
     def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, train_data, test_data, numHiddenUnits, kernelType_='RBF', continuous_=True ):
                        #self, dataSize, induceSize, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_='RBF'
         SGPDV.__init__( self, len(train_data), numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_ )
+        
 
-        train_data = np.array(train_data)
-        self.P = tain_data.shape[1]
-        self.y = th.shared( tain_data )
-        self.y.name = 'y'
-        self.y_miniBatch = self.y[self.currentBatch,:]
-        self.y_miniBatch.name = 'y_minibatch'
         self.HU_decoder = numHiddenUnits
         self.continuous = continuous_
-
+        
+        # set the data
+        train_data             = np.array(train_data)
+        test_data              = np.array(test_data)        
+        self.P                 = train_data.shape[1]
+        self.y                 = th.shared( train_data )
+        self.y_miniBatch       = self.y[self.currentBatch,:]
+        self.y_train           = th.shared( test_data )
+        self.y_train_miniBatch = self.y_train[self.currentBatch,:]
+        
+        self.y.name           = 'y'
+        self.y_miniBatch.name = 'y_minibatch'
+        
+        # Construct appropriately sized matrices to initialise theano shares
         HU_Q_mat = np.zeros( (self.HU_decoder, self.Q))
         HU_vec   = np.zeros( (self.HU_decoder ,1 ))
         P_HU_mat = np.zeros( (self.P ,self.HU_decoder))
@@ -352,7 +384,7 @@ class VA(SGPDV):
         self.W3.name = 'W3'
         self.b3.name = 'b3'
 
-        self.gradientVariables += [self.W1,self.W2,self.W3,self.b1,self.b2,self.b3]
+        self.gradientVariables.extend([self.W1,self.W2,self.W3,self.b1,self.b2,self.b3])
 
         # Keep track of bounds and gradients for post analysis
         self.all_bounds = []
@@ -372,24 +404,37 @@ class VA(SGPDV):
         self.W3 = th.shared( P_HU_mat )
         self.b3 = th.shared( P_vec )
 
-    def log_p_y_z( self ):
+    def log_p_y_z( self, test=False ):
         if self.continuous:
             h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z.T) + self.b1)
-            h_decoder.name ='h_decoder'
-            mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)
-            mu_decoder.name = 'mu_decoder'
+            mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)            
             log_sigma_decoder = 0.5*(T.dot(self.W3, h_decoder) + self.b3)
+
+            if not test:
+                log_pyz = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
+                        - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
+            else:
+                log_pyz = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
+                        - 0.5 * ((self.y_test_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
+            
             log_sigma_decoder.name = 'log_sigma_decoder'
-            log_pyz = T.sum(-(0.5 * np.log(2 * np.pi) + log_sigma_decoder) - 0.5 * ((self.y_miniBatch - mu_decoder) / T.exp(log_sigma_decoder))**2)
-            log_pyz.name = 'log_p_y_z'
+            mu_decoder.name        = 'mu_decoder'
+            h_decoder.name         = 'h_decoder'            
+            log_pyz.name           = 'log_p_y_z'
         else:
             h_decoder = T.tanh(T.dot(self.W1,self.z.T) + self.b1)
+            y_hat     = T.nnet.sigmoid(T.dot(self.W2,h_decoder) + self.b2)
+            log_pyz   = -T.nnet.binary_crossentropy(y_hat,self.y_miniBatch).sum()
             h_decoder.name = 'h_decoder'
-            y_hat = T.nnet.sigmoid(T.dot(self.W2,h_decoder) + self.b2)
-            y_hat.name = 'y_hat'
-            log_pyz = -T.nnet.binary_crossentropy(y_hat,self.y_miniBatch).sum()
-            log_pyz.name = 'log_p_y_z'
+            y_hat.name     = 'y_hat'                        
+            log_pyz.name   = 'log_p_y_z'
         return log_pyz
+
+    def getTestLowerBound( self ):
+        """Use this method for example to compute lower bound on testset"""
+        self.sample()
+        return self.lowerBound -self.log_p_y_z() +self.log_p_y_z( test=True )
+
 
 
     # def KL_qp( self ):
@@ -408,32 +453,79 @@ class VA(SGPDV):
             KL = -0.5*self.B*self.Q*(1 + self.sigma**2 - 2*T.log(self.sigma)) \
                  +0.5*nlinalg.trace(T.dot( self.iKuu, T.dot( Kuf_Kfu_iKuu, (T.dot(self.kappa.T, self.kappa) + self.iKuu) ) )) \
                  +0.5*self.Q*( nlinalg.trace(self.Kff) - nlinalg.trace(Kuf_Kfu_iKuu) )
-            KL = 0 # TODO
         return KL
-
 
 if __name__ == "__main__":
 
-    va = VA( 3,20,1,2,np.ones((3,1),dtype=np.float64),1.0,np.random.rand(40,3),np.random,rand(40,3),1 )
+             #numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, train_data, test_data, numHiddenUnits
+    va = VA( 3,20,1,2,np.ones((2,),dtype=np.float64),1.0,np.random.rand(40,3),np.random.rand(40,3),2 )
+
+#    tmp1 = va.log_p_y_z()
+#    T.grad( tmp1,  [va.Xu, va.theta, va.sigma, va.phi, va.Phi, va.kappa, va.W1,va.W2,va.W3,va.b1,va.b2,va.b3] )
+#
+#    # va.log_p_z() No implmented in va
+#
+#    tmp2 = va.KL_qp()
+#    T.grad( tmp2, [va.Xu, va.theta, va.phi, va.Phi, va.kappa] )
+#
+#    # va.log_q_z_fX() not implmented yet
+#
+#    tmp3 = va.KL_qr()
+#    T.grad( tmp3, [va.Xu, va.theta, va.phi, va.Phi, va.kappa, va.tau, va.Tau, va.upsilon, va.Upsilon] )
+#
+#
+#    tmp4 = va.log_r_uX_z()
+#    T.grad( tmp4, [va.Xu, va.theta, va.kappa, va.phi, va.Phi, va.tau, va.Tau, va.upsilon, va.Upsilon] )
+#
+#    tmp5 = va.log_q_uX()
+#    T.grad( tmp5, [va.theta, va.kappa, va.phi, va.Phi, va.Xu ] )
+#
+#    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+#    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+#    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+#    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
 
     va.randomise()
-
+    
     va.randomise_VA()
 
     va.sample()
 
-    va.log_p_y_z()
+    print th.function( [], va.cSigma )()
+    
+    print th.function( [], va.cPhi )()
+    print th.function( [], va.Xf )()
+    print th.function( [], va.cPhi )()
+    print th.function( [], va.Xf )()
 
-    # va.log_p_z() No implmented in va
+    print th.function( [], va.Xu )()
+    print th.function( [], va.Xf )()
+    print th.function( [], va.Xf )()
 
-    va.KL_qp()
+    print th.function( [], va.cKuu )()
+    print th.function( [], va.iKuu )()
+    print th.function( [], va.cKuu )()
+    print th.function( [], va.iKuu )()
 
-    # va.log_q_z_fX() not implmented yet
+    print th.function( [], va.Sigma )()
+    print th.function( [], va.cSigma )()
+    
+    print th.function( [], va.u )()
+    print th.function( [], va.mu )()
+    print th.function( [], va.f )()
+    print th.function( [], va.z )()
 
-    va.KL_qr()
+    print th.function( [], va.logDetKuu )()
+    print th.function( [], va.logDetPhi )()
+    print th.function( [], va.logDetTau )()
+    print th.function( [], va.logDetUpsilon )()
+    print th.function( [], va.logDetSigma )()
 
-    va.log_r_uX_z()
+    print th.function( [], va.iPhi )()
+    print th.function( [], va.iUpsilon )()
+    print th.function( [], va.iTau )()
 
-    va.log_q_uX()
-
-    va.construct_L()
+    #print va.L_func()
+    
+    
+    
