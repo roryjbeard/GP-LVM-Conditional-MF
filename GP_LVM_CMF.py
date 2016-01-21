@@ -43,7 +43,7 @@ class SGPDV(object):
 
     def __init__(self, numberOfDataPoints, numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType='RBF' ):
 
-        self.N = numberOfDataPoints # Number of observations
+        self.N = numberOfDataPoints # Number of observations        
         self.M = numberOfInducingPoints # Number of inducing ponts in sparse GP
         self.B = batchSize # Size of mini batch
         self.R = dimX # Dimensionality of the latent co-ordinates
@@ -221,7 +221,7 @@ class SGPDV(object):
         xOuter = T.dot(X_m_tau.T, X_m_tau)
         uOuter = T.dot((self.u - self.upsilon).T, (self.u - self.upsilon))
 
-        log2pi        = np.log(2*np.pi)
+        log2pi  = np.log(2*np.pi)
 
         log_ruz = -0.5 * self.Q*self.M*log2pi - 0.5*self.Q*self.logDetUpsilon \
                   -0.5 * nlinalg.trace( T.dot(self.iUpsilon, uOuter ) )
@@ -286,24 +286,6 @@ class SGPDV(object):
         self.eta.set_value( eta_ )
         self.xi.set_value( xi_ )
 
-    def getTestLowerBound( self, test_data ):
-        """Use this method for example to compute lower bound on testset"""
-        self.sample()
-
-        lowerbound = 0
-        [N,dimX] = test_data.shape
-        batches = np.arange(0,N,self.batch_size)
-        if batches[-1] != N:
-            batches = np.append(batches,N)
-
-        for i in xrange(0,len(batches)-2):
-            testBatch = test_data[batches[i]:batches[i+1]]
-            self.currentBatch.set_value( testBatch ) # overwrite this member variable which gets a batch from the TRAIN set by default
-            lowerbound += self.L_func()
-
-        return lowerbound/N
-
-
     def train_adagrad( self, tol, numberOfIterations, learningRate ):
 
         lowerbound = np.array([])
@@ -332,18 +314,19 @@ class SGPDV(object):
                 newVariableValue = learningRate/np.sqrt(h) * (totalGradients[i] - (self.B/self.N))
                 # Set the new variable value
                 self.gradientVariables[i].setvalue( newVariableValue )
-
-            f_new = self.L_func()
+                
+            self.lowerBound = self.L_func()
+            f_new = self.lowerBound
             end = time.time()
             print("Iteration %d, lower bound = %.2f,"
                   " time = %.2fs"
-                  % (it, f_new/self.N, end - begin))
+                  % (it, f_new/self.B, end - begin))
             begin = end
             lowerbound = np.appenx(lowerbound,f_new)
 
             if it % 5 == 0:
                 print "Calculating test lowerbound"
-                testlowerbound = np.append(testlowerbound,self.getTestLowerBound(self.test_data))
+                testlowerbound = np.append( testlowerbound, self.getTestLowerBound() )
 
             # Check exit conditions
             self.all_bounds.append(self.f_new/self.N)
@@ -354,6 +337,9 @@ class SGPDV(object):
 
             pbar.update()
         pbar.finsh()
+        
+    def getTestLowerBound(self):
+        return 0        
 
 class VA(SGPDV):
 
@@ -367,13 +353,15 @@ class VA(SGPDV):
         self.continuous = continuous_
         
         # set the data
-        train_data       = np.array(train_data)
-        test_data        = np.array(test_data)        
-        self.P           = train_data.shape[1]
-        self.y           = th.shared( train_data )
-        self.y_miniBatch = self.y[self.currentBatch,:]
+        train_data             = np.array(train_data)
+        test_data              = np.array(test_data)        
+        self.P                 = train_data.shape[1]
+        self.y                 = th.shared( train_data )
+        self.y_miniBatch       = self.y[self.currentBatch,:]
+        self.y_train           = th.shared( test_data )
+        self.y_train_miniBatch = self.y_train[self.currentBatch,:]
         
-        self.y.name           = 'y'        
+        self.y.name           = 'y'
         self.y_miniBatch.name = 'y_minibatch'
         
         # Construct appropriately sized matrices to initialise theano shares
@@ -416,15 +404,19 @@ class VA(SGPDV):
         self.W3 = th.shared( P_HU_mat )
         self.b3 = th.shared( P_vec )
 
-    def log_p_y_z( self ):
+    def log_p_y_z( self, test=False ):
         if self.continuous:
             h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z.T) + self.b1)
-            mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)
-            
+            mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)            
             log_sigma_decoder = 0.5*(T.dot(self.W3, h_decoder) + self.b3)
-            log_pyz           = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
-                              - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
 
+            if not test:
+                log_pyz = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
+                        - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
+            else:
+                log_pyz = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
+                        - 0.5 * ((self.y_test_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
+            
             log_sigma_decoder.name = 'log_sigma_decoder'
             mu_decoder.name        = 'mu_decoder'
             h_decoder.name         = 'h_decoder'            
@@ -437,6 +429,12 @@ class VA(SGPDV):
             y_hat.name     = 'y_hat'                        
             log_pyz.name   = 'log_p_y_z'
         return log_pyz
+
+    def getTestLowerBound( self ):
+        """Use this method for example to compute lower bound on testset"""
+        self.sample()
+        return self.lowerBound -self.log_p_y_z() +self.log_p_y_z( test=True )
+
 
 
     # def KL_qp( self ):
@@ -493,9 +491,6 @@ if __name__ == "__main__":
 
     va.sample()
 
-
-
-
     print th.function( [], va.cSigma )()
     
     print th.function( [], va.cPhi )()
@@ -530,8 +525,6 @@ if __name__ == "__main__":
     print th.function( [], va.iUpsilon )()
     print th.function( [], va.iTau )()
 
-
- 
     #print va.L_func()
     
     
