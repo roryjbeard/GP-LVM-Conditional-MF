@@ -262,16 +262,16 @@ class SGPDV(object):
 
          return log_q_u + log_q_X
 
-    def KL_qr(self):
+    def KL_qr(self, r_is_nnet=False):
 
         if r_is_nnet:
 
             # Construct appropriately sized matrices to initialise theano shares
             HU_QpP_mat   = np.zeros( (self.HU_encoder, (self.Q+self.P) ) )
-            HU_vec       = np.zeros( (self.HU_encoder ,1 ) )
+            HU_vec       = np.zeros( (self.HU_encoder, ) )
             P_HU_mat     = np.zeros( (self.P ,self.HU_encoder) )
-            P_vec        = np.zeros( (self.P, 1) )
-            MQpBR_vec    = np.zeros( ( self.M*self.Q+self.B*self.R, 1 ) ) # MQ+BR vec (stacked cols of u and X)
+            P_vec        = np.zeros( (self.P, ) )
+            MQpBR_vec    = np.zeros( ( self.M*self.Q+self.B*self.R, ) ) # MQ+BR vec (stacked cols of u and X)
             MQpBR_HU_mat = np.zeros( ( self.M*self.Q+self.B*self.R, self.HU_encoder ) )
 
             self.Wr1 = th.shared( HU_QpP_mat )
@@ -484,9 +484,9 @@ class VA(SGPDV):
 
         # Construct appropriately sized matrices to initialise theano shares
         HU_Q_mat = np.zeros( (self.HU_decoder, self.Q) )
-        HU_vec   = np.zeros( (self.HU_decoder ,1 ) )
+        HU_vec   = np.zeros( (self.HU_decoder, ) )
         P_HU_mat = np.zeros( (self.P ,self.HU_decoder) )
-        P_vec    = np.zeros( (self.P, 1) )
+        P_vec    = np.zeros( (self.P,) )
 
         self.W1 = th.shared( HU_Q_mat )
         self.b1 = th.shared( HU_vec )
@@ -513,16 +513,16 @@ class VA(SGPDV):
         super(VA,self).randomise( sig )
 
         HU_Q_mat = sig * np.random.randn( self.HU_decoder, self.Q )
-        HU_vec   = sig * np.random.randn( self.HU_decoder, 1 )
+        HU_vec   = sig * np.random.randn( self.HU_decoder,)
         P_HU_mat = sig * np.random.randn( self.P, self.HU_decoder )
-        P_vec    = sig * np.random.randn( self.P, 1 )
+        P_vec    = sig * np.random.randn( self.P)
 
         self.W1 = th.shared( HU_Q_mat )
-        self.b1 = th.shared( HU_vec, broadcastable=(False,True) )
+        self.b1 = th.shared( HU_vec )
         self.W2 = th.shared( P_HU_mat)
-        self.b2 = th.shared( P_vec, broadcastable=(False,True) )
+        self.b2 = th.shared( P_vec )
         self.W3 = th.shared( P_HU_mat )
-        self.b3 = th.shared( P_vec, broadcastable=(False,True) )
+        self.b3 = th.shared( P_vec )
 
     def log_p_y_z( self ):
         if self.continuous:
@@ -581,30 +581,30 @@ if __name__ == "__main__":
         #numberOfInducingPoints, batchSize, dimX, dimZ, theta_init, sigma_init, data, numHiddenUnits
     va = VA( 3,20,1,2,np.ones((2,),dtype=np.float64),1.0,np.random.rand(40,3),2 )
 
-    tmp1 = va.log_p_y_z()
-    T.grad( tmp1,  [va.Xu, va.theta, va.sigma, va.phi, va.Phi, va.kappa, va.W1,va.W2,va.W3,va.b1,va.b2,va.b3] )
+    # tmp1 = va.log_p_y_z()
+    # T.grad( tmp1,  [va.Xu, va.theta, va.sigma, va.phi, va.Phi, va.kappa, va.W1,va.W2,va.W3,va.b1,va.b2,va.b3] )
 
-    # va.log_p_z() No implmented in va
+    # # va.log_p_z() No implmented in va
 
-    tmp2 = va.KL_qp()
-    T.grad( tmp2, [va.Xu, va.theta, va.phi, va.Phi, va.kappa] )
+    # tmp2 = va.KL_qp()
+    # T.grad( tmp2, [va.Xu, va.theta, va.phi, va.Phi, va.kappa] )
 
-    # va.log_q_z_fX() not implmented yet
+    # # va.log_q_z_fX() not implmented yet
 
-    tmp3 = va.KL_qr()
-    T.grad( tmp3, [va.Xu, va.theta, va.phi, va.Phi, va.kappa, va.tau, va.Tau, va.upsilon, va.Upsilon] )
+    # tmp3 = va.KL_qr()
+    # T.grad( tmp3, [va.Xu, va.theta, va.phi, va.Phi, va.kappa, va.tau, va.Tau, va.upsilon, va.Upsilon] )
 
 
-    tmp4 = va.log_r_uX_z()
-    T.grad( tmp4, [va.Xu, va.theta, va.kappa, va.phi, va.Phi, va.tau, va.Tau, va.upsilon, va.Upsilon] )
+    # tmp4 = va.log_r_uX_z()
+    # T.grad( tmp4, [va.Xu, va.theta, va.kappa, va.phi, va.Phi, va.tau, va.Tau, va.upsilon, va.Upsilon] )
 
-    tmp5 = va.log_q_uX()
-    T.grad( tmp5, [va.theta, va.kappa, va.phi, va.Phi, va.Xu ] )
+    # tmp5 = va.log_q_uX()
+    # T.grad( tmp5, [va.theta, va.kappa, va.phi, va.Phi, va.Xu ] )
 
     va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
-    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
-    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
-    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+    # va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+    # va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+    # va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
 
     va.randomise()
 
