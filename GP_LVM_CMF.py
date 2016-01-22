@@ -202,7 +202,9 @@ class SGPDV(object):
 
     def construct_L( self, p_z_gaussian=True, r_uX_z_gaussian=True, q_f_Xu_equals_r_f_Xuz=True, r_is_nnet=False ):
 
-        L = self.log_p_y_z()
+        self.r_is_nnet = r_is_nnet
+        
+        L = self.log_p_y_z()        
         L.name = 'L'
 
         if p_z_gaussian and q_f_Xu_equals_r_f_Xuz:
@@ -264,7 +266,7 @@ class SGPDV(object):
 
     def KL_qr(self):
 
-        if r_is_nnet:
+        if self.r_is_nnet:
 
             # Construct appropriately sized matrices to initialise theano shares
             HU_QpP_mat   = np.zeros( (self.HU_encoder, (self.Q+self.P) ) )
