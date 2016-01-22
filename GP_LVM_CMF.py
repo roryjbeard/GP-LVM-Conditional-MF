@@ -200,7 +200,7 @@ class SGPDV(object):
         # Overload this function in the derived classes if p_z_gaussian==True
         return 0.0
 
-    def construct_L( self, p_z_gaussian=True, r_uX_z_gaussian=True, q_f_Xu_equals_r_f_Xuz=True ):
+    def construct_L( self, p_z_gaussian=True, r_uX_z_gaussian=True, q_f_Xu_equals_r_f_Xuz=True, r_is_nnet=False ):
 
         L = self.log_p_y_z()
         L.name = 'L'
@@ -264,21 +264,72 @@ class SGPDV(object):
 
     def KL_qr(self):
 
-        upsilon_m_kapa = self.upsilon - self.kappa
-        phi_m_tau      = self.phi     - self.tau
+        if r_is_nnet:
 
-        uOuter = T.dot(upsilon_m_kapa.T, upsilon_m_kapa)
-        xOuter = T.dot(phi_m_tau.T, phi_m_tau)
+            # Construct appropriately sized matrices to initialise theano shares
+            HU_QpP_mat   = np.zeros( (self.HU_encoder, (self.Q+self.P) ) )
+            HU_vec       = np.zeros( (self.HU_encoder ,1 ) )
+            P_HU_mat     = np.zeros( (self.P ,self.HU_encoder) )
+            P_vec        = np.zeros( (self.P, 1) )
+            MQpBR_vec    = np.zeros( ( self.M*self.Q+self.B*self.R, 1 ) ) # MQ+BR vec (stacked cols of u and X)
+            MQpBR_HU_mat = np.zeros( ( self.M*self.Q+self.B*self.R, self.HU_encoder ) )
 
-        KL_qr_u = 0.5 * ( nlinalg.trace( T.dot(self.iUpsilon, uOuter ) ) ) \
-                + nlinalg.trace( T.dot( self.iUpsilon, self.Kuu) ) \
-                + self.logDetUpsilon - self.logDetKuu - self.Q*self.M
+            self.Wr1 = th.shared( HU_QpP_mat )
+            self.br1 = th.shared( HU_vec )
+            self.Wr2 = th.shared( MQpBR_HU_mat )
+            self.br2 = th.shared( MQpBR_vec )
+            self.Wr3 = th.shared( MQpBR_HU_matP_HU_mat )
+            self.br3 = th.shared( MQpBR_vec )
 
-        KL_qr_X = 0.5 * ( nlinalg.trace( T.dot( self.iTau, xOuter ) ) ) \
-                + nlinalg.trace(T.dot(self.iTau, self.Phi)) \
-                + self.logDetTau - self.logDetPhi - self.N*self.R
+            self.Wr1.name = 'Wr1'
+            self.br1.name = 'br1'
+            self.Wr2.name = 'Wr2'
+            self.br2.name = 'br2'
+            self.Wr3.name = 'Wr3'
+            self.br3.name = 'br3'
 
-        return KL_qr_u + KL_qr_X
+            self.gradientVariables.extend([self.Wr1,self.Wr2,self.Wr3,self.br1,self.br2,self.br3])
+
+            h_r         = T.nnet.softplus(T.dot(self.Wr1,T.stack(self.z,self.y) + self.br1))
+            mu_r        = T.nnet.sigmoid(T.dot(self.Wr2, h_r) + self.br2)
+            log_sigma_r = 0.5*(T.dot(self.Wr3, h_r) + self.br3)
+            log_r_uXz   = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
+                                - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
+
+            log_sigma_r.name = 'log_sigma_r'
+            mu_r.name        = 'mu_r'
+            h_r.name         = 'h_r'
+
+
+            m_r_minus_m_q = mu_r - T.stack([self.kappa, self.tau])
+            outer         = T.dot(m_r_minus_m_q.T, m_r_minus_m_q)
+            iSigma_r      = T.diag(T.exp(-log_sigma_r))
+            diag_Sigma_q  = T.stack([T.diag(self.Kuu), T.diag(self.Phi)])
+            trace_iSigma_r_Simga_q = iSigma_r * T.diag(diag_Sigma_q)
+            logDetSigma_r = nlinalg.trace(log_sigma_r)
+            logDetSigma_q = self.logDetKuu + self.logDetPhi
+
+            KL = 0.5 * ( nlinalg.Trace( T.dot(iSigma_r, outer) )  \
+                 + trace_iSigma_r_Simga_q \
+                 + logDetSigma_r - logDetSigma_q - self.B - self.M )
+
+        else:
+            upsilon_m_kapa = self.upsilon - self.kappa
+            phi_m_tau      = self.phi     - self.tau
+
+            uOuter = T.dot(upsilon_m_kapa.T, upsilon_m_kapa)
+            xOuter = T.dot(phi_m_tau.T, phi_m_tau)
+
+            KL_qr_u = 0.5 * ( nlinalg.trace( T.dot(self.iUpsilon, uOuter ) ) ) \
+                    + nlinalg.trace( T.dot( self.iUpsilon, self.Kuu) ) \
+                    + self.logDetUpsilon - self.logDetKuu - self.Q*self.M
+
+            KL_qr_X = 0.5 * ( nlinalg.trace( T.dot( self.iTau, xOuter ) ) ) \
+                    + nlinalg.trace(T.dot(self.iTau, self.Phi)) \
+                    + self.logDetTau - self.logDetPhi - self.N*self.R
+            KL = KL_qr_u + KL_qr_X
+
+        return KL
 
     def sample( self ):
         # generate standard gaussian random varibales
@@ -516,16 +567,6 @@ class VA(SGPDV):
     def optimiseLatentCoordinates( self ):
         assert(False)
 
-
-    # def KL_qp( self ):
-    #     E_uu_T_term = nlinalg.trace(T.dot( self.Kfu.T, T.dot(self.Kfu,self.iKuu) ) ) \
-    #     + T.dot(self.kappa.T, T.dot(self.iKuu, T.dot(self.Kfu.T, T.dot(self.Kfu, T.dot(self.iKuu, self.kappa)))))
-    #     if self.continuous:
-    #         KL = -0.5*self.B*(1. + 2*T.log(self.sigma) - self.sigma**2) \
-    #         + 0.5 * nlinalg.trace(E_uu_T_term + self.Sigma)
-    #     else:
-    #         KL = 0 # TODO
-    #     return KL
 
     def KL_qp( self ):
         if self.continuous:
