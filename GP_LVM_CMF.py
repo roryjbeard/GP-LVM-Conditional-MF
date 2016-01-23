@@ -4,7 +4,7 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 from theano.tensor import slinalg, nlinalg
-#import progressbar
+import progressbar
 import time
 from copy import deepcopy
 
@@ -351,11 +351,11 @@ class SGPDV(object):
         self.eta.set_value(eta_)
         self.xi.set_value(xi_)
 
-    def train_adagrad(self, numberOfIterations, learningRate=1e-2, fudgeFactor=1e-6):
+    def train_adagrad(self, numberOfIterations, learningRate=1e-3, fudgeFactor=1e-6):
 
         lowerBounds = []
 
-        # pbar = progressbar.ProgressBar(maxval=numberOfIterations).start()
+        pbar = progressbar.ProgressBar(maxval=numberOfIterations).start()
 
         startTime    = time.time()
         wallClockOld = startTime
@@ -369,7 +369,7 @@ class SGPDV(object):
             grads = self.lowerTriangularGradients( self.dL_func() )
             # For each gradient variable returned by the gradient function
             for i in range( len( self.gradientVariables) ):
-                if totalGradients[i] == 0:
+                if np.any(totalGradients[i] == 0):
                     totalGradients[i] =  grads[i]**2
                 else:
                     totalGradients[i] += grads[i]**2
@@ -387,13 +387,13 @@ class SGPDV(object):
             stepTime     = wallClock - wallClockOld
             wallClockOld = wallClock
 
-            print("It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
+            print("\n It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
                   % (it, wallClock, stepTime, self.lowerBound))
 
             lowerBounds.append( (self.lowerBound, wallClock) )
 
-            #pbar.update()
-        #pbar.finsh()
+            pbar.update(it)
+        pbar.finish()
 
         return lowerBounds
 
@@ -519,10 +519,30 @@ class VA(SGPDV):
 
         super(VA,self).randomise(sig)
 
-        HU_Q_mat = sig * np.random.randn(self.HU_decoder, self.Q)
-        HU_vec   = sig * np.random.randn(self.HU_decoder,1 )
-        P_HU_mat = sig * np.random.randn(self.P, self.HU_decoder)
-        P_vec    = sig * np.random.randn(self.P, 1)
+        # Hidden layer weights are uniformly sampled from a symmetric interval
+        # following [Xavier, 2010]
+
+        # HU_Q_mat = sig * np.random.randn(self.HU_decoder, self.Q)
+        # HU_vec   = sig * np.random.randn(self.HU_decoder,1 )
+        # P_HU_mat = sig * np.random.randn(self.P, self.HU_decoder)
+        # P_vec    = sig * np.random.randn(self.P, 1)
+
+        HU_Q_mat = np.asarray(np.random.uniform(
+                                        low=-np.sqrt(6. / (self.HU_decoder + self.Q)),
+                                        high=np.sqrt(6. / (self.HU_decoder + self.Q)),
+                                        size=(self.HU_decoder, self.Q)),
+                                dtype=th.config.floatX)
+
+        HU_vec   = np.asarray(np.zeros((self.HU_decoder,1 )), dtype=th.config.floatX)
+
+
+        P_HU_mat = np.asarray(np.random.uniform(
+                                        low=-np.sqrt(6. / (self.P+ self.HU_decoder)),
+                                        high=np.sqrt(6. / (self.P + self.HU_decoder)),
+                                        size=(self.P, self.HU_decoder)),
+                                dtype=th.config.floatX)
+        P_vec    = np.asarray(np.zeros((self.P, 1)))
+
 
         self.W1.set_value(HU_Q_mat)
         self.b1.set_value(HU_vec)
@@ -531,8 +551,17 @@ class VA(SGPDV):
         self.W3.set_value(P_HU_mat)
         self.b3.set_value(P_vec)
 
+        if self.continuous:
+            # Optimal initial values for sigmoid transform are ~ 4 times
+            # those for tanh transform
+            self.W1.set_value(HU_Q_mat*4.)
+            self.W2.set_value(P_HU_mat*4.)
+            self.W3.set_value(P_HU_mat*4.)
+
+
     def log_p_y_z(self):
         if self.continuous:
+
             h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z) + self.b1)
             mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)
             log_sigma_decoder = 0.5*(T.dot(self.W3, h_decoder) + self.b3)
