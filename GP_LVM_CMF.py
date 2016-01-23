@@ -220,7 +220,7 @@ class SGPDV(object):
 
         dL = T.grad( L, self.gradientVariables )
 
-        self.L_func  = th.function( [], L )
+        self.L_func  = th.function( [], L, mode="DebugMode" )
         self.dL_func = th.function( [], dL )
 
     def log_r_uX_z(self):
@@ -517,12 +517,12 @@ class VA(SGPDV):
         P_HU_mat = sig * np.random.randn( self.P, self.HU_decoder )
         P_vec    = sig * np.random.randn( self.P)
 
-        self.W1 = th.shared( HU_Q_mat )
-        self.b1 = th.shared( HU_vec )
-        self.W2 = th.shared( P_HU_mat)
-        self.b2 = th.shared( P_vec )
-        self.W3 = th.shared( P_HU_mat )
-        self.b3 = th.shared( P_vec )
+        self.W1.set_value( HU_Q_mat )
+        self.b1.set_value( HU_vec )
+        self.W2.set_value( P_HU_mat)
+        self.b2.set_value( P_vec )
+        self.W3.set_value( P_HU_mat )
+        self.b3.set_value( P_vec )
 
     def log_p_y_z( self ):
         if self.continuous:
