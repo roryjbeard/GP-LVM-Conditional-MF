@@ -524,21 +524,12 @@ class VA(SGPDV):
         P_HU_mat = sig * np.random.randn(self.P, self.HU_decoder)
         P_vec    = sig * np.random.randn(self.P, 1)
 
-<<<<<<< HEAD
-        self.W1.set_value( HU_Q_mat )
-        self.b1.set_value( HU_vec )
-        self.W2.set_value( P_HU_mat)
-        self.b2.set_value( P_vec )
-        self.W3.set_value( P_HU_mat )
-        self.b3.set_value( P_vec )
-=======
         self.W1.set_value(HU_Q_mat)
         self.b1.set_value(HU_vec)
         self.W2.set_value(P_HU_mat)
         self.b2.set_value(P_vec)
         self.W3.set_value(P_HU_mat)
         self.b3.set_value(P_vec)
->>>>>>> b5ed275129ba311268a0066f5be95354bb89fea5
 
     def log_p_y_z(self):
         if self.continuous:
