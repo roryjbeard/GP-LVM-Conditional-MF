@@ -37,9 +37,17 @@ va = VA(n_induce, batch_size, dimX, dimZ, np.ones((3,1), dtype=np.float64), 1.0,
 va.construct_L()
 
 va.randomise()
+va.sample()
+
+print va.L_func()
+temp = va.dL_func()
+
+f = open('workfile', 'w')
+f.write(str(temp))
+f.close()
 
 print "Training"
-lowerBounds = va.train_adagrad( n_iter, learning_rate )
+#lowerBounds = va.train_adagrad( n_iter, learning_rate )
 
 
 
