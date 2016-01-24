@@ -22,20 +22,23 @@ n_iter = 500
 
 [N,dimX] = data.shape
 
-dimZ = 20
-dimX = 5
+dimZ = 10
+dimX = 3
 HU_decoder = 400
 
 
-batch_size = 100
-n_induce = 100
-learning_rate = 0.01
+batch_size = 500
+n_induce = 50
+learning_rate = 0.001
 
 print "Initialising"
-va = VA(n_induce, batch_size, dimX, dimZ, np.ones((3,1), dtype=np.float64), 1.0, x_train, HU_decoder, kernelType_='RBF', continuous_=True )
+va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True )
 
 va.construct_L()
 
+va.setHyperparameters(0.01, 0.1*np.ones((2,)),
+    1e-100, 0.5,
+    [1e-10,1e-10], [10,10] )
 va.randomise()
 va.sample()
 
@@ -47,7 +50,7 @@ f.write(str(temp))
 f.close()
 
 print "Training"
-#lowerBounds = va.train_adagrad( n_iter, learning_rate )
+lowerBounds = va.train_adagrad( n_iter, learning_rate )
 
 
 
