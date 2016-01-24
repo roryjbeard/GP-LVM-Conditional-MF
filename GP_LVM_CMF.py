@@ -7,6 +7,7 @@ from theano.tensor import slinalg, nlinalg
 import progressbar
 import time
 from copy import deepcopy
+from utils import *
 
 
 class kernelFactory(object):
@@ -64,26 +65,30 @@ class SGPDV(object):
         M_M_mat = np.zeros((self.M,self.M), dtype=np.float64)
         B_vec   = np.zeros((self.B,), dtype=np.int32 )
 
-        # variational and auxilery parameters
+        # variational and auxiliary parameters
         self.upsilon = th.shared( Q_M_mat ) # mean of r(u|z)
         self.Upsilon = th.shared( M_M_mat ) # variance of r(u|z)
         self.tau     = th.shared( N_R_mat )
         self.Tau     = th.shared( R_R_mat )
         self.phi     = th.shared( N_R_mat )
-        self.Phi     = th.shared( R_R_mat )
+        # self.Phi     = th.shared( R_R_mat )
         self.kappa   = th.shared( Q_M_mat )
         self.upsilon.name = 'upsilon'
         self.Upsilon.name = 'Upsilon'
         self.tau.name     = 'tau'
         self.Tau.name     = 'Tau'
         self.phi.name     = 'phi'
-        self.Phi.name     = 'Phi'
+        # self.Phi.name     = 'Phi'
         self.kappa.name   = 'kappa'
 
         # lower triangular versions
         self.Upsilon_lower = np.tril( M_M_mat )
         self.Phi_lower     = np.tril( R_R_mat )
         self.Tau_lower     = np.tril( R_R_mat )
+
+        Phi = np.dot(self.Phi_lower, self.Phi_lower)
+        self.Phi = th.shared(Phi)
+        self.Phi.name     = 'Phi'
 
         # Other parameters
         self.theta = th.shared(np.array(theta_init,dtype=np.float64).flatten())  # kernel parameters
@@ -121,7 +126,8 @@ class SGPDV(object):
         self.Kff = kfactory.kernel( self.Xf, None,    self.theta, 'Kff' )
         self.Kfu = kfactory.kernel( self.Xf, self.Xu, self.theta, 'Kfu' )
 
-        self.cKuu = slinalg.cholesky( self.Kuu )
+        # self.cKuu = slinalg.cholesky( self.Kuu )
+        self.cKuu = jitterChol( self.Kuu )
         self.iKuu = nlinalg.matrix_inverse( self.Kuu )
         self.cKuu.name = 'cKuu'
         self.iKuu.name = 'iKuu'
