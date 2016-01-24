@@ -724,9 +724,9 @@ if __name__ == "__main__":
     print th.function([], va.KL_qr())()
     
 
-#        L += self.log_p_z() -self.log_q_z_fX()
+#   L += self.log_p_z() -self.log_q_z_fX()
 
-#        L += self.log_r_uX_z() -self.log_q_uX()
+#   L += self.log_r_uX_z() -self.log_q_uX()
 
 
     print 'L_func'
