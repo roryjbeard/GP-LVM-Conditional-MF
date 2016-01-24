@@ -22,13 +22,13 @@ n_iter = 500
 
 [N,dimX] = data.shape
 
-dimZ = 10
-dimX = 3
+dimZ = 2
+dimX = 5
 HU_decoder = 400
 
 
-batch_size = 500
-n_induce = 50
+batch_size = 100
+n_induce = 1
 learning_rate = 0.001
 
 print "Initialising"
