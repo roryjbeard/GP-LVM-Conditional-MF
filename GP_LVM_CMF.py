@@ -212,6 +212,9 @@ class SGPDV(object, r_is_nnet=False):
                                   self.tau, self.Tau,
                                   self.upsilon, self.Upsilon]
 
+        if self.backConstrainX:
+            self.gradientVariables.extend(self.log_gamma)
+
     def randomise(self, sig=1, r_is_nnet=False):
 
         self.Upsilon_lower = np.tril( sig*np.random.randn(self.M, self.M) )
@@ -236,6 +239,10 @@ class SGPDV(object, r_is_nnet=False):
         self.Phi.set_value( Phi_ )
         self.kappa.set_value( kappa_ )
         self.Xu.set_value( Xu_ )
+
+        if self.backConstrainX:
+            log_gamma_ = sig*np.random.randn()
+            self.log_gamma.set_value( log_gamma_ )
 
         if self.r_is_nnet:
 
