@@ -27,20 +27,21 @@ dimX = 5
 HU_decoder = 400
 
 
+<<<<<<< HEAD
 batch_size = 100
 
 n_induce = 5
 learning_rate = 1e-3
 
 r_is_nnet = False
-
+backConstrainX = False
 
 print "Initialising"
-va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, r_is_nnet )
+va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, backConstrainX=backConstrainX, r_is_nnet=r_is_nnet )
 
 va.construct_L()
 
-va.setHyperparameters(0.01, 0.1*np.ones((2,)),
+va.setHyperparameters(0.01, 5*np.ones((2,)),
     1e-100, 0.5,
     [1e-10,1e-10], [10,10] )
 va.randomise()

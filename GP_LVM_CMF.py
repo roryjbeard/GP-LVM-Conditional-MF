@@ -46,22 +46,29 @@ class kernelFactory(object):
 class SGPDV(object, r_is_nnet=False):
 
     def __init__(self,
-            numberOfDataPoints,     # Number of observations
             numberOfInducingPoints, # Number of inducing ponts in sparse GP
             batchSize,              # Size of mini batch
             dimX,                   # Dimensionality of the latent co-ordinates
             dimZ,                   # Dimensionality of the latent variables
+            data,                   # [NxP] matrix of observations
             kernelType='RBF',
+            backConstrainX=False,
             r_is_nnet
         ):
 
-        self.N = numberOfDataPoints
+        # set the data
+        data = np.array(data)
+        self.N = data.shape[0]  # Number of observations
+        self.P = data.shape[1]  # Dimension of each observation
         self.M = numberOfInducingPoints
         self.B = batchSize
         self.R = dimX
         self.Q = dimZ
 
         self.r_is_nnet = r_is_nnet
+
+        self.y = th.shared(data)
+        self.y.name = 'y'
 
         if kernelType == 'RBF':
             self.numberOfHyperparameters = 2
@@ -81,28 +88,71 @@ class SGPDV(object, r_is_nnet=False):
         Q_B_mat = np.zeros((self.Q, self.B), dtype=np.float64)
         M_M_mat = np.zeros((self.M, self.M), dtype=np.float64)
         B_vec   = np.zeros((self.B,), dtype=np.int32 )
-
         if self.r_is_nnet:
             HU_QpP_mat   = np.zeros( (self.HU_encoder, (self.Q+self.P) ) )
             HU_vec       = np.zeros( (self.HU_encoder,1 ) )
             MQpBR_vec    = np.zeros( (self.M*self.Q+self.B*self.R, ) ) # MQ+BR vec (stacked cols of u and X)
             MQpBR_HU_mat = np.zeros( (self.M*self.Q+self.B*self.R, self.HU_encoder) )
 
+        #Mini batch indicator varible
+        self.currentBatch = th.shared(B_vec)
+        self.currentBatch.name = 'currentBatch'
+
+        self.y_miniBatch = self.y[self.currentBatch,:]
+        self.y_miniBatch.name = 'y_minibatch'
+
+        kfactory = kernelFactory( kernelType )
+
+        # Random variables
+        self.alpha = th.shared(Q_M_mat)
+        self.beta  = th.shared(B_R_mat)
+        self.eta   = th.shared(Q_B_mat)
+        self.xi    = th.shared(Q_B_mat)
+        self.alpha.name = 'alpha'
+        self.eta.name   = 'eta'
+        self.xi.name    = 'xi'
+        self.beta.name  = 'beta'
+
+        if not backConstrainX:
+            # Have a normal variational distribution over location of latent co-ordinates
+            self.Phi_lower = np.tril(R_R_mat)
+
+            self.phi = th.shared(N_R_mat)
+            self.Phi = th.shared(R_R_mat)
+
+            self.phi.name = 'phi'
+            self.Phi.name = 'Phi'
+
+            (self.cPhi,self.iPhi,self.logDetPhi) = cholInvLogDet(self.Phi)
+
+            self.Xf   = self.phi[self.currentBatch,:] + ( T.dot(self.cPhi, self.beta.T) ).T
+
+        else:
+            # Draw the latent coordinates from a GP with data co-ordinates
+            self.log_gamma = th.shared( np.zeros(self.numberOfHyperparameters) )
+            self.Kyy = kfactory.kernel(self.y_miniBatch, None, self.log_gamma, 'Kyy')
+            (self.cKyy,_,_) = cholInvLogDet(self.Kyy)
+            self.Xf = T.dot(self.cKyy, self.beta.T).T
+
+            self.log_gamma.name = 'log_gamma'
+
+        self.Xf.name   = 'Xf'
+
+        # Inducing points co-ordinates
+        self.Xu = th.shared(M_R_mat)
+        self.Xu.name = 'Xu'
 
         # variational and auxiliary parameters
+        self.kappa   = th.shared(Q_M_mat)
         self.upsilon = th.shared(Q_M_mat) # mean of r(u|z)
         self.Upsilon = th.shared(M_M_mat) # variance of r(u|z)
         self.tau     = th.shared(N_R_mat)
         self.Tau     = th.shared(R_R_mat)
-        self.phi     = th.shared(N_R_mat)
-        self.Phi     = th.shared(R_R_mat)
-        self.kappa   = th.shared(Q_M_mat)
+
         self.upsilon.name = 'upsilon'
         self.Upsilon.name = 'Upsilon'
         self.tau.name     = 'tau'
         self.Tau.name     = 'Tau'
-        self.phi.name     = 'phi'
-        self.Phi.name     = 'Phi'
         self.kappa.name   = 'kappa'
 
         if self.r_is_nnet:
@@ -115,7 +165,6 @@ class SGPDV(object, r_is_nnet=False):
 
         # lower triangular versions
         self.Upsilon_lower = np.tril(M_M_mat)
-        self.Phi_lower     = np.tril(R_R_mat)
         self.Tau_lower     = np.tril(R_R_mat)
 
         # Other parameters
@@ -124,31 +173,7 @@ class SGPDV(object, r_is_nnet=False):
         self.log_theta.name = 'log_theta'
         self.log_sigma.name = 'log_sigma'
 
-        # Random variables
-        self.alpha = th.shared(Q_M_mat)
-        self.beta  = th.shared(B_R_mat)
-        self.eta   = th.shared(Q_B_mat)
-        self.xi    = th.shared(Q_B_mat)
-        self.alpha.name = 'alpha'
-        self.beta.name  = 'beta'
-        self.eta.name   = 'eta'
-        self.xi.name    = 'xi'
-
-        # Inducing points co-ordinates
-        self.Xu = th.shared(M_R_mat)
-        self.Xu.name = 'Xu'
-
-        #Mini batch indicator varible
-        self.currentBatch = th.shared(B_vec)
-        self.currentBatch.name = 'currentBatch'
-
-        # Latent co-ordinates
-        (self.cPhi,self.iPhi,self.logDetPhi) = cholInvLogDet(self.Phi, 'Phi')
-        self.Xf   = self.phi[self.currentBatch,:] + ( T.dot(self.cPhi, self.beta.T) ).T
-        self.Xf.name   = 'Xf'
-
         # Kernels
-        kfactory = kernelFactory( kernelType )
         self.Kuu = kfactory.kernel( self.Xu, None,    self.log_theta, 'Kuu' )
         self.Kff = kfactory.kernel( self.Xf, None,    self.log_theta, 'Kff' )
         self.Kfu = kfactory.kernel( self.Xf, self.Xu, self.log_theta, 'Kfu' )
@@ -382,7 +407,7 @@ class SGPDV(object, r_is_nnet=False):
 
         return KL
 
-    def sample( self ):
+    def sample( self, withoutReplacement=False ):
         # generate standard gaussian random varibales
         alpha_ = np.random.randn(self.Q, self.M)
         beta_  = np.random.randn(self.B, self.R)
@@ -442,8 +467,9 @@ class SGPDV(object, r_is_nnet=False):
 
             # Set the new variable value
             self.setVariableValues( variableValues )
-            self.lowerBound = self.L_func()
-
+            lbTmp = self.L_func()
+            lbTmp = lbTmp.flatten()
+            self.lowerBound = lbTmp[0]
             currentTime  = time.time()
             wallClock    = currentTime - startTime
             stepTime     = wallClock - wallClockOld
@@ -485,6 +511,7 @@ class SGPDV(object, r_is_nnet=False):
 
             if self.gradientVariables[i] == self.Upsilon:
                 self.Upsilon_lower = values[i]
+                #print  np.dot(self.Upsilon_lower, self.Upsilon_lower.T)
                 self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T) )
             elif self.gradientVariables[i] == self.Phi:
                 self.Phi_lower = values[i]
@@ -562,21 +589,12 @@ class SGPDV(object, r_is_nnet=False):
 class VA(SGPDV):
 
             #                                               []                       []
-    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits, kernelType_='RBF', continuous_=True, r_is_nnet=False ):
+    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits, kernelType_='RBF', continuous_=True, backContrainX=False, r_is_nnet=False ):
                        #self, dataSize, induceSize, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_='RBF'
-        SGPDV.__init__(self, len(data), numberOfInducingPoints, batchSize, dimX, dimZ, kernelType_, r_is_nnet )
+        SGPDV.__init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, kernelType_, backConstrainX, r_is_nnet )
 
         self.HU_decoder = numHiddenUnits
         self.continuous = continuous_
-
-        # set the data
-        data             = np.array(data)
-        self.P           = data.shape[1]
-        self.y           = th.shared(data)
-        self.y_miniBatch = self.y[self.currentBatch,:]
-
-        self.y.name           = 'y'
-        self.y_miniBatch.name = 'y_minibatch'
 
         # Construct appropriately sized matrices to initialise theano shares
         HU_Q_mat = np.zeros( (self.HU_decoder, self.Q) )
