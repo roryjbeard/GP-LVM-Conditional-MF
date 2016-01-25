@@ -22,20 +22,27 @@ n_iter = 500
 
 [N,dimX] = data.shape
 
-dimZ = 20
+dimZ = 2
 dimX = 5
 HU_decoder = 400
 
 
 batch_size = 100
+
 n_induce = 5
 learning_rate = 1e-3
 
+r_is_nnet = False
+
+
 print "Initialising"
-va = VA(n_induce, batch_size, dimX, dimZ, np.ones((3,1), dtype=np.float64), 1.0, x_train, HU_decoder, kernelType_='RBF', continuous_=True )
+va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, r_is_nnet )
 
 va.construct_L()
 
+va.setHyperparameters(0.01, 0.1*np.ones((2,)),
+    1e-100, 0.5,
+    [1e-10,1e-10], [10,10] )
 va.randomise()
 va.sample()
 
