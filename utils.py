@@ -23,7 +23,7 @@ def jitterChol(covmat):
 def cholInvLogDet( A, useJitterChol=False, fast=False ):
     
     if useJitterChol:
-        cA = jitterChol(A)        
+        cA = jitterChol(A)
     else:        
         cA  = slinalg.cholesky(A)
     
@@ -32,11 +32,12 @@ def cholInvLogDet( A, useJitterChol=False, fast=False ):
         icA.name = 'ic' + A.name
         iA  = T.dot( icA.T, icA )
         logDetA = 2.0*T.sum( T.log( T.abs_( T.diag(cA) ) ) )
+        #logDetA = T.log( nlinalg.Det()(A) )
     else:
         iA = nlinalg.matrix_inverse(A)
         logDetA = T.log( nlinalg.Det()(A) )
     
-    cA.name  = 'c' + A.name
+    cA.name = 'c' + A.name
     iA.name = 'i' + A.name
     logDetA.name = 'logDetA' + A.name
     

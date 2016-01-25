@@ -46,20 +46,27 @@ class kernelFactory(object):
 class SGPDV(object):
 
     def __init__(self,
-            numberOfDataPoints,     # Number of observations
             numberOfInducingPoints, # Number of inducing ponts in sparse GP
             batchSize,              # Size of mini batch
             dimX,                   # Dimensionality of the latent co-ordinates                   
             dimZ,                   # Dimensionality of the latent variables
-            kernelType='RBF'
+            data,                   # [NxP] matrix of observations
+            kernelType='RBF',
+            backConstrainX=False,
         ):
 
-        self.N = numberOfDataPoints 
+        # set the data
+        data = np.array(data)
+        self.N = data.shape[0]  # Number of observations 
+        self.P = data.shape[1]  # Dimension of each observation
         self.M = numberOfInducingPoints
         self.B = batchSize 
         self.R = dimX
         self.Q = dimZ 
 
+        self.y = th.shared(data)
+        self.y.name = 'y'
+        
         if kernelType == 'RBF':
             self.numberOfHyperparameters = 2
         elif kernelType == 'RBFnn':
@@ -79,32 +86,14 @@ class SGPDV(object):
         M_M_mat = np.zeros((self.M, self.M), dtype=np.float64)
         B_vec   = np.zeros((self.B,), dtype=np.int32 )
 
-        # variational and auxiliary parameters
-        self.upsilon = th.shared(Q_M_mat) # mean of r(u|z)
-        self.Upsilon = th.shared(M_M_mat) # variance of r(u|z)
-        self.tau     = th.shared(N_R_mat)
-        self.Tau     = th.shared(R_R_mat)
-        self.phi     = th.shared(N_R_mat)
-        self.Phi     = th.shared(R_R_mat)
-        self.kappa   = th.shared(Q_M_mat)
-        self.upsilon.name = 'upsilon'
-        self.Upsilon.name = 'Upsilon'
-        self.tau.name     = 'tau'
-        self.Tau.name     = 'Tau'
-        self.phi.name     = 'phi'
-        self.Phi.name     = 'Phi'
-        self.kappa.name   = 'kappa'
+        #Mini batch indicator varible
+        self.currentBatch = th.shared(B_vec)
+        self.currentBatch.name = 'currentBatch'
+        
+        self.y_miniBatch = self.y[self.currentBatch,:]
+        self.y_miniBatch.name = 'y_minibatch'
 
-        # lower triangular versions
-        self.Upsilon_lower = np.tril(M_M_mat)
-        self.Phi_lower     = np.tril(R_R_mat)
-        self.Tau_lower     = np.tril(R_R_mat)
-
-        # Other parameters
-        self.log_theta = th.shared( np.zeros(self.numberOfHyperparameters) )  # kernel parameters
-        self.log_sigma = th.shared(0.0)  # standard deviation of q(z|f)
-        self.log_theta.name = 'log_theta'
-        self.log_sigma.name = 'log_sigma'
+        kfactory = kernelFactory( kernelType )
 
         # Random variables
         self.alpha = th.shared(Q_M_mat)
@@ -112,25 +101,63 @@ class SGPDV(object):
         self.eta   = th.shared(Q_B_mat)
         self.xi    = th.shared(Q_B_mat)
         self.alpha.name = 'alpha'
-        self.beta.name  = 'beta'
         self.eta.name   = 'eta'
         self.xi.name    = 'xi'
+        self.beta.name  = 'beta'
 
+        if not backConstrainX:
+            # Have a normal variational distribution over location of latent co-ordinates            
+            self.Phi_lower = np.tril(R_R_mat)
+
+            self.phi = th.shared(N_R_mat)
+            self.Phi = th.shared(R_R_mat)
+            
+            self.phi.name = 'phi'
+            self.Phi.name = 'Phi'   
+            
+            (self.cPhi,self.iPhi,self.logDetPhi) = cholInvLogDet(self.Phi)
+
+            self.Xf   = self.phi[self.currentBatch,:] + ( T.dot(self.cPhi, self.beta.T) ).T
+
+        else:
+            # Draw the latent coordinates from a GP with data co-ordinates
+            self.log_gamma = th.shared( np.zeros(self.numberOfHyperparameters) )
+            self.Kyy = kfactory.kernel(self.y_miniBatch, None, self.log_gamma, 'Kyy')
+            (self.cKyy,_,_) = cholInvLogDet(self.Kyy)
+            self.Xf = T.dot(self.cKyy, self.beta.T).T
+            
+            self.log_gamma.name = 'log_gamma'
+        
+        self.Xf.name   = 'Xf'
+    
         # Inducing points co-ordinates
         self.Xu = th.shared(M_R_mat)
         self.Xu.name = 'Xu'
 
-        #Mini batch indicator varible
-        self.currentBatch = th.shared(B_vec)
-        self.currentBatch.name = 'currentBatch'
+        # variational and auxiliary parameters
+        self.kappa   = th.shared(Q_M_mat)
+        self.upsilon = th.shared(Q_M_mat) # mean of r(u|z)
+        self.Upsilon = th.shared(M_M_mat) # variance of r(u|z)
+        self.tau     = th.shared(N_R_mat)
+        self.Tau     = th.shared(R_R_mat)
 
-        # Latent co-ordinates
-        (self.cPhi,self.iPhi,self.logDetPhi) = cholInvLogDet(self.Phi, 'Phi')
-        self.Xf   = self.phi[self.currentBatch,:] + ( T.dot(self.cPhi, self.beta.T) ).T
-        self.Xf.name   = 'Xf'
+        self.upsilon.name = 'upsilon'
+        self.Upsilon.name = 'Upsilon'
+        self.tau.name     = 'tau'
+        self.Tau.name     = 'Tau'
+        self.kappa.name   = 'kappa'
+        
+        # lower triangular versions
+        self.Upsilon_lower = np.tril(M_M_mat)
+        self.Tau_lower     = np.tril(R_R_mat)
 
+        # Other parameters
+        self.log_theta = th.shared( np.zeros(self.numberOfHyperparameters) )  # kernel parameters
+        self.log_sigma = th.shared(0.0)  # standard deviation of q(z|f)
+        self.log_theta.name = 'log_theta'
+        self.log_sigma.name = 'log_sigma'
+        
         # Kernels
-        kfactory = kernelFactory( kernelType )
         self.Kuu = kfactory.kernel( self.Xu, None,    self.log_theta, 'Kuu' )
         self.Kff = kfactory.kernel( self.Xf, None,    self.log_theta, 'Kff' )
         self.Kfu = kfactory.kernel( self.Xf, self.Xu, self.log_theta, 'Kfu' )
@@ -357,7 +384,7 @@ class SGPDV(object):
 
         return KL
 
-    def sample( self ):
+    def sample( self, withoutReplacement=False ):
         # generate standard gaussian random varibales
         alpha_ = np.random.randn(self.Q, self.M)
         beta_  = np.random.randn(self.B, self.R)
@@ -417,7 +444,9 @@ class SGPDV(object):
 
             # Set the new variable value
             self.setVariableValues( variableValues )
-            self.lowerBound = self.L_func()   
+            lbTmp = self.L_func()
+            lbTmp = lbTmp.flatten()
+            self.lowerBound = lbTmp[0]   
             
             currentTime  = time.time()
             wallClock    = currentTime - startTime
@@ -460,6 +489,7 @@ class SGPDV(object):
 
             if self.gradientVariables[i] == self.Upsilon:
                 self.Upsilon_lower = values[i]
+                #print  np.dot(self.Upsilon_lower, self.Upsilon_lower.T)           
                 self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T) )
             elif self.gradientVariables[i] == self.Phi:
                 self.Phi_lower = values[i]
@@ -539,19 +569,10 @@ class VA(SGPDV):
             #                                               []                       []
     def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits, kernelType_='RBF', continuous_=True ):
                        #self, dataSize, induceSize, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_='RBF'
-        SGPDV.__init__(self, len(data), numberOfInducingPoints, batchSize, dimX, dimZ, kernelType_ )
+        SGPDV.__init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, kernelType_ )
 
         self.HU_decoder = numHiddenUnits
         self.continuous = continuous_
-
-        # set the data
-        data             = np.array(data)
-        self.P           = data.shape[1]
-        self.y           = th.shared(data)
-        self.y_miniBatch = self.y[self.currentBatch,:]
-
-        self.y.name           = 'y'
-        self.y_miniBatch.name = 'y_minibatch'
 
         # Construct appropriately sized matrices to initialise theano shares
         HU_Q_mat = np.zeros( (self.HU_decoder, self.Q) )
