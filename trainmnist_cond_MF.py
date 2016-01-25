@@ -28,8 +28,8 @@ HU_decoder = 400
 
 
 batch_size = 100
-n_induce = 100
-learning_rate = 0.01
+n_induce = 5
+learning_rate = 1e-3
 
 print "Initialising"
 va = VA(n_induce, batch_size, dimX, dimZ, np.ones((3,1), dtype=np.float64), 1.0, x_train, HU_decoder, kernelType_='RBF', continuous_=True )
@@ -47,8 +47,7 @@ f.write(str(temp))
 f.close()
 
 print "Training"
-#lowerBounds = va.train_adagrad( n_iter, learning_rate )
-
+lowerBounds = va.train_adagrad( n_iter, learning_rate )
 
 
 

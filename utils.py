@@ -17,7 +17,7 @@ def jitterChol(covmat):
             val = slinalg.cholesky(covmat + \
                 + jitter * T.eye(M))
             passed = True
-        except:
+        except np.linalg.LinAlgError:
             jitter = jitter * 1.1
             passed = False
         return val
