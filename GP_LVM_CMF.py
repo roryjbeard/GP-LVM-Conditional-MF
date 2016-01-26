@@ -117,7 +117,7 @@ class SGPDV(object):
         self.eta   = th.shared(Q_B_mat, name='eta')
         self.xi    = th.shared(Q_B_mat, name='xi')
 
-        if not self.backConstrainX:
+        if not self.x_backConstrain:
             # Have a normal variational distribution over location of latent co-ordinates
             self.Phi_lower = np.tril(R_R_mat)
             self.Phi = th.shared(R_R_mat, name='Phi')
@@ -129,7 +129,7 @@ class SGPDV(object):
         (self.cPhi,self.iPhi,self.logDetPhi) = cholInvLogDet(self.Phi)
         self.phi = th.shared(N_R_mat, name='phi')
     
-        if not self.backConstrainX:        
+        if not self.x_backConstrain:        
             self.Xf  = self.phi[self.currentBatch,:] + ( T.dot(self.cPhi, self.beta.T) ).T
         else:
             self.Xf  = self.phi[self.currentBatch,:] + ( T.dot(self.cPhi, self.beta) )
