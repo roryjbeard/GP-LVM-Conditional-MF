@@ -67,7 +67,7 @@ class SGPDV(object, r_is_nnet=False):
 
         self.r_is_nnet = r_is_nnet
 
-        self.y = th.shared(data)
+        self.y = th.shared(data.astype(th.config.floatX))
         self.y.name = 'y'
 
         if kernelType == 'RBF':
@@ -415,12 +415,23 @@ class SGPDV(object, r_is_nnet=False):
         return KL
 
     def sample( self, withoutReplacement=False ):
+
+        if hasattr(self, batchIndiciesRemaining):
+            try:
+                currentBatch_ = np.int32( np.sort ( np.random.choice(self.batchIndiciesRemaining, self.B, replace=False) ) )
+                self.batchIndiciesRemaining = np.delete(self.batchIndiciesRemaining, currentBatch_)
+            except(ValueError):
+                # not enough left for a full batch
+                currentBatch_ = self.batchIndiciesRemaining
+                self.B = currentBatch_.shape[0] # reduced batch size
+        else:
+            currentBatch_ = np.int32( np.sort( np.random.choice(self.N,self.B,replace=False) ) )
+
         # generate standard gaussian random varibales
         alpha_ = np.random.randn(self.Q, self.M)
         beta_  = np.random.randn(self.B, self.R)
         eta_   = np.random.randn(self.Q, self.B)
         xi_    = np.random.randn(self.Q, self.B)
-        currentBatch_ = np.int32( np.sort( np.random.choice(self.N,self.B,replace=False) ) )
 
         self.currentBatch.set_value(currentBatch_)
         self.alpha.set_value(alpha_)
@@ -428,69 +439,78 @@ class SGPDV(object, r_is_nnet=False):
         self.eta.set_value(eta_)
         self.xi.set_value(xi_)
 
-    def train_adagrad(self, numberOfIterations, learningRate=1e-3, fudgeFactor=1e-6):
+    def train_adagrad(self, numberOfIterations, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6):
+
+        if is None numberOfIterations:
+            numberOfIterations = np.ceil(self.N / batchSize)
 
         lowerBounds = []
-
-        #pbar = progressbar.ProgressBar(maxval=numberOfIterations).start()
 
         startTime    = time.time()
         wallClockOld = startTime
         # For each iteration...
         variableValues = self.getVariableValues()
         totalGradients = [0]*len(self.gradientVariables)
-        for it in range( numberOfIterations ):
-            #...generate and set value for a minibatch...
-            self.sample()
-            #...compute the gradient for this mini-batch
-            grads = self.lowerTriangularGradients( self.dL_func() )
-            # For each gradient variable returned by the gradient function
-            for i in range(len(self.gradientVariables)):
-                if np.any(totalGradients[i] == 0):
-                    totalGradients[i] =  grads[i]**2
-                else:
-                    totalGradients[i] += grads[i]**2
 
-                adjustedGrad = grads[i] / (fudgeFactor + np.sqrt(totalGradients[i]))
+        pbar = progressbar.ProgressBar(maxval=numberOfEpochs*numberOfIterations).start()
 
-                variableValues[i] = variableValues[i] + learningRate * adjustedGrad
+        for epoch in range(numberOfEpochs):
+            # in case last batch was of reduced size, revert B to full batch size
+            self.B = batchSize
+            self.batchIndiciesRemaining = np.arange(self.N)
+           for it in range( numberOfIterations ):
+                #...generate and set value for a minibatch...
+                self.sample()
+                #...compute the gradient for this mini-batch
+                grads = self.lowerTriangularGradients( self.dL_func() )
 
-                if self.gradientVariables[i] == self.log_sigma:
-                    if self.log_sigma_min > variableValues[i]:
-                        variableValues[i] = self.log_sigma_min
-                        print 'Constraining sigma to sigma_min'
-                    elif variableValues[i] > self.log_sigma_max:
-                        variableValues[i] = self.log_sigma_max
-                        print 'Constraining sigma to sigma_max'
-                elif self.gradientVariables[i] == self.log_theta:
-                    if np.any( self.log_theta_min > variableValues[i] ):
-                        under = np.where( self.log_theta_min > variableValues[i] )
-                        variableValues[i][under] = self.log_theta_min[under]
-                        print 'Constraining theta to theta_min'
-                    if np.any( variableValues[i] > self.log_theta_max ):
-                        over = np.where( variableValues[i] > self.log_theta_max )
-                        variableValues[i][over] = self.log_theta_max[over]
-                        print 'Constraining theta to theta_max'
+                # For each gradient variable returned by the gradient function
+                for i in range(len(self.gradientVariables)):
+                    if np.any(totalGradients[i] == 0):
+                        totalGradients[i] =  grads[i]**2
+                    else:
+                        totalGradients[i] += grads[i]**2
 
-            # Set the new variable value
-            self.setVariableValues( variableValues )
-            lbTmp = self.L_func()
-            lbTmp = lbTmp.flatten()
-            self.lowerBound = lbTmp[0]
-            currentTime  = time.time()
-            wallClock    = currentTime - startTime
-            stepTime     = wallClock - wallClockOld
-            wallClockOld = wallClock
+                    adjustedGrad = grads[i] / (fudgeFactor + np.sqrt(totalGradients[i]))
 
-            print("\n It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
-                  % (it, wallClock, stepTime, self.lowerBound))
+                    variableValues[i] = variableValues[i] + learningRate * adjustedGrad
 
-            lowerBounds.append( (self.lowerBound, wallClock) )
+                    if self.gradientVariables[i] == self.log_sigma:
+                        if self.log_sigma_min > variableValues[i]:
+                            variableValues[i] = self.log_sigma_min
+                            print 'Constraining sigma to sigma_min'
+                        elif variableValues[i] > self.log_sigma_max:
+                            variableValues[i] = self.log_sigma_max
+                            print 'Constraining sigma to sigma_max'
+                    elif self.gradientVariables[i] == self.log_theta:
+                        if np.any( self.log_theta_min > variableValues[i] ):
+                            under = np.where( self.log_theta_min > variableValues[i] )
+                            variableValues[i][under] = self.log_theta_min[under]
+                            print 'Constraining theta to theta_min'
+                        if np.any( variableValues[i] > self.log_theta_max ):
+                            over = np.where( variableValues[i] > self.log_theta_max )
+                            variableValues[i][over] = self.log_theta_max[over]
+                            print 'Constraining theta to theta_max'
 
-            #pbar.update(it)
-        #pbar.finish()
+                # Set the new variable value
+                self.setVariableValues( variableValues )
+                lbTmp = self.L_func()
+                lbTmp = lbTmp.flatten()
+                self.lowerBound = lbTmp[0]
+                currentTime  = time.time()
+                wallClock    = currentTime - startTime
+                stepTime     = wallClock - wallClockOld
+                wallClockOld = wallClock
 
-        return lowerBounds
+                print("\n It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
+                      % (it, wallClock, stepTime, self.lowerBound))
+
+                lowerBounds.append( (self.lowerBound, wallClock) )
+
+                pbar.update(epoch*numberOfIterations+it)
+        pbar.finish()
+
+        self.lowerBounds = lowerBounds
 
 
     def lowerTriangularGradients(self, gradients):
