@@ -1,5 +1,6 @@
-import GP_LVM_CMF.py
+import GP_LVM_CMF
 import utils
+import config
 
 import os
 import cPickle as pkl
@@ -58,10 +59,8 @@ def post_experiment(directory_name, dataset, model):
 
 def directory_to_store(**kwargs):
     '''Expects arguments that describe the experiment and returns the directory where the results of the experiment should be stored'''
-    if kwargs['exp'] == 'train':
-        directory_name = '{}l{}{}k{}'.format(kwargs['dataset'], kwargs['layers'], kwargs['model'], kwargs['k'])
-    else:
-        directory_name = kwargs['exp']
+
+        directory_name = '{}l{}{}k{}'.format(kwargs['exp'], kwargs['model'], kwargs['dataset'], kwargs['k'])
 
     return os.path.join(config.RESULTS_DIR, directory_name)
 
@@ -110,7 +109,7 @@ def training_experiment(directory_name, batch_size, dimX, dimZ, x_train, HU_deco
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run training experiments.')
-    parser.add_argument('--exp', 'e', choices=['autoenc_q_kernel', 'autoenc_r_kernel',
+    parser.add_argument('--exp', '-e', choices=['autoenc_q_kernel', 'autoenc_r_kernel',
         'autoenc_both_kernel', 'autoenc_q_MLP', 'autoenc_r_MLP', 'autoenc_both_MLP',
         'no_autoenc'], default='autoenc_both_kernel')
     parser.add_argument('--model', '-m', choices=['MLP', 'GP_LVM'], default='MLP') # TODO
@@ -144,6 +143,10 @@ if __name__ == '__main__':
         autoenc_r = True
         autoenc_type = 'MLP'
 
+
+    directory_name = directory_to_store(**args.__dict__)
+    if not os.path.exists(directory_name):
+        os.makedirs(directory_name)
 
 
     training_experiment(directory_name, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_q=autoenc_q, autoenc_r=autoenc_r, checkpoint=args.checkpoint):
