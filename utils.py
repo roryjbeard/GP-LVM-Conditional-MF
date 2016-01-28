@@ -3,6 +3,21 @@ import theano as th
 from theano import tensor as T
 from theano.tensor import slinalg, nlinalg
 
+
+
+def t_repeat(x, num_repeats, axis):
+    '''Repeats x along an axis num_repeats times. Axis has to be 0 or 1, x has to be a matrix.'''
+    if num_repeats == 1:
+        return x
+    else:
+        if axis == 0:
+            return T.alloc(x.dimshuffle(1, 0, 'x'), x.shape[1], x.shape[0], num_repeats)\
+                   .reshape((x.shape[1], num_repeats*x.shape[0]))\
+                   .dimshuffle(1, 0)
+        elif axis == 1:
+            return T.alloc(x.dimshuffle(0, 'x', 1), x.shape[0], num_repeats, x.shape[1]).reshape((x.shape[0], num_repeats*x.shape[1]))
+
+
 def srng(seed=123):
     return MRG_RandomStreams(seed=seed)
 
@@ -45,3 +60,6 @@ def cholInvLogDet( A, useJitterChol=False, fast=False ):
     logDetA.name = 'logDetA' + A.name
 
     return(cA, iA, logDetA)
+
+
+
