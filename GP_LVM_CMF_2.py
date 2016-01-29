@@ -75,9 +75,9 @@ class SGPDV(object):
 
         self.encoder    = encoder
         self.encode_qX  = encode_qX
-        self.encode_ruX = encode_ruX
-        self.z_optimise   = z_optimise       
-        self.phi_optimise = phi_optimise
+        self.encode_rX  = encode_rX
+        self.encode_ru  = encode_ru
+        self.z_optimise = z_optimise       
 
         self.y = th.shared(data)
         self.y.name = 'y'
@@ -145,28 +145,28 @@ class SGPDV(object):
         elif self.encoder == 1:
             # Auto encode 
            
-            self.W1_q = th.shared(H_P_mat, name='W1_q')
-            self.b1_q = th.shared(H_vec,   name='b1_q')
-            self.W2_q = th.shared(R_H_mat, name='W2_q')
-            self.b2_q = th.shared(R_vec,   name='b2_q')
-            self.W3_q = th.shared(O_H_mat, name='W3_q')
-            self.b3_q = th.shared(0.0,     name='W3_q')
+            self.W1_qX = th.shared(H_P_mat, name='W1_qX')
+            self.b1_qX = th.shared(H_vec,   name='b1_qX')
+            self.W2_qX = th.shared(R_H_mat, name='W2_qX')
+            self.b2_qX = th.shared(R_vec,   name='b2_qX')
+            self.W3_qX = th.shared(O_H_mat, name='W3_qX')
+            self.b3_qX = th.shared(0.0,     name='W3_qX')
             
             #[HxB] = softplus( [HxP] . [BxP]^T + repmat([Hx1],[1,B]) )
-            h_q         = T.nnet.softplus(T.dot(self.W1_q,self.y_miniBatch.T + self.b1_q) )
+            h_qX        = T.nnet.softplus(T.dot(self.W1_qX,self.y_miniBatch.T + self.b1_qX) )
             #[RxB] = sigmoid( [RxH] . [HxB] + repmat([Rx1],[1,B]) )
-            mu_q        = T.nnet.sigmoid(T.dot(self.W2_q, h_q) + self.b2_q)
+            mu_qX       = T.nnet.sigmoid(T.dot(self.W2_qX, h_qX) + self.b2_qX)
             #[1xB] = 0.5 * ( [1xH] . [HxB] + repmat([1x1],[1,B]) )            
-            log_sigma_q = 0.5*(T.dot(self.W3_q, h_q) + self.b3_q)
+            log_sigma_q = 0.5*(T.dot(self.W3_q, h_qX) + self.b3_qX)
             
-            h_q.name         = 'h_q'
-            mu_q.name        = 'mu_q'
-            log_sigma_q.name = 'log_sigma_q'
+            h_qX.name         = 'h_qX'
+            mu_qX.name        = 'mu_qX'
+            log_sigma_qX.name = 'log_sigma_qX'
             
             self.phi  = mu_q.T #[BxR]
-            self.Phi  = T.diag( T.exp(log_sigma_q) ) #[BxB]
-            self.iPhi = T.diag( T.exp(-log_sigma_q) ) #[BxB] 
-            self.cPhi = T.diag( T.exp(0.5*log_sigma_q) ) #[BxB] 
+            self.Phi  = T.diag( T.exp(log_sigma_qX) ) #[BxB]
+            self.iPhi = T.diag( T.exp(-log_sigma_qX) ) #[BxB] 
+            self.cPhi = T.diag( T.exp(0.5*log_sigma_qX) ) #[BxB] 
             self.logDetPhi = T.sum(log_sigma_q) #scalar
 
             self.phi.name       = 'phi'
@@ -230,7 +230,7 @@ class SGPDV(object):
             tauRange = th.shared( np.reshape(range(0,self.R*self.N),[self.R,self.N]) )                        
             TauIndices = T.flatten( tauRange[:,self.currentBatch] )
             
-            tauRange.name = 'tauRange'
+            tauRange.name   = 'tauRange'
             TauIndices.name = 'TauIndices'            
             
             self.tau = self.tau_full[:,self.currentBatch]            
@@ -280,7 +280,7 @@ class SGPDV(object):
 
         if not self.encode_ru:
         
-            self.upsilon = th.shared(QM_vec, name='upsilon')
+            self.upsilon = th.shared(QM_vec,    name='upsilon')
             self.Upsilon = th.shared(QM_QM_mat, name='Upsilon')            
             self.Upsilon_lower = np.tril(QM_QM_mat)
  
@@ -322,20 +322,27 @@ class SGPDV(object):
         # We always want to optimise these variables
         self.gradientVariables = [self.log_theta, self.log_sigma, self.kappa]
         
-        if not self.encode_ruX:
-            self.gradientVariables.extend([self.tau_full, self.Tau_full, self.upsilon, self.Upsilon])
-        elif self.encoder == 1:
-            self.gradientVariables.extend([self.W1_r,self.W2_r,self.W3_r,self.b1_r,self.b2_r,self.b3_r])
-        elif self.encoder == 2:
-            self.gradientVariables.extend(self.log_omega)
-
         if not self.encode_qX:
             self.gradientVariables.extend([self.phi_full, self.Phi_full])
         elif self.encoder == 1:
             self.gradientVariables.extend([self.W1_q,self.W2_q,self.W3_q,self.b1_q,self.b2_q,self.b3_q])
         elif self.encoder == 2:
             self.gradientVariables.extend(self.log_gamma)
-                
+
+        if not self.encode_rX:
+            self.gradientVariables.extend([self.tau_full, self.Tau_full])
+        elif self.encoder == 1:
+            self.gradientVariables.extend([self.W1_rX,self.W2_rX,self.W3_rX,self.b1_rX,self.b2_rX,self.b3_rX])
+        elif self.encoder == 2:
+            self.gradientVariables.extend(self.log_omega)
+
+        if not self.encode_ru:
+            self.gradientVariables.extend([self.upsilon, self.Upsilon])
+        elif self.encoder == 1:
+            self.gradientVariables.extend([self.W1_ru,self.W2_ru,self.W3_ru,self.b1_ru,self.b2_ru,self.b3_ru])
+        elif self.encoder == 2:
+            RuntimeError('Not implemented')
+
         if self.z_optimise:
             self.gradientVariables.extend(self.Xu)
             
@@ -411,6 +418,16 @@ class SGPDV(object):
         # Overload this function in the derived classes if p_z_gaussian==True
         return 0.0
 
+    def log_q_z_fX(self):
+        # TODO: implement this function
+        return 0
+
+    def log_q_f_uX(self):
+        log_q_f_uX_ = -0.5*self.Q*self.B*np.log(2*np.pi) - 0.5*self.Q*self.logDetSigma \
+                    - 0.5 * nlinalg.trace(T.dot(self.iSigma, T.dot((self.f - self.mu).T, (self.f - self.mu))))
+        return log_q_f_uX_
+
+
     def construct_L(self, p_z_gaussian=True, r_uX_z_gaussian=True,
                     q_f_Xu_equals_r_f_Xuz=True):
 
@@ -438,8 +455,8 @@ class SGPDV(object):
     def log_r_uX_z(self):
         # use this function if we don't want to exploit gaussianity or if?
         
-        X_m_tau = self.Xf - self.tau_batch
-        xOuter = T.dot(X_m_tau.T, X_m_tau)
+        X_m_tau = self.Xf - self.tau
+        xOuter = T.reshape (X_m_tau.T, X_m_tau)
         uOuter = T.dot((self.u - self.upsilon).T, (self.u - self.upsilon))
 
         log2pi  = np.log(2*np.pi)
@@ -452,41 +469,37 @@ class SGPDV(object):
 
         return log_rX_z + log_ru_z
 
-    def log_q_f_uX(self):
-        log_q_f_uX_ = -0.5*self.Q*self.B*np.log(2*np.pi) - 0.5*self.Q*self.logDetSigma \
-                    - 0.5 * nlinalg.trace(T.dot(self.iSigma, T.dot((self.f - self.mu).T, (self.f - self.mu))))
-        return log_q_f_uX_
-
-    def log_q_z_fX(self):
-        # TODO: implement this function
-        return 0
-
     def log_q_uX(self):
 
          log2pi  = np.log(2*np.pi)
 
-         X_m_phi = self.Xf - self.phi[self.currentBatch,:]
-         xOuter  = T.dot(X_m_phi.T, X_m_phi)
+         #[BxR]
+         X_m_phi = self.Xf - self.phi
+         #[BxB]         
+         xOuter  = T.dot(X_m_phi, X_m_phi.T)
+         #[MxM]  = [RxM]^T . [RxM] 
          uOuter  = T.dot((self.u - self.kappa).T, (self.u - self.kappa))
+
+         log_q_X = -0.5 * self.B*self.R*log2pi - 0.5*self.R*self.logDetPhi \
+                   -0.5 * nlinalg.trace( T.dot( self.iPhi, xOuter ) )
 
          log_q_u = -0.5 * self.Q*self.M*log2pi - 0.5*self.Q*self.logDetKuu \
                    -0.5 * nlinalg.trace( T.dot( self.iKuu, uOuter ) )
-         log_q_X = -0.5 * self.B*self.R*log2pi - 0.5*self.B*self.logDetPhi \
-                   -0.5 * nlinalg.trace( T.dot( self.iPhi, xOuter ) )
 
          return log_q_u + log_q_X
 
     def KL_qr(self):
 
-            upsilon_m_kappa = self.upsilon - self.kappa
-            phi_m_tau       = self.phi     - self.tau
+            upsilon_m_kappa = self.upsilon - T.reshape( self.kappa, [self.Q*self.M,1] )
+            phi_m_tau       = T.reshape( self.phi - self.tau, [self.B*self.R, 1] )
 
-            uOuter = T.dot(upsilon_m_kapa.T, upsilon_m_kappa)
-            xOuter = T.dot(phi_m_tau.T, phi_m_tau)
+            Kuu_stacked = linalg.kron( T.eye(self.Q), self.Kuu )
 
-            KL_qr_u = 0.5 * ( nlinalg.trace( T.dot(self.iUpsilon, uOuter) ) \
-                + nlinalg.trace( T.dot(self.iUpsilon, self.Kuu)) \
-                + self.logDetUpsilon - self.logDetKuu - self.Q*self.M )
+            KL_qr_u = 0.5 * ( T.dot( upsilon_m_kappa.T, T.dot( self.iUpsilon, upsilon_m_kappa ) ) \
+                + nlinalg.trace( T.dot(self.iUpsilon, Kuu_stacked)) \
+                + self.logDetUpsilon - self.Q*self.logDetKuu - self.Q*self.M )
+
+            Phi_stacked = linalg.kron( T.eye(self.))
 
             KL_qr_X = 0.5 * ( nlinalg.trace( T.dot(self.iTau, xOuter) ) \
                 + nlinalg.trace(T.dot(self.iTau, self.Phi)) \
@@ -496,7 +509,7 @@ class SGPDV(object):
 
             return KL
 
-    def sample( self, withoutReplacement=False ):
+    def sample(self, withoutReplacement=False):
 
         currentBatch_ = np.int32( np.sort( np.random.choice(self.N,self.B,replace=False) ) )
         self.currentBatch.set_value(currentBatch_)
@@ -718,27 +731,21 @@ class VA(SGPDV):
         # Hidden layer weights are uniformly sampled from a symmetric interval
         # following [Xavier, 2010]
 
-        # HU_Q_mat = sig * np.random.randn(self.HU_decoder, self.Q)
-        # HU_vec   = sig * np.random.randn(self.HU_decoder,1 )
-        # P_HU_mat = sig * np.random.randn(self.P, self.HU_decoder)
-        # P_vec    = sig * np.random.randn(self.P, 1)
-
         HU_Q_mat = np.asarray(np.random.uniform(
-                                        low=-np.sqrt(6. / (self.HU_decoder + self.Q)),
-                                        high=np.sqrt(6. / (self.HU_decoder + self.Q)),
-                                        size=(self.HU_decoder, self.Q)),
-                                dtype=th.config.floatX)
+            low=-np.sqrt(6. / (self.HU_decoder + self.Q)),
+            high=np.sqrt(6. / (self.HU_decoder + self.Q)),
+            size=(self.HU_decoder, self.Q)),
+            dtype=th.config.floatX)
 
         HU_vec   = np.asarray(np.zeros((self.HU_decoder,1 )), dtype=th.config.floatX)
 
-
         P_HU_mat = np.asarray(np.random.uniform(
-                                        low=-np.sqrt(6. / (self.P+ self.HU_decoder)),
-                                        high=np.sqrt(6. / (self.P + self.HU_decoder)),
-                                        size=(self.P, self.HU_decoder)),
-                                dtype=th.config.floatX)
-        P_vec    = np.asarray(np.zeros((self.P, 1)))
-
+            low=-np.sqrt(6. / (self.P + self.HU_decoder)),
+            high=np.sqrt(6. / (self.P + self.HU_decoder)),
+            size=(self.P, self.HU_decoder)),
+            dtype=th.config.floatX)
+        
+        P_vec = np.asarray(np.zeros((self.P, 1)))
 
         self.W1.set_value(HU_Q_mat)
         self.b1.set_value(HU_vec)
@@ -753,7 +760,6 @@ class VA(SGPDV):
             self.W1.set_value(HU_Q_mat*4.)
             self.W2.set_value(P_HU_mat*4.)
             self.W3.set_value(P_HU_mat*4.)
-
 
     def log_p_y_z(self):
         if self.continuous:
