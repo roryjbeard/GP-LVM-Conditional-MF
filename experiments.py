@@ -64,7 +64,6 @@ def directory_to_store(**kwargs):
 
     return os.path.join(config.RESULTS_DIR, directory_name)
 
-    #VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, backConstrainX=backConstrainX, r_is_nnet=r_is_nnet )
 
 def training_experiment(directory_name, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_q, autoenc_r, checkpoint=-1):
     '''The experiment that trains a model with given parameters'''
@@ -82,9 +81,8 @@ def training_experiment(directory_name, batch_size, dimX, dimZ, x_train, HU_deco
 
     def checkpoint1to8(i, model, srng):
         learning_rate = 1e-4*round(10.**(1-(i-1)/7.), 1)
-        n_minibatches = model.y.get_value.shape[0]
-        n_iter =
-        model.train_adagrad( n_iter=None, n_epoch= n_epoch, learning_rate=learning_rate )
+        model.train_adagrad( numberOfIterations=None, numberOfEpochs=3**(i-1), learningRate=learning_rate )
+
         return model, srng
 
 
@@ -114,6 +112,10 @@ if __name__ == '__main__':
         'no_autoenc'], default='autoenc_both_kernel')
     parser.add_argument('--model', '-m', choices=['MLP', 'GP_LVM'], default='MLP') # TODO
     parser.add_argument('--k', '-k', type=int, default=1) # TODO
+    parser.add_argument('--induce', '-M', type=int, default=20)
+    parser.add_argument('--hunits', '-h', type=int, default=400)
+    parser.add_argument('--batchsize', '-b', type=int, default=100)
+    parser.add_argument('--dimZ', '-Q', type=int, default=20)
     parser.add_argument('--dataset', '-d', choices=['MNIST', 'OMNI', 'BinFixMNIST'], default='MNIST')]) # TODO
     parser.add_argument('--checkpoint', '-c', type=int, default=-1)
 
@@ -143,13 +145,18 @@ if __name__ == '__main__':
         autoenc_r = True
         autoenc_type = 'MLP'
 
+    HU_de
+
 
     directory_name = directory_to_store(**args.__dict__)
     if not os.path.exists(directory_name):
         os.makedirs(directory_name)
 
+#################### NEED TO COMPLETE ####################
 
-    training_experiment(directory_name, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_q=autoenc_q, autoenc_r=autoenc_r, checkpoint=args.checkpoint):
+    training_experiment(directory_name, args.batchsize, dimX, args.dimZ,
+                        x_train, args.hunits, kernelType_='RBF', continuous_=True,
+                        autoenc_q=autoenc_q, autoenc_r=autoenc_r, checkpoint=args.checkpoint):
 
 
 

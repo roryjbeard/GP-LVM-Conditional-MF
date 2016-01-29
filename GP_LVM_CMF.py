@@ -465,7 +465,7 @@ class SGPDV(object):
 
         return KL
 
-    def sample( self, withoutReplacement=False ):
+    def sample( self, num_samples=1, withoutReplacement=False ):
 
         if hasattr(self, batchIndiciesRemaining):
             try:
@@ -478,17 +478,23 @@ class SGPDV(object):
         else:
             currentBatch_ = np.int32( np.sort( np.random.choice(self.N,self.B,replace=False) ) )
 
+        # repeat if we want multiples samples from same minibatch
+        currentBatch_ = t_repeat(currentBatch_, num_samples, axis=0)
+
         # generate standard gaussian random varibales
         alpha_ = np.random.randn(self.Q, self.M)
-        beta_  = np.random.randn(self.B, self.R)
-        eta_   = np.random.randn(self.Q, self.B)
-        xi_    = np.random.randn(self.Q, self.B)
-
+        beta_  = np.random.randn(self.B*num_samples, self.R)
+        eta_   = np.random.randn(self.Q, self.B*num_samples)
+        xi_    = np.random.randn(self.Q, self.B*num_samples)
         self.currentBatch.set_value(currentBatch_)
         self.alpha.set_value(alpha_)
         self.beta.set_value(beta_)
         self.eta.set_value(eta_)
         self.xi.set_value(xi_)
+
+        self.z.set_value(T.reshape(self.z, (self.B, num_samples)))
+
+
 
     def train_adagrad(self, numberOfIterations, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6):
 
@@ -664,6 +670,22 @@ class SGPDV(object):
         return dL_var
 
 
+    def measure_marginal_log_likelihood(self, dataset, subdataset, seed=123, minibatch_size=20, num_samples=50):
+        print "Measuring {} log likelihood".format(subdataset)
+
+        pbar = progressbar.ProgressBar(maxval=num_minibatches).start()
+        sum_of_log_likelihoods = 0.
+        for i in xrange(num_minibatches):
+            summand = get_log_marginal_likelihood(i)
+            sum_of_log_likelihoods += summand
+            pbar.update(i)
+        pbar.finish()
+
+        marginal_log_likelihood = sum_of_log_likelihoods/n_examples
+
+        return marginal_log_likelihood
+
+
 class VA(SGPDV):
 
             #                                               []                       []
@@ -799,6 +821,25 @@ class VA(SGPDV):
             RuntimeError("Case not implemented")
 
         return KL
+
+
+    def log_importance_weights(self, minibatch, num_samples):
+
+        # get num_samples posterior z samples (from q(z))
+        # need a function which draws a number of post z samples given
+        # a minibatch. It may be that a minibatch of data is NOT NEEDED
+        # to generate samples from q(z) (it's only needed if we are back-
+        # constraining q(X)) but we'll pass it for generality.
+        self.sample()
+
+        # compute the LOG importance weights and reshape
+        log_ws = self.log_p_y_z() + self.log_p_z() - self.log_q_z_fX() \
+               - self.log_q_f_uX() - self.log_q_uX() + self.log_r_uX_z()
+
+        log_ws_matrix = log_ws.reshape(minibatch.shape[0], num_samples)
+        log_marginal_estimate = log_mean_exp_stable(log_ws_matrix, axis=1)
+
+        return log_marginal_estimate
 
 
 

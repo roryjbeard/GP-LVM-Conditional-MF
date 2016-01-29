@@ -61,5 +61,10 @@ def cholInvLogDet( A, useJitterChol=False, fast=False ):
 
     return(cA, iA, logDetA)
 
+def log_mean_exp_stable(x, axis):
+    m = T.max(x, axis=axis, keepdims=True)
+    return m + T.log(T.mean(T.exp(x - m), axis=axis, keepdims=True))
+
+
 
 
