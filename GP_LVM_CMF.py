@@ -514,8 +514,9 @@ class SGPDV(object):
 
             return KL
 
-    def sample(self, sample ):
+    def sample(self, sampleRemaining=False ):
 
+        if sampleRemaining:
             if len(self.batchIndiciesRemaining) >= self.B:
                 currentBatch_ = np.int32( np.sort ( np.random.choice(self.batchIndiciesRemaining, self.B, replace=False) ) )
                 self.batchIndiciesRemaining = np.delete(self.batchIndiciesRemaining, currentBatch_)
@@ -920,6 +921,15 @@ if __name__ == "__main__":
     va.setHyperparameters(0.01, 0.1*np.ones((2,)))
 
     va.printParameters()
+
+    members = [attr for attr in dir(self)]
+
+    for name in members:
+        var = getattr(self,name)
+        if type(var) == th.shared:
+            rnd( var )
+
+
 
 #    print th.function( [], va.cSigma )()
 #
