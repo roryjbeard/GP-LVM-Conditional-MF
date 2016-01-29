@@ -12,6 +12,7 @@ from scitools import ndgrid
 from utils import *
 from testTools import checkgrad
 
+precision = th.config.float32
 
 class kernelFactory(object):
     def __init__(self, kernelType_, eps_=1e-4):
@@ -92,15 +93,15 @@ class SGPDV(object):
         self.lowerBound = -np.inf # Lower bound
 
         # Suitably sized zero matrices
-        N_R_mat = np.zeros((self.N, self.R), dtype=th.floatX)
-        M_R_mat = np.zeros((self.M, self.R), dtype=th.floatX)
-        B_R_mat = np.zeros((self.B, self.R), dtype=th.floatX)
-        Q_M_mat = np.zeros((self.Q, self.M), dtype=th.floatX)
-        Q_B_mat = np.zeros((self.Q, self.B), dtype=th.floatX)
+        N_R_mat = np.zeros((self.N, self.R), dtype=precision )
+        M_R_mat = np.zeros((self.M, self.R), dtype=precision )
+        B_R_mat = np.zeros((self.B, self.R), dtype=precision )
+        Q_M_mat = np.zeros((self.Q, self.M), dtype=precision )
+        Q_B_mat = np.zeros((self.Q, self.B), dtype=precision )
         B_vec   = np.zeros((self.B,), dtype=np.int32 )
         
-        H_QpP_mat  = np.zeros( (self.H, (self.Q+self.P) ) )
-        H_vec      = np.zeros( (self.H,1 ) )
+        H_QpP_mat  = np.zeros( (self.H, (self.Q+self.P) ), dtype=precision )
+        H_vec      = np.zeros( (self.H,1 ), dtype=th.config.floatX )
         
         #Mini batch indicator varible
         self.currentBatch = th.shared(B_vec, name='currentBatch')
@@ -133,9 +134,9 @@ class SGPDV(object):
         if not self.encode_qX:
             # Have a normal variational distribution over location of latent co-ordinates
 
-            self.Phi_full_lower = np.zeros((self.N,self.N))             
-            self.Phi_full = th.shared(N_N_mat)
-            self.phi_full = th.shared(N_R_mat)
+            self.Phi_full_lower = np.zeros((self.N,self.N), dtype=precision )             
+            self.Phi_full = th.shared(N_N_mat, dtype=precision)
+            self.phi_full = th.shared(N_R_mat, dtype=precision)
             
             self.phi = self.phi_full[self.currentBatch,:]
             self.Phi = self.Phi_full[self.currentBatch, self.currentBatch]            
@@ -260,7 +261,7 @@ class SGPDV(object):
             mu_rX.name        = 'mu_rX'
             log_sigma_rX.name = 'log_sigma_rX'
   
-            self.tau = mu_rX;
+            self.tau = mu_rX.T;
             self.Tau = T.diag( T.flatten(T.exp(log_sigma_rX)))
             self.cTau = T.diag( T.flatten(T.exp(0.5*log_sigma_rX)))
             self.iTau = T.diag( T.flatten(T.exp(-log_sigma_rX)))
@@ -455,13 +456,15 @@ class SGPDV(object):
     def log_r_uX_z(self):
         # use this function if we don't want to exploit gaussianity or if?
         
+        #TODO fix this        
+        
         X_m_tau = self.Xf - self.tau
         xOuter = T.reshape (X_m_tau.T, X_m_tau)
         uOuter = T.dot((self.u - self.upsilon).T, (self.u - self.upsilon))
 
         log2pi  = np.log(2*np.pi)
 
-        log_ru_z = -0.5 * self.Q*self.M*log2pi - 0.5*self.Q*self.logDetUpsilon \
+        log_ru_z = -0.5 * self.Q*self.M*log2pi - 0.5*self.Q*self.M*self.logDetUpsilon \
              -0.5 * nlinalg.trace( T.dot(self.iUpsilon, uOuter ) )
 
         log_rX_z = -0.5 * self.Q*self.M*log2pi - 0.5*self.Q*self.logDetUpsilon \
@@ -499,7 +502,7 @@ class SGPDV(object):
                 + nlinalg.trace( T.dot(self.iUpsilon, Kuu_stacked)) \
                 + self.logDetUpsilon - self.Q*self.logDetKuu - self.Q*self.M )
 
-            Phi_stacked = linalg.kron( T.eye(self.))
+            Phi_stacked = linalg.kron( T.eye(self.R), self.Phi )
 
             KL_qr_X = 0.5 * ( nlinalg.trace( T.dot(self.iTau, xOuter) ) \
                 + nlinalg.trace(T.dot(self.iTau, self.Phi)) \
@@ -757,9 +760,9 @@ class VA(SGPDV):
         if self.continuous:
             # Optimal initial values for sigmoid transform are ~ 4 times
             # those for tanh transform
-            self.W1.set_value(HU_Q_mat*4.)
-            self.W2.set_value(P_HU_mat*4.)
-            self.W3.set_value(P_HU_mat*4.)
+            self.W1.set_value(HU_Q_mat*4.0)
+            self.W2.set_value(P_HU_mat*4.0)
+            self.W3.set_value(P_HU_mat*4.0)
 
     def log_p_y_z(self):
         if self.continuous:
