@@ -38,6 +38,16 @@ def jitterChol(covmat):
             passed = False
         return val
 
+def invLogDet( C ):
+    # Return inv(A) and log det A where A = C . C^T 
+    iC = nlinalg.matrix_inverse(C)
+    iC.name = 'i' + C.name
+    iA  = T.dot( iC.T, iC )
+    iA.name    = 'i' + C.name[1:]        
+    logDetA = 2.0*T.sum( T.log( T.abs_( T.diag(C) ) ) )
+    logDetA.name = 'logDet' + C.name[1:]    
+    return(iA, logDetA)
+    
 def cholInvLogDet( A, useJitterChol=False, fast=False ):
 
     if useJitterChol:
@@ -45,21 +55,22 @@ def cholInvLogDet( A, useJitterChol=False, fast=False ):
     else:
         cA  = slinalg.cholesky(A)
 
+    cA.name = 'c' + A.name
+
     if fast:
-        icA = nlinalg.matrix_inverse(cA)
-        icA.name = 'ic' + A.name
-        iA  = T.dot( icA.T, icA )
-        logDetA = 2.0*T.sum( T.log( T.abs_( T.diag(cA) ) ) )
-        #logDetA = T.log( nlinalg.Det()(A) )
+        (iA,logDetA) = invLogDet( cA )
     else:
         iA = nlinalg.matrix_inverse(A)
         logDetA = T.log( nlinalg.Det()(A) )
-
-    cA.name = 'c' + A.name
-    iA.name = 'i' + A.name
-    logDetA.name = 'logDetA' + A.name
+        iA.name = 'i' + A.name
+        logDetA.name = 'logDet' + A.name
 
     return(cA, iA, logDetA)
+    
+    
+
+
+
 
 def log_mean_exp_stable(x, axis):
     m = T.max(x, axis=axis, keepdims=True)
