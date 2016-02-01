@@ -412,7 +412,10 @@ class SGPDV(object):
                 elif var.name == 'y_miniBatch':
                     pass
                 elif var.name.endswith("lower"):
-                     var.set_value( np.tril( rnd( var.get_value() ) ) )
+                     A = rnd( var.get_value() )
+                     B = np.dot(A, A.T)
+                     L = np.tril(B) 
+                     var.set_value(L)
                 else:
                      var.set_value( rnd( var.get_value() ) )
             elif type(var) == T.sharedvar.ScalarSharedVariable:
@@ -425,7 +428,7 @@ class SGPDV(object):
         for name in members:
             var = getattr(self,name)
             if type(var) == T.sharedvar.ScalarSharedVariable or \
-               type(var) == T.sharedvar.TensorSharedVariable :
+               type(var) == T.sharedvar.TensorSharedVariable:
                 rnd( var )
 
     def setHyperparameters(self,
