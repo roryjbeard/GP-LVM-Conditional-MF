@@ -59,9 +59,11 @@ class SGPDV(object):
             encode_qX=False,
             encode_rX=False,
             encode_ru=False,
+            encoder_type='MLP',     # 0 = undefined, 1 = neural network, 2 = GP
             z_optimise=False,
             phi_optimise=True,
             numberOfEncoderHiddenUnits=0
+
         ):
 
         # set the data
@@ -916,11 +918,13 @@ class VA(SGPDV):
             encode_qX=False,
             encode_rX=False,
             encode_ru=False,
+            encoder_type='MLP',
             z_optimise=False,
-            phi_optimise=True,
+            phi_optimise=True,             # 0 = undefined, 1 = neural network, 2 = GP
             numHiddenUnits_encoder=0,
             numHiddentUnits_decoder=10,
             continuous=True
+
         ):
 
         SGPDV.__init__(self,
@@ -934,6 +938,7 @@ class VA(SGPDV):
             encode_qX,
             encode_rX,
             encode_ru,
+            encoder_type,           # 0 = undefined, 1 = neural network, 2 = GP
             z_optimise,
             phi_optimise,
             numHiddenUnits_encoder
@@ -1040,39 +1045,39 @@ if __name__ == "__main__":
     #nnumberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits
     va = VA( 3, 20, 2, 2, np.random.rand(40,3))
 
-#    log_p_y_z_eqn = va.log_p_y_z()
-#    log_p_y_z_var = [va.Xu]
-#    log_p_y_z_var.extend(va.qf_vars)
-#    log_p_y_z_var.extend(va.qu_vars)
-#    log_p_y_z_var.extend(va.qX_vars)
-#    log_p_y_z_var.extend(va.likelihoodVariables)
-#    log_p_y_z_grad = T.grad(log_p_y_z_eqn, log_p_y_z_var)
-#
-#    KL_qr_eqn = va.KL_qr()
-#    KL_qr_var = []
-#    KL_qr_var.extend(va.qu_vars)
-#    KL_qr_var.extend(va.qX_vars)
-#    KL_qr_var.extend(va.rX_vars)
-#    KL_qr_var.extend(va.ru_vars)
-#    KL_qr_grad = T.grad(KL_qr_eqn, KL_qr_var)
-#
-#    KL_qp_eqn = va.KL_qp()
-#    KL_qp_var = []
-#    KL_qp_var.extend(va.qu_vars)
-#    KL_qp_var.extend(va.qX_vars)
-#
-#    log_r_uX_z_eqn = va.log_r_uX_z()
-#    log_r_uX_z_var = []
-#    log_r_uX_z_var.extend(va.ru_vars)
-#    log_r_uX_z_var.extend(va.rX_vars)
-#    T.grad(log_r_uX_z_eqn, log_r_uX_z_var)
-#
-#    log_q_uX_equ = va.log_q_uX()
-#    log_q_uX_var = []
-#    log_q_uX_var.extend(va.qu_vars)
-#    log_q_uX_var.extend(va.qX_vars)
-#    T.grad(log_q_uX_equ, log_q_uX_var)
-#
+    log_p_y_z_eqn = va.log_p_y_z()
+    log_p_y_z_var = [va.Xu]
+    log_p_y_z_var.extend(va.qf_vars)
+    log_p_y_z_var.extend(va.qu_vars)
+    log_p_y_z_var.extend(va.qX_vars)
+    log_p_y_z_var.extend(va.likelihoodVariables)
+    log_p_y_z_grad = T.grad(log_p_y_z_eqn, log_p_y_z_var)
+
+    KL_qr_eqn = va.KL_qr()
+    KL_qr_var = []
+    KL_qr_var.extend(va.qu_vars)
+    KL_qr_var.extend(va.qX_vars)
+    KL_qr_var.extend(va.rX_vars)
+    KL_qr_var.extend(va.ru_vars)
+    KL_qr_grad = T.grad(KL_qr_eqn, KL_qr_var)
+
+    KL_qp_eqn = va.KL_qp()
+    KL_qp_var = []
+    KL_qp_var.extend(va.qu_vars)
+    KL_qp_var.extend(va.qX_vars)
+
+    log_r_uX_z_eqn = va.log_r_uX_z()
+    log_r_uX_z_var = []
+    log_r_uX_z_var.extend(va.ru_vars)
+    log_r_uX_z_var.extend(va.rX_vars)
+    T.grad(log_r_uX_z_eqn, log_r_uX_z_var)
+
+    log_q_uX_equ = va.log_q_uX()
+    log_q_uX_var = []
+    log_q_uX_var.extend(va.qu_vars)
+    log_q_uX_var.extend(va.qX_vars)
+    T.grad(log_q_uX_equ, log_q_uX_var)
+
     va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
 #    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
 #    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
@@ -1083,25 +1088,25 @@ if __name__ == "__main__":
     va.sample()
 
     va.setKernelParameters(0.01, 1*np.ones((2,)))
-#
+
     va.printSharedVariables()
 
     va.printTheanoVariables()
 
-#    print 'log_p_y_z'
-#    print th.function([], va.log_p_y_z())()
-#
-#    print 'KL_qp'
-#    print th.function([], va.KL_qp())()
-#
-#    print 'KL_qr'
-#    print th.function([], va.KL_qr())()
-#
-#    print 'log_q_f_uX'
-#    print th.function([], va.log_q_f_uX())()
-#
-#    print 'log_r_uX_z'
-#    print th.function([], va.log_r_uX_z())()
+    print 'log_p_y_z'
+    print th.function([], va.log_p_y_z())()
+
+    print 'KL_qp'
+    print th.function([], va.KL_qp())()
+
+    print 'KL_qr'
+    print th.function([], va.KL_qr())()
+
+    print 'log_q_f_uX'
+    print th.function([], va.log_q_f_uX())()
+
+    print 'log_r_uX_z'
+    print th.function([], va.log_r_uX_z())()
 #
 #    for i in range(len(va.gradientVariables)):
 #        f  = lambda x: va.L_test( x, va.gradientVariables[i] )
