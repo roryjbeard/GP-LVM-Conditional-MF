@@ -1,0 +1,188 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%% ICML 2016 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Use the following line _only_ if you're still using LaTeX 2.09.
+%\documentstyle[icml2016,epsf,natbib]{article}
+% If you rely on Latex2e packages, like most moden people use this:
+\documentclass{article}
+
+% use Times
+\usepackage{times}
+% For figures
+\usepackage{graphicx} % more modern
+%\usepackage{epsfig} % less modern
+\usepackage{subfigure}
+
+% For citations
+\usepackage{natbib}
+
+% For algorithms
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% As of 2011, we use the hyperref package to produce hyperlinks in the
+% resulting PDF.  If this breaks your system, please commend out the
+% following usepackage line and replace \usepackage{icml2016} with
+% \usepackage[nohyperref]{icml2016} above.
+\usepackage{hyperref}
+
+% Packages hyperref and algorithmic misbehave sometimes.  We can fix
+% this with the following command.
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Employ the following version of the ``usepackage'' statement for
+% submitting the draft version of the paper for review.  This will set
+% the note in the first column to ``Under review.  Do not distribute.''
+\usepackage{icml2016}
+
+% Employ this version of the ``usepackage'' statement after the paper has
+% been accepted, when creating the final version.  This will set the
+% note in the first column to ``Proceedings of the...''
+%\usepackage[accepted]{icml2016}
+
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{Submission and Formatting Instructions for ICML 2016}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Submission and Formatting Instructions for \\
+           International Conference on Machine Learning (ICML 2016)}
+
+% It is OKAY to include author information, even for blind
+% submissions: the style file will automatically remove it for you
+% unless you've provided the [accepted] option to the icml2016
+% package.
+\icmlauthor{Your Name}{email@yourdomain.edu}
+\icmladdress{Your Fantastic Institute,
+            314159 Pi St., Palo Alto, CA 94306 USA}
+\icmlauthor{Your CoAuthor's Name}{email@coauthordomain.edu}
+\icmladdress{Their Fantastic Institute,
+            27182 Exp St., Toronto, ON M6H 2T1 CANADA}
+
+% You may provide any keywords that you
+% find helpful for describing your paper; these are used to populate
+% the "keywords" metadata in the PDF but will not be shown in the document
+\icmlkeywords{boring formatting information, machine learning, ICML}
+
+\vskip 0.3in
+]
+
+\begin{abstract}
+The purpose of this document is to provide both the basic paper template and
+submission guidelines. Abstracts should be a single paragraph, between 4--6 sentences long, ideally.  Gross violations will trigger corrections at the camera-ready phase.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+We approach the problem of capturing the statistical dependence structure of the conditionally independent variational factors in a flexible, Bayesian nonparametric manner. We augment
+
+
+From the perspective of the variational principle, we propose a drop-in for mean field in which a rich, variational distribution is specified in the expanded space of variables we wish to infer augmented with auxiliary inference variables. This can be seen as specifying a hierarchical variational distribution (CITE RANAGNATH 2015)... integrating over the auxiliary inference parameters recovers a marginal distribution as an infinite mixture of augmented distributions...
+
+From the perspective of variational autoencoding, the GP-LVM-CMF scheme consists of a non-parametric inference network, or \emph{encoder}, which maps the augmented data-auxiliary variable space to the latent variable space. ... should be more flexible than rigidly encoding directly from the non-augmented data space (WHY EXACTLY???)
+
+
+The marginal variational distribution over the variables of interest, $q(Z,\eta)$, is itself intractable precluding the analyticity of the variational entropy... therefore we lower bound again...
+
+SVI framework permits a learning procedure that requires only unbiased estimates of the lower bound (or rather its gradient), removing the issue of the lack of analyticity of the lower bound and, for no extra cost, granting a highly data-scalable mini-batch update scheme. There has been much recent work which empirically demonstrates the success of ... despite the presence of two sources of stochasticity.
+
+Controlling the variance of the stochastic lower bounds: reparameterization trick... theoretical Lipschitz result, ease of implementation.
+
+
+l;asdf. We additionally introduce a kernel based approach to back-constrained amortization in which random functions are trained to capture the encoding process. WHY IS THIS GOOD: provable guarantees of kernel mappings, ameliorates pathological curvature??
+This also provokes a second look at the VAE in which, in addition to replacing the decoder with a Bayesian non-parametric mapping, the same adjustment is made for the decoding part of the architecture.
+
+We showcase the GP-LVM-CMF scheme ...
+Experiments:
+
+\section{Background principles}
+\label{sec:background}
+
+\subsection{Variational Inference}
+\label{subsec:vi}
+
+\begin{itemize}
+  \item Fixed form and factorised... fixed-point coordinate ascent update scheme. Loss of posterior statistical dependence - particularly bad for factor models.
+  \item Black-box approaches and SVI. Reparam trick for variance reduction, autoencoding and back-constraints for amortization.
+  \item Augmented inference space, hierarchical variational distribution.
+\end{itemize}
+
+\subsection{The Bayesian GP-LVM}
+\label{subsec:gplvm}
+
+\section{GP-LVM-Conditional Mean Field Variational Inference} % (fold)
+\label{sec:gplvmcmf}
+
+-------------THIS SHOULD POSSIBLY GO IN THE INTRO--------------
+
+\begin{itemize}
+  \item Swapping out the directly parameterised $q(z)$ of a fixed-form VB distribution for the augmented GP-LVM-CMF distribution leads to an intractable lower bound.
+  \item While it is true that we have already forsaken analyticity by performing mini-batch stochastic estimates of the lower bound - so it doesn't worsen things in the sense of analyticity that we can only sample the entropy, we still have variance control to consider.
+  \item By judiciously further lower bounding we show that we can not only avoid such risks of large stoch gradient variance, but do so in a way which is more Bayesian than the typical case.
+  \item This procedure results in an \emph{auxiliary} lower bound which was inspired by independent approaches of Salimans and Welling and an UNPUBLISHED TECHNICAL NOTE on reinterpreting the sparse variational Gaussian process framework of Titsias.
+  \item In the present work we shed new light on this auxiliary approach, and argue that it as a more correct (in the Bayesian sense) approach to inference than simply sampling the entropy term in the bound, as well as than MCMC.
+\end{itemize}
+
+----------------------------------------------------------------
+
+We begin by applying the standard variational principle to lower bound the marginal log likelihood as follows
+%
+\begin{align}
+  \log p_\theta(Y) &= \mathbb{E}_{q_\phi(Z)}[\log p_\theta(Y|Z) - \log q_\phi(Z)]\notag\\
+  &+ \text{KL}[q_\phi(Z)\Vert p_\theta(Z|Y)]\label{eq:var_principle}\\
+  &\geq \mathbb{E}_{q_\phi(Z)}[\log p_\theta(Y|Z) - \log q_\phi(Z)] =: \mathcal{L}_1\label{eq:bound1}
+\end{align}
+ %
+ where we denote the set of all fixed point generative (resp. inference) model parameters to be learned by $\theta$ (resp. $\phi$), and we denote the set of all latent variables and parameters subject to inference by $Z$ (though later we will use $\eta$ to ...).
+ Integrating \ref{eq:bound1} with respect to the auxiliary variables, noting that the marginal variational distribution over $Z$ can be expressed as $q(Z) = q(Z|F(),U,X)q(F(),U,X)/q(F(),U,X|Z)$, and introducing an auxiliary model $r_\psi(F(),U,X)$, we arrive at the following \emph{auxiliary lower bound}:
+ %
+ \begin{align}
+  \mathcal{L}_1 &\geq \mathbb{E}_{q(Z,F(),U,X)}\big[ \log p(Y|Z)p(Z)r(F(),U,X|Z)\notag\\
+   &- \log q(Z|F(),X)q(F(),U,X) \big]\label{eq:lowerlower}\\
+    &+ \mathbb{E}_{q(Z)}\big[ \text{KL}[q(F(),U,X|Z)\Vert r(F(),U,X|Z)] \big] =: \mathcal{L}_{aux}.\label{eq:L_aux}
+ \end{align}
+%
+To explain this bound, we find it useful to refer to $q(F(),U,X)$ (resp. $q(F(),U,X|Z)$) as the \emph{variational prior} (resp.) \emph{variational posterior} distributions over the auxiliary inference variables, the latter of which constitutes a posterior belief over the auxiliary variables having observed a (set of) sample(s), $Z$, generated under the measure $q$ endowed by the inference network.
+
+
+This lower bound is indistinguishable from the one we would arrive at if we were to apply the variational principle to the problem of trying to estimate (lower bound) the log evidence of the augmented model $p(Z)p(Y|Z)r(U|Z)$: getting r exactly right (i.e. choosing $r(U|Z)=q(U|Z)$) would recover $\mathcal{L}_1$ but intractability precludes knowing $q(U|Z)$ so we must replace it with a tractable surrogate, and perform inference in the augmented space rather than in the marginal $Z$ space. --> Find the form of the surrogate $r$ which leads to a variational inference task in an augmented space which is as equivalent as possible to performing variational inference in the collapsed space.
+
++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++
+
+\subsection{Scalable and Amortized Inference}
+\label{subsec:scale}
+
+Having forsaken analyticity in favour a rich and flexibly variational distribution, we must resort to gradient based methods to optimising the auxiliary lower bound with respect to the set of all parameters; generative, variational and auxiliary $\omega=\{\theta,\phi,\psi\}$, with a simulation-based stochastic approach in which we seek to optimise an MC estimate of the auxiliary lower bound:
+%
+\begin{align}
+  \sum_{j=1}^J [\log p(Y|Z^{(j)})p(Z^{(j)})...]\label{eq:stoch_L_aux}
+\end{align}
+%
+SVI, while introduced as a means of performing variational inference on a stochastic lower bound when the source of stochasticity is the mini-batch approach, popularised the fact that one only requires an unbiased estimate of the lower bound (in addition to satisfying some basic conditions) to converge via stochastic gradient descent on the (local) minima of the true lower bound. There has been much recent success in the way of performing so called \emph{doubly stochastic} variational inference........
+Inspired by the success of the approach in the VAE / stochastic backprop in deep networks of learning generative and inference model parameters concurrently, we perform stochastic gradient-based optimization in the joint parameter space of $\omega$. The gradients produced by naively differentiating the MC estimate of (\ref{eq:stoch_L_aux}) will suffer from prohibitively high variance...
+
+variance reduction ... reparam ... A but we also note that the additional lower bounding step (\ref{eq:lowerlower}) allows the resulting auxiliary lower bound (\ref{eq:L_aux}) to be written as
+
+We can rearrange (\ref{eq:L_aux}) as follows:
+%
+\begin{align}
+  \mathcal{L}_{aux} &= \mathbb{E}_{q(Z)}[ \log p(Y|Z) ] - \mathbb{E}_{q(F(),U,X)}[ \text{KL}[q(Z|F(),U,X)\Vert p(Z)] ]\notag\\
+  &- \mathbb{E}_{q(Z)}[ \text{KL}[q(F(),U,X)\Vert r(F(),U,X|Z)] ].\label{eq:L_aux_ABC}.
+\end{align}
+%
+As noted by Kingma and Welling, in the case of Gaussian $p(Z)$ and $q(Z|F(),U,X)$, the first K-L divergence can be evaluated analytically and, but the lower lower means we can get a second analytical term... This was also noticed by Tran et al., in their lower lower bound...
+
+
+Variational compression ... sparse variational GPs ... set $r(F()|U,X,Z):=q(F()|U,X)$ which means that $r(F(),U,X|Z) = q(F()|U,X)r(U,X|Z)$. Full implications of this??? Reduces configuration space... The aptness of this hinges on the veracity of the assumption that ... are sufficient statistics for ... in expectation under ...
+
+\end{document}
