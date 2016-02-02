@@ -34,24 +34,22 @@ def invLogDet( C ):
     
 def cholInvLogDet( A, dim, jitter, fast=False ):
 
-    cA = slinalg.cholesky(A + jitter * T.eye(dim, dtype='float32'))
+    A_jitter = A + jitter * T.eye(dim, dtype='float32')
+
+    cA = slinalg.cholesky(A_jitter)
     cA.name = 'c' + A.name
 
     if fast:
-        (iA,logDetA) = invLogDet( cA )
+        (iA,logDetA) = invLogDet(cA)
     else:
-        iA = nlinalg.matrix_inverse(A)
-        logDetA = T.log( nlinalg.Det()(A) )
+        iA = nlinalg.matrix_inverse(A_jitter)
+        logDetA = T.log( nlinalg.Det()(A_jitter) )
         iA.name = 'i' + A.name
         logDetA.name = 'logDet' + A.name
 
     return(cA, iA, logDetA)
     
     
-
-
-
-
 def log_mean_exp_stable(x, axis):
     m = T.max(x, axis=axis, keepdims=True)
     return m + T.log(T.mean(T.exp(x - m), axis=axis, keepdims=True))

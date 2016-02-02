@@ -11,8 +11,8 @@ from copy import deepcopy
 from utils import *
 from testTools import checkgrad
 
-precision = np.float32
-log2pi = np.log(2*np.pi)
+precision = np.float64
+log2pi = precision(np.log(2*np.pi))
 
 class kernelFactory(object):
     def __init__(self, kernelType_, eps_=1e-4):
@@ -244,7 +244,7 @@ class SGPDV(object):
             self.TauRange = np.reshape(range(0, self.N*self.R), [self.N, self.R])
 
             self.Tau_full_lower = deepcopy(NR_NR_mat)
-            self.Tau = th.shared(BR_BR_mat, name='Tau_full')
+            self.Tau = th.shared(BR_BR_mat, name='Tau')
 
             self.tau_full = th.shared(N_R_mat, name='tau')
             self.tau = self.tau_full[self.currentBatch,:]
@@ -711,7 +711,7 @@ class SGPDV(object):
                 #...generate and set value for a minibatch...
                 self.sample(useRemainingList)
                 #...compute the gradient for this mini-batch
-                grads = self.lowerTriangularGradients( jitterProtected( self.dL_func ) )
+                grads = self.lowerTriangularGradients(self.jitterProtect(self.dL_func))
                 # For each gradient variable returned by the gradient function
                 for i in range(len(self.gradientVariables)):
                     if totalGradients[i] == 0: # If not initialised (i.e. == 0)
@@ -728,7 +728,7 @@ class SGPDV(object):
                 self.constrainKernelParameters()                
                 
                 self.jitter.set_value(self.jitterDefault)
-                lbTmp = self.jitterProtected(self.L_func)
+                lbTmp = self.jitterProtect(self.L_func)
                 lbTmp = lbTmp.flatten()
                 self.lowerBound = lbTmp[0]
                 currentTime  = time.time()
@@ -746,7 +746,7 @@ class SGPDV(object):
 
         return lowerBounds
 
-    def jitterProtected(self, func):
+    def jitterProtect(self, func):
 
         passed = False        
         while not passed:
@@ -754,6 +754,7 @@ class SGPDV(object):
                 val = func()
                 passed = True
             except np.linalg.LinAlgError:
+                print 'Increasing value of jitter'
                 self.jitter.set_value(self.jitter.get_value()*self.jitterGrowthFactor)
         return val
 
@@ -872,7 +873,10 @@ class SGPDV(object):
             var = getattr(self, name)
             if type(var) == va.z.__class__:
                 print var.name
-                print var.eval()
+                print self.jitterProtect(var.eval)
+                self.jitter.set_value(self.jitterDefault)
+                        
+        self.jitter.set_value(self.jitterDefault)
 
     def L_test(self, x, variable):
 
@@ -1078,48 +1082,52 @@ if __name__ == "__main__":
     log_q_uX_var.extend(va.qX_vars)
     T.grad(log_q_uX_equ, log_q_uX_var)
 
+    va.gradientVariables = [va.upsilon]
+
     va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
 #    va.construct_L( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
 #    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
 #    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
 #
-    va.randomise(rndQR=True)
+    va.randomise(rndQR=False)
 
     va.sample()
 
     va.setKernelParameters(0.01, 1*np.ones((2,)))
 
-    va.printSharedVariables()
-
-    va.printTheanoVariables()
-
-    print 'log_p_y_z'
-    print th.function([], va.log_p_y_z())()
-
-    print 'KL_qp'
-    print th.function([], va.KL_qp())()
-
-    print 'KL_qr'
-    print th.function([], va.KL_qr())()
-
-    print 'log_q_f_uX'
-    print th.function([], va.log_q_f_uX())()
-
-    print 'log_r_uX_z'
-    print th.function([], va.log_r_uX_z())()
+#    va.printSharedVariables()
 #
-#    for i in range(len(va.gradientVariables)):
-#        f  = lambda x: va.L_test( x, va.gradientVariables[i] )
-#        df = lambda x: va.dL_test( x, va.gradientVariables[i] )
-#        x0 = va.gradientVariables[i].get_value().flatten()
-#        print va.gradientVariables[i].name
-#        checkgrad( f, df, x0, disp=True, useAssert=False )
-###
+#    va.printTheanoVariables()
+#
+#    print 'log_p_y_z'
+#    print th.function([], va.log_p_y_z())()
+#
+#    print 'KL_qp'
+#    print th.function([], va.KL_qp())()
+#
+#    print 'KL_qr'
+#    print th.function([], va.KL_qr())()
+#
+#    print 'log_q_f_uX'
+#    print th.function([], va.log_q_f_uX())()
+#
+#    print 'log_r_uX_z'
+#    print th.function([], va.log_r_uX_z())()
+
+
+
+    for i in range(len(va.gradientVariables)):
+        f  = lambda x: va.L_test( x, va.gradientVariables[i] )
+        df = lambda x: va.dL_test( x, va.gradientVariables[i] )
+        x0 = va.gradientVariables[i].get_value().flatten()
+        print va.gradientVariables[i].name
+        checkgrad( f, df, x0, disp=True, useAssert=False )
+##
 #    print 'L_func'
-#    print va.L_func()
+#    print self.jitterProtect(va.L_func)
 #
 #    print 'dL_func'
-#    print va.dL_func()
+#    print self.jitterProtect(va.dL_func)
 
 
 
