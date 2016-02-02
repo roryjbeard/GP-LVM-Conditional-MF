@@ -21,22 +21,6 @@ def t_repeat(x, num_repeats, axis):
 def srng(seed=123):
     return MRG_RandomStreams(seed=seed)
 
-def jitterChol(covmat):
-    M = covmat.shape[0]
-    passed = False
-    jitter = 1e-8
-    val = 0
-    while not passed:
-        if jitter > 1e5:
-            val = slinalg.cholesky(T.eye(M))
-            break
-        try:
-            val = slinalg.cholesky(covmat + jitter * T.eye(M))
-            passed = True
-        except np.linalg.LinAlgError:
-            jitter = jitter * 1.1
-            passed = False
-        return val
 
 def invLogDet( C ):
     # Return inv(A) and log det A where A = C . C^T 
@@ -48,13 +32,9 @@ def invLogDet( C ):
     logDetA.name = 'logDet' + C.name[1:]    
     return(iA, logDetA)
     
-def cholInvLogDet( A, useJitterChol=False, fast=False ):
+def cholInvLogDet( A, dim, jitter, fast=False ):
 
-    if useJitterChol:
-        cA = jitterChol(A)
-    else:
-        cA  = slinalg.cholesky(A)
-
+    cA = slinalg.cholesky(A + jitter * T.eye(dim, dtype='float32'))
     cA.name = 'c' + A.name
 
     if fast:
