@@ -374,7 +374,7 @@ class SGPDV(object):
 
         self.batchIndiciesRemaining = np.int32([])
 
-    def randomise(self, sig=1):
+    def randomise(self, sig=1, rndQR=False):
 
         def rnd(var):
             if type(var) == np.ndarray:
@@ -387,6 +387,27 @@ class SGPDV(object):
                 pass
             elif var.name == 'jitter':
                 pass
+            elif var.name.startswith('W1') or \
+                 var.name.startswith('W2') or \
+                 var.name.startswith('W3'):
+                
+                # Hidden layer weights are uniformly sampled from a symmetric interval
+                # following [Xavier, 2010]
+                
+                X = var.get_value().shape[0]
+                Y = var.get_value().shape[1]
+                symInterval = np.sqrt(6. / (X + Y))
+                X_Y_mat = precision( np.random.uniform(size=(X, Y), 
+                    low=-symInterval, high=symInterval) )
+
+                var.set_value(X_Y_mat)
+
+            elif var.name.startswith('b1') or \
+                 var.name.startswith('b2') or \
+                 var.name.startswith('b3'):
+                # Offsets not randomised at all
+                var.set_value(np.zeros(var.get_value().shape, dtype=precision))
+
             elif type(var) == T.sharedvar.TensorSharedVariable:
                 var.set_value( rnd( var.get_value() ) )
             elif type(var) == T.sharedvar.ScalarSharedVariable:
@@ -403,13 +424,22 @@ class SGPDV(object):
                 rnd( var )
         
         if not self.encode_qX:
-            self.Phi_full_lower = np.tril( rnd(self.Phi_full_lower) )
+            if rndQR:
+                self.Phi_full_lower = np.tril( rnd(self.Phi_full_lower) )
+            else:
+                self.Phi_full_lower = np.eye( self.Phi_full_lower.shape[0], dtype=precision )
             
         if not self.encode_rX:
-            self.Tau_full_lower = np.tril( rnd(self.Tau_full_lower) )            
+            if rndQR:
+                self.Tau_full_lower = np.tril( rnd(self.Tau_full_lower) )            
+            else:
+                self.Tau_full_lower = np.eye( self.Tau_full_lower.shape[0], dtype=precision )
             
         if not self.encode_ru:
-            self.Upsilon_lower = np.tril( rnd(self.Upsilon_lower) )
+            if rndQR:
+                self.Upsilon_lower = np.tril( rnd(self.Upsilon_lower) )
+            else:
+                self.Upsilon_lower = np.eye( self.Upsilon_lower.shape[0], dtype=precision )
             self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T) )
 
 
@@ -570,7 +600,6 @@ class SGPDV(object):
 
     def KL_qr(self):
 
-
             upsilon_m_kappa = self.upsilon - self.kappa
             upsilon_m_kappa.name = 'upsilon_m_kappa'
 
@@ -680,7 +709,7 @@ class SGPDV(object):
                 #...generate and set value for a minibatch...
                 self.sample(useRemainingList)
                 #...compute the gradient for this mini-batch
-                grads = self.lowerTriangularGradients( self.dL_func() )
+                grads = self.lowerTriangularGradients( jitterProtected( self.dL_func ) )
                 # For each gradient variable returned by the gradient function
                 for i in range(len(self.gradientVariables)):
                     if totalGradients[i] == 0: # If not initialised (i.e. == 0)
@@ -693,10 +722,11 @@ class SGPDV(object):
                     variableValues[i] = variableValues[i] + learningRate * adjustedGrad
 
                 # Set the new variable value
-                self.setVariableValues( variableValues )
+                self.setVariableValues(variableValues)
                 self.constrainKernelParameters()                
                 
-                lbTmp = self.L_func()
+                self.jitter.set_value(self.jitterDefault)
+                lbTmp = self.jitterProtected(self.L_func)
                 lbTmp = lbTmp.flatten()
                 self.lowerBound = lbTmp[0]
                 currentTime  = time.time()
@@ -713,6 +743,17 @@ class SGPDV(object):
         #pbar.finish()
 
         return lowerBounds
+
+    def jitterProtected(self, func):
+
+        passed = False        
+        while not passed:
+            try:
+                val = func()
+                passed = True
+            except np.linalg.LinAlgError:
+                self.jitter.set_value(self.jitter.get_value()*self.jitterGrowthFactor)
+        return val
 
 
     def lowerTriangularGradients(self, gradients):
@@ -921,40 +962,16 @@ class VA(SGPDV):
         self.all_bounds = []
         self.all_gradients = []
 
-    def randomise(self, sig=1):
+    def randomise(self, sig=1, rndQR=False):
 
-        super(VA,self).randomise(sig)
-
-        # Hidden layer weights are uniformly sampled from a symmetric interval
-        # following [Xavier, 2010]
-
-        HU_Q_mat = precision(np.random.uniform(
-            low=-np.sqrt(6. / (self.HU_decoder + self.Q)),
-            high=np.sqrt(6. / (self.HU_decoder + self.Q)),
-            size=(self.HU_decoder, self.Q)))
-
-        HU_vec = precision(np.zeros((self.HU_decoder,1 )), )
-
-        P_HU_mat = precision(np.random.uniform(
-            low=-np.sqrt(6. / (self.P + self.HU_decoder)),
-            high=np.sqrt(6. / (self.P + self.HU_decoder)),
-            size=(self.P, self.HU_decoder)))
-
-        P_vec = precision(np.zeros((self.P, 1)))
-
-        self.W1.set_value(HU_Q_mat)
-        self.b1.set_value(HU_vec)
-        self.W2.set_value(P_HU_mat)
-        self.b2.set_value(P_vec)
-        self.W3.set_value(P_HU_mat)
-        self.b3.set_value(P_vec)
+        super(VA,self).randomise(sig,rndQR)
 
         if self.continuous:
             # Optimal initial values for sigmoid transform are ~ 4 times
             # those for tanh transform
-            self.W1.set_value(HU_Q_mat*4.0)
-            self.W2.set_value(P_HU_mat*4.0)
-            self.W3.set_value(P_HU_mat*4.0)
+            self.W1.set_value(self.W1.get_value()*4.0)
+            self.W2.set_value(self.W2.get_value()*4.0)
+            self.W3.set_value(self.W3.get_value()*4.0)
 
     def log_p_y_z(self):
 
@@ -1061,7 +1078,7 @@ if __name__ == "__main__":
 #    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
 #    va.construct_L( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
 #
-    va.randomise()
+    va.randomise(rndQR=True)
 
     va.sample()
 
