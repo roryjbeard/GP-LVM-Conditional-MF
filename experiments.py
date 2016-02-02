@@ -13,8 +13,8 @@ def save_checkpoint(directory_name, i, model, srng):
             filename_to_save = os.path.join(directory_name, "training_state{}.pkl".format(i))
             with open(filename_to_save, "wb") as f:
                 pkl.dump([model, srng.rstate], f, protocol=pkl.HIGHEST_PROTOCOL)
-            except:
-                print "Failed to write to file {}".format(filename_to_save)
+        except:
+            print "Failed to write to file {}".format(filename_to_save)
 
 
 def load_checkpoint(directory_name, i):
@@ -29,10 +29,10 @@ def load_checkpoint(directory_name, i):
             srng = utils.srng()
             srng.rstate = rstate
             loaded_checkpoint = i
-        except:
-            loaded_checkpoint = -1
-            model, srng = None, None
-        return loaded_checkpoint, model,
+    except:
+        loaded_checkpoint = -1
+        model, srng = None, None
+    return loaded_checkpoint, model,
 
 def post_experiment(directory_name, dataset, model):
     '''Analyze the model: draw samples, measure test and training log likelihoods'''
@@ -64,11 +64,19 @@ def directory_to_store(**kwargs):
 
     return os.path.join(config.RESULTS_DIR, directory_name)
 
+def load_dataset_from_name(dataset):
+    if dataset == 'MNSIT':
+        f = gzip.open('config.DATASET_DIR/mnist.pkl.gz', 'rb')
+        (x_train, t_train), (x_valid, t_valid), (x_test, t_test)  = cPickle.load(f)
+        f.close()
+    else:
+        RuntimeError("Case not implemented")
 
-def training_experiment(directory_name, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_q, autoenc_r, checkpoint=-1):
+
+def training_experiment(directory_name, dataset, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_qX, autoenc_rX, autoenc_ru, enc_type, checkpoint=-1):
     '''The experiment that trains a model with given parameters'''
     def checkpoint0(dataset):
-        va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_q=autoenc_q, autoenc_r=autoenc_r )
+        va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, encode_qX=autoenc_qX, encode_rX=autoenc_rX, encode_ru=autoenc_ru, encode_type=enc_type )
         va.construct_L()
         va.setHyperparameters(0.01, 5*np.ones((2,)),
             1e-100, 0.5,
@@ -84,6 +92,8 @@ def training_experiment(directory_name, batch_size, dimX, dimZ, x_train, HU_deco
         model.train_adagrad( numberOfIterations=None, numberOfEpochs=3**(i-1), learningRate=learning_rate )
 
         return model, srng
+
+    load_dataset_from_name(dataset)
 
 
     loaded_checkpoint = -1
@@ -121,31 +131,36 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.exp == 'autoenc_q_kernel':
-        autoenc_q = True
-        autoenc_r = False
+        autoenc_qX = True
+        autoenc_rX = False
+        autoenc_ru = False
         autoenc_type = 'kernel'
     elif args.exp == 'autoenc_r_kernel':
         autoenc_q = False
-        autoenc_r = True
+        autoenc_rX = True
+        autoenc_ru = True
         autoenc_type = 'kernel'
     elif args.exp == 'autoenc_both_kernel':
-        autoenc_q = True
-        autoenc_r = True
+        autoenc_qX = True
+        autoenc_rX = True
+        autoenc_ru = True
         autoenc_type = 'kernel'
     elif args.exp == 'autoenc_q_MLP':
-        autoenc_q = True
-        autoenc_r = False
+        autoenc_qX = True
+        autoenc_rX = False
+        autoenc_ru = False
         autoenc_type = 'MLP'
     elif args.exp == 'autoenc_r_MLP':
-        autoenc_q = False
-        autoenc_r = True
+        autoenc_qX = False
+        autoenc_rX = True
+        autoenc_ru = True
         autoenc_type = 'MLP'
     elif args.exp == 'autoenc_both_MLP':
-        autoenc_q = True
-        autoenc_r = True
+        autoenc_qX = True
+        autoenc_rX = True
+        autoenc_ru = True
         autoenc_type = 'MLP'
 
-    HU_de
 
 
     directory_name = directory_to_store(**args.__dict__)
@@ -154,11 +169,11 @@ if __name__ == '__main__':
 
 #################### NEED TO COMPLETE ####################
 
-    training_experiment(directory_name, args.batchsize, dimX, args.dimZ,
-                        x_train, args.hunits, kernelType_='RBF', continuous_=True,
-                        autoenc_q=autoenc_q, autoenc_r=autoenc_r, checkpoint=args.checkpoint):
+    training_experiment(directory_name, dataset=args.dataset, batch_size=args.batchsize, dimX, dimZ=args.dimZ,
+                        x_train, HU_decoder=args.hunits, kernelType_='RBF', continuous_=True,
+                        encode_qX=args.autoenc_qX, encode_rX=args.autoenc_rX, encode_ru=args.autoenc_ru, enc_type=args.autoenc_type, checkpoint=args.checkpoint):
 
 
 
-
+# (directory_name, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_q, autoenc_r, checkpoint=-1):
 

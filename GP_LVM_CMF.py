@@ -143,7 +143,7 @@ class SGPDV(object):
 
             (self.cPhi,self.iPhi,self.logDetPhi) = cholInvLogDet(self.Phi)
 
-        elif self.encoder == 1:
+        elif self.encoder_type == 'MLP':
             # Auto encode
 
             self.W1_qX = th.shared(H_P_mat, name='W1_qX')
@@ -175,7 +175,7 @@ class SGPDV(object):
             self.cPhi.name      = 'cPhi'
             self.logDetPhi.name = 'logDetPhi'
 
-        elif self.encoder == 2:
+        elif self.encoder_type == 'kernel':
             # Draw the latent coordinates from a GP with data co-ordinates
             self.Phi = kfactory.kernel(self.y_miniBatch, None, self.log_gamma, 'Phi')
             self.phi = th.shared(B_R_mat, name='phi')
@@ -242,7 +242,7 @@ class SGPDV(object):
 
             (self.cTau,self.iTau,self.logDetTau) = cholInvLogDet(self.Tau)
 
-        elif self.encoder == 1:
+        elif self.encoder_type == 'MLP':
             self.W1_rX = th.shared(H_QpP_mat, name='W1_rX')
             self.b1_rX = th.shared(H_vec,     name='b1_rX')
             self.W2_rx = th.shared(R_H_mat,   name='W2_rX')
@@ -267,7 +267,7 @@ class SGPDV(object):
             self.iTau = T.diag( T.flatten(T.exp(-log_sigma_rX)))
             self.logDetTau = T.sum(log_sigma_rX)
 
-        elif self.encoder == 2:
+        elif self.encoder_type == 'kernel':
 
             #[BxB] matrix Tau_r
             Tau_r = kfactory.kernel(T.concatenate(self.z,self.y_miniBatch).T, None, self.log_omega, 'Tau_r')
@@ -287,7 +287,7 @@ class SGPDV(object):
 
             (self.cUpsilon,self.iUpsilon,self.logDetUpsilon) = cholInvLogDet(self.Upsilon)
 
-        elif self.encoder == 1:
+        elif self.encoder_type == 'MLP':
 
             self.W1_ru = th.shared(H_B_mat,   name='W1_ru')
             self.b1_ru = th.shared(H_vec,     name='b1_ru')
@@ -313,7 +313,7 @@ class SGPDV(object):
             self.iUpsilon = T.diag(T.flatten(T.exp(-log_sigma_ru.T)))
             self.logDetUpsilon = T.sum(log_sigma_ru.T)
 
-        elif self.encoder == 2:
+        elif self.encoder_type == 'kernel':
             RuntimeError('Case not implemented')
 
         else:
@@ -325,23 +325,23 @@ class SGPDV(object):
 
         if not self.encode_qX:
             self.gradientVariables.extend([self.phi_full, self.Phi_full])
-        elif self.encoder == 1:
+        elif self.encoder_type == 'MLP':
             self.gradientVariables.extend([self.W1_q,self.W2_q,self.W3_q,self.b1_q,self.b2_q,self.b3_q])
-        elif self.encoder == 2:
+        elif self.encoder_type == 'kernel':
             self.gradientVariables.extend(self.log_gamma)
 
         if not self.encode_rX:
             self.gradientVariables.extend([self.tau_full, self.Tau_full])
-        elif self.encoder == 1:
+        elif self.encoder_type == 'MLP':
             self.gradientVariables.extend([self.W1_rX,self.W2_rX,self.W3_rX,self.b1_rX,self.b2_rX,self.b3_rX])
-        elif self.encoder == 2:
+        elif self.encoder_type == 'kernel':
             self.gradientVariables.extend(self.log_omega)
 
         if not self.encode_ru:
             self.gradientVariables.extend([self.upsilon, self.Upsilon])
-        elif self.encoder == 1:
+        elif self.encoder_type == 'MLP':
             self.gradientVariables.extend([self.W1_ru,self.W2_ru,self.W3_ru,self.b1_ru,self.b2_ru,self.b3_ru])
-        elif self.encoder == 2:
+        elif self.encoder_type == 'kernel':
             RuntimeError('Not implemented')
 
         if self.z_optimise:
@@ -514,8 +514,9 @@ class SGPDV(object):
 
             return KL
 
-    def sample(self, sample ):
+    def sample(self, sampleRemaining=False ):
 
+        if sampleRemaining:
             if len(self.batchIndiciesRemaining) >= self.B:
                 currentBatch_ = np.int32( np.sort ( np.random.choice(self.batchIndiciesRemaining, self.B, replace=False) ) )
                 self.batchIndiciesRemaining = np.delete(self.batchIndiciesRemaining, currentBatch_)
@@ -552,17 +553,17 @@ class SGPDV(object):
         variableValues = self.getVariableValues()
         totalGradients = [0]*len(self.gradientVariables)
 
-        sampleWithoutReplacement = numberOfEpochs > 0
+        useRemainingList = numberOfEpochs > 0
         if numberOfEpochs == 0:
             numberOfEpochs = 1
 
         for ep in range(numberOfEpochs):
-            if sampleWithoutReplacement:
+            if useRemainingList:
                 self.batchIndiciesRemaining = np.int32( range(self.N) )
 
             for it in range(numberOfIterations):
                 #...generate and set value for a minibatch...
-                self.sample()
+                self.sample(useRemainingList)
                 #...compute the gradient for this mini-batch
                 grads = self.lowerTriangularGradients( self.dL_func() )
                 # For each gradient variable returned by the gradient function
@@ -733,12 +734,16 @@ class SGPDV(object):
 class VA(SGPDV):
 
             #                                               []                       []
-    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits, kernelType_='RBF', continuous_=True, backContrainX=False, r_is_nnet=False ):
+    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits, kernelType_='RBF', continuous_=True, encode_qX=True,encode_rX=False, encode_ru=False, encoder_type='kernel' ):
                        #self, dataSize, induceSize, batchSize, dimX, dimZ, theta_init, sigma_init, kernelType_='RBF'
         SGPDV.__init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, kernelType_, backConstrainX, r_is_nnet )
 
         self.HU_decoder = numHiddenUnits
         self.continuous = continuous_
+        self.encode_qX = encode_qX
+        self.encode_ru = encode_ru
+        self.encode_rX = encode_rX
+        self.encoder_type = encoder_type
 
         # Construct appropriately sized matrices to initialise theano shares
         HU_Q_mat = np.zeros( (self.HU_decoder, self.Q) )
