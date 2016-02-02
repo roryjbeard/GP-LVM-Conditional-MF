@@ -8,9 +8,55 @@ import progressbar
 from GP_LVM_CMF import SGPDV, kernelFactory
 
 class IBP_Factor(SGPDV):
-    def __init__(self, numberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits, kernelType_='RBF', continuous_=True, encode_qX=True,encode_rX=False, encode_ru=False, encoder_type='kernel' ):
+    def __init__(self,
+            numberOfInducingPoints, # Number of inducing ponts in sparse GP
+            batchSize,              # Size of mini batch
+            dimX,                   # Dimensionality of the latent co-ordinates
+            dimZ,                   # Dimensionality of the latent variables
+            data,                   # [NxP] matrix of observations
+            kernelType='RBF',
+            encode_qX=False,
+            encode_rX=False,
+            encode_ru=False,
+            encoder_type='MLP',     # 0 = undefined, 1 = neural network, 2 = GP
+            z_optimise=False,
+            phi_optimise=True,
+            numHiddenUnits_encoder=0,
+            numHiddentUnits_decoder=10,
+            continuous=True
+
+        ):
                        #self, numberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits, kernelType_='RBF', continuous_=True, encode_qX=True,encode_rX=False, encode_ru=False, encoder_type='kernel' ):
-        SGPDV.__init__( self, len(train_data), numberOfInducingPoints, batchSize, dimX, K, theta_init, sigma_init, kernelType_ )
+        SGPDV.__init__(self,
+            numberOfInducingPoints,
+            batchSize,
+            dimX,
+            dimZ,
+            data,
+            kernelType,
+            encode_qX,
+            encode_rX,
+            encode_ru,
+            encoder_type,
+            z_optimise,
+            phi_optimise,
+            numHiddenUnits_encoder
+
+            )
+
+        numberOfInducingPoints, # Number of inducing ponts in sparse GP
+        batchSize,              # Size of mini batch
+        dimX,                   # Dimensionality of the latent co-ordinates
+        dimZ,                   # Dimensionality of the latent variables
+        data,                   # [NxP] matrix of observations
+        kernelType,
+        encoder,              # 0 = undefined, 1 = neural network, 2 = GP
+        encode_qX,
+        encode_rX,
+        encode_ru,
+        z_optimise,
+        phi_optimise,
+        numHiddenUnits_encoder
 
 
         floatX = th.config.floatX
@@ -18,15 +64,6 @@ class IBP_Factor(SGPDV):
         self.K = dimZ # max number of features
         self.D = data.shape[1] # dimensionality of features
         self.continuous = continuous_
-
-        # # set the data
-        # train_data             = np.array(train_data)
-        # test_data              = np.array(test_data)
-        # self.P                 = train_data.shape[1]
-        # self.y                 = th.shared( train_data )
-        # self.y_miniBatch       = self.y[self.currentBatch,:]
-        # self.y_train           = th.shared( test_data )
-        # self.y_train_miniBatch = self.y_train[self.currentBatch,:]
 
         # Suitably sized zero matrices
         K_D_mat   = np.zeros((self.K,self.D), dtype=floatX)

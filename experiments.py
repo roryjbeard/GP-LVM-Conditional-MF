@@ -65,7 +65,7 @@ def directory_to_store(**kwargs):
     return os.path.join(config.RESULTS_DIR, directory_name)
 
 def load_dataset_from_name(dataset):
-    if dataset == 'MNSIT':
+    if dataset == 'MNIST':
         f = gzip.open('config.DATASET_DIR/mnist.pkl.gz', 'rb')
         (x_train, t_train), (x_valid, t_valid), (x_test, t_test)  = cPickle.load(f)
         f.close()
@@ -73,10 +73,47 @@ def load_dataset_from_name(dataset):
         RuntimeError("Case not implemented")
 
 
-def training_experiment(directory_name, dataset, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_qX, autoenc_rX, autoenc_ru, enc_type, checkpoint=-1):
-    '''The experiment that trains a model with given parameters'''
+def training_experiment(directory_name,
+            dataset,
+            n_induce,
+            batch_size,
+            dimX,
+            dimZ,
+            kernelType_='RBF',
+            autoenc_qX,
+            autoenc_rX,
+            autoenc_ru,
+            enc_type,
+            z_optimise,
+            phi_optimise,
+            HU_encoder,
+            HU_decoder,
+            checkpoint=-1):
+
     def checkpoint0(dataset):
-        va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, encode_qX=autoenc_qX, encode_rX=autoenc_rX, encode_ru=autoenc_ru, encode_type=enc_type )
+        if dataset == 'MNIST':
+            continuous=True
+        else:
+            RuntimeError('Case not implemented')
+
+        load_dataset_from_name(dataset)
+
+        va = VA(n_induce,
+        batch_size,
+        dimX,
+        dimZ,
+        x_train,
+        HU_encoder,
+        HU_decoder,
+        kernelType_='RBF',
+        continuous,
+        encode_qX=autoenc_qX,
+        encode_rX=autoenc_rX,
+        encode_ru=autoenc_ru,
+        encode_type=enc_type,
+        z_optimise,
+        phi_optimise)
+
         va.construct_L()
         va.setHyperparameters(0.01, 5*np.ones((2,)),
             1e-100, 0.5,
@@ -92,8 +129,6 @@ def training_experiment(directory_name, dataset, batch_size, dimX, dimZ, x_train
         model.train_adagrad( numberOfIterations=None, numberOfEpochs=3**(i-1), learningRate=learning_rate )
 
         return model, srng
-
-    load_dataset_from_name(dataset)
 
 
     loaded_checkpoint = -1
@@ -126,6 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--hunits', '-h', type=int, default=400)
     parser.add_argument('--batchsize', '-b', type=int, default=100)
     parser.add_argument('--dimZ', '-Q', type=int, default=20)
+    parser.add_argument('--dimX', '-R', type=int, default=2)
     parser.add_argument('--dataset', '-d', choices=['MNIST', 'OMNI', 'BinFixMNIST'], default='MNIST')]) # TODO
     parser.add_argument('--checkpoint', '-c', type=int, default=-1)
 
@@ -169,11 +205,20 @@ if __name__ == '__main__':
 
 #################### NEED TO COMPLETE ####################
 
-    training_experiment(directory_name, dataset=args.dataset, batch_size=args.batchsize, dimX, dimZ=args.dimZ,
-                        x_train, HU_decoder=args.hunits, kernelType_='RBF', continuous_=True,
-                        encode_qX=args.autoenc_qX, encode_rX=args.autoenc_rX, encode_ru=args.autoenc_ru, enc_type=args.autoenc_type, checkpoint=args.checkpoint):
-
-
-
-# (directory_name, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, autoenc_q, autoenc_r, checkpoint=-1):
+    training_experiment(directory_name,
+                dataset=args.dataset,
+                n_induce=args.induce,
+                batch_size=args.batchsize,
+                dimX=args.dimX,
+                dimZ=args.dimZ,
+                kernelType_='RBF',
+                encode_qX=args.autoenc_qX,
+                encode_rX=args.autoenc_rX,
+                encode_ru=args.autoenc_ru,
+                enc_type=args.autoenc_type,
+                z_optimise,
+                phi_optimise,
+                HU_encoder,
+                HU_decoder=args.hunits,
+                checkpoint=args.checkpoint):
 

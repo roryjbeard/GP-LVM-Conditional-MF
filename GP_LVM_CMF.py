@@ -55,13 +55,14 @@ class SGPDV(object):
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
             kernelType='RBF',
-            encoder=0,              # 0 = undefined, 1 = neural network, 2 = GP
             encode_qX=False,
             encode_rX=False,
             encode_ru=False,
+            encoder_type='MLP',     # 0 = undefined, 1 = neural network, 2 = GP
             z_optimise=False,
             phi_optimise=True,
             numberOfEncoderHiddenUnits=0
+
         ):
 
         # set the data
@@ -874,15 +875,16 @@ class VA(SGPDV):
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
             kernelType='RBF',
-            encoder_type='MLP,              # 0 = undefined, 1 = neural network, 2 = GP
             encode_qX=False,
             encode_rX=False,
             encode_ru=False,
+            encoder_type='MLP',
             z_optimise=False,
-            phi_optimise=True,
+            phi_optimise=True,             # 0 = undefined, 1 = neural network, 2 = GP
             numHiddenUnits_encoder=0,
             numHiddentUnits_decoder=10,
             continuous=True
+
         ):
 
         SGPDV.__init__(self,
@@ -892,10 +894,10 @@ class VA(SGPDV):
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
             kernelType,
-            encoder,              # 0 = undefined, 1 = neural network, 2 = GP
             encode_qX,
             encode_rX,
             encode_ru,
+            encoder_type,           # 0 = undefined, 1 = neural network, 2 = GP
             z_optimise,
             phi_optimise,
             numHiddenUnits_encoder
