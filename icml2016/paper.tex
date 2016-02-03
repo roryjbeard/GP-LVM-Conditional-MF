@@ -159,7 +159,7 @@ This lower bound is indistinguishable from the one we would arrive at if we were
 +++++++++++++++++++++++++++++++++++++++
 +++++++++++++++++++++++++++++++++++++++
 
-\subsection{Scalable and Amortized Inference}
+\subsection{Scalable and Amortised Inference}
 \label{subsec:scale}
 
 Having forsaken analyticity in favour a rich and flexibly variational distribution, we must resort to gradient based methods to optimising the auxiliary lower bound with respect to the set of all parameters; generative, variational and auxiliary $\omega=\{\theta,\phi,\psi\}$, with a simulation-based stochastic approach in which we seek to optimise an MC estimate of the auxiliary lower bound:
@@ -184,5 +184,19 @@ As noted by Kingma and Welling, in the case of Gaussian $p(Z)$ and $q(Z|F(),U,X)
 
 
 Variational compression ... sparse variational GPs ... set $r(F()|U,X,Z):=q(F()|U,X)$ which means that $r(F(),U,X|Z) = q(F()|U,X)r(U,X|Z)$. Full implications of this??? Reduces configuration space... The aptness of this hinges on the veracity of the assumption that ... are sufficient statistics for ... in expectation under ...
+
+Amortised inference ... VAE, back-constraints, ... we test several options: MLP vs kernel, q(X) vs r(U,X)...
+
+
+\section{TO DO:}
+\begin{itemize}
+  \item Graphs for the 3 models.
+\end{itemize}
+
+\section{NOTES}
+
+From another perspective, the partial feedback of of z to the aux params (captured in r) means that there is a term in the cost function (aux lower bound) which is a direct effect of the generative power of aux params to generate z - an indirect is achieved when z is first passed through the generative model. So direct feedback is a reinforce step - it reinforces our current belief over z. It endows the scheme with a memory!
+
+The above is for the aux lower lower bound in general, but we have even more motivation to use it in the case of the GP-LVM-CMF: want to avoid having to do optimization to make a prediction of a new data point!
 
 \end{document}

@@ -1,5 +1,5 @@
 # Fdb version 3
-["pdflatex"] 1454456802 "paper.tex" "paper.pdf" "paper" 1454456803
+["pdflatex"] 1454457365 "paper.tex" "paper.pdf" "paper" 1454457366
   "/usr/local/texlive/2014/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2014/texmf-dist/fonts/map/fontname/texfonts.map" 1272929888 3287 e6b82fe08f5336d4d5ebc73fb1152e87 ""
   "/usr/local/texlive/2014/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1136768653 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -85,11 +85,11 @@
   "fancyhdr.sty" 1449175058 21006 088e3513a90ac3aa21515dd46e858ae4 ""
   "icml2016.sty" 1449175058 21054 e8373248539194b27ab576415196e73b ""
   "natbib.sty" 1449175058 45154 40088ce024445d7ee2bca59e704cdd01 ""
-  "paper.aux" 1454456803 1261 89ace9238e121a8b31d68427319c5d1f ""
-  "paper.out" 1454456803 0 d41d8cd98f00b204e9800998ecf8427e ""
-  "paper.tex" 1454456801 12274 e55b5f58e97923588199bb45852908f3 ""
+  "paper.aux" 1454457366 1261 89ace9238e121a8b31d68427319c5d1f ""
+  "paper.out" 1454457365 0 d41d8cd98f00b204e9800998ecf8427e ""
+  "paper.tex" 1454457363 12384 8b368280119d407cf25b6a47433212bf ""
   (generated)
+  "paper.log"
   "paper.out"
   "paper.pdf"
-  "paper.log"
   "paper.aux"
