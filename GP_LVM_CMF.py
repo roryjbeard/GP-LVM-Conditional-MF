@@ -11,9 +11,10 @@ from copy import deepcopy
 from utils import *
 from testTools import checkgrad
 
-#precision = np.float64
+
+# precision = np.float64
 precision = th.config.floatX
-log2pi = precision(np.log(2*np.pi))
+log2pi = T.constant(np.log(2*np.pi).astype(theano.config.floatX))
 
 class kernelFactory(object):
     def __init__(self, kernelType_, eps_=1e-4):
