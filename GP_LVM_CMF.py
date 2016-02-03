@@ -4,7 +4,7 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 from theano.tensor import slinalg, nlinalg
-import progressbar
+# import progressbar
 import time
 from copy import deepcopy
 
@@ -738,7 +738,7 @@ class SGPDV(object):
 
         print "training for {} epochs with {} learning rate".format(numberOfEpochs, learningRate)
 
-        pbar = progressbar.ProgressBar(maxval=numberOfIterations*numberOfEpochs).start()
+        # pbar = progressbar.ProgressBar(maxval=numberOfIterations*numberOfEpochs).start()
 
 
         for ep in range(numberOfEpochs):
@@ -779,8 +779,8 @@ class SGPDV(object):
 
                 lowerBounds.append( (self.lowerBound, wallClock) )
 
-            pbar.update(ep*numberOfIterations+it)
-        pbar.finish()
+            # pbar.update(ep*numberOfIterations+it)
+        # pbar.finish()
 
         return lowerBounds
 
