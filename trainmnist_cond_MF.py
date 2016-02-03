@@ -5,7 +5,6 @@ import numpy as np
 import argparse
 import gzip, cPickle
 
-
 parser = argparse.ArgumentParser()
 
 args = parser.parse_args()
@@ -22,65 +21,81 @@ n_iter = 500
 
 [N,dimX] = data.shape
 
-dimZ = 2
+dimZ = 20
 dimX = 5
 HU_decoder = 400
+batchSize = 100
 
+# numTestSamples = 5000
 
-batch_size = 100
+numberOfInducingPoints = 5
 
-n_induce = 5
-learning_rate = 1e-3
+# learning_rate = 1e-3
 
-r_is_nnet = False
-backConstrainX = False
 
 print "Initialising"
-va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, backConstrainX=backConstrainX, r_is_nnet=r_is_nnet )
 
-va.construct_L()
+va = VA(
+    numberOfInducingPoints, # Number of inducing ponts in sparse GP
+    batchSize,              # Size of mini batch
+    dimX,                   # Dimensionality of the latent co-ordinates
+    dimZ,                   # Dimensionality of the latent variables
+    x_train,                   # [NxP] matrix of observations
+    kernelType='RBF',
+    encoderType_qX='MLP',  # 'FreeForm', 'MLP', 'Kernel'.
+    encoderType_rX='MLP',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+    encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
+    z_optimise=False,
+    numHiddenUnits_encoder=0,
+    numHiddentUnits_decoder=10,
+    continuous=True
+)
 
-va.setHyperparameters(0.01, 5*np.ones((2,)),
+va.construct_L_using_r()
+
+va.setKernelParameters(0.01, 5*np.ones((2,)),
     1e-100, 0.5,
     [1e-10,1e-10], [10,10] )
+
 va.randomise()
-va.sample()
-
-print va.L_func()
-temp = va.dL_func()
-
-f = open('workfile', 'w')
-f.write(str(temp))
-f.close()
 
 print "Training"
-lowerBounds = va.train_adagrad( n_iter, learning_rate )
+
+for i in range(8):
+
+    learning_rate = 1e-4*round(10.**(1-(i-1)/7.), 1)
+    va.train_adagrad( numberOfIterations=None, numberOfEpochs=np.int32(3**(i-1)), learningRate=learning_rate )
+
+
+    # print va.L_func()
+    # temp = va.dL_func()
+
+    # f = open('workfile', 'w')
+    # f.write(str(temp))
+    # f.close()
+
+
+lowerBounds = va.train_adagrad( n_iter, learningRate=learning_rate )
 
 print "Testing"
+vatest = va = VA(
+    numberOfInducingPoints, # Number of inducing ponts in sparse GP
+    batchSize,              # Size of mini batch
+    dimX,                   # Dimensionality of the latent co-ordinates
+    dimZ,                   # Dimensionality of the latent variables
+    x_test,                   # [NxP] matrix of observations
+    kernelType='RBF',
+    encoderType_qX='MLP',  # 'FreeForm', 'MLP', 'Kernel'.
+    encoderType_rX='MLP',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+    encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
+    z_optimise=False,
+    numHiddenUnits_encoder=0,
+    numHiddentUnits_decoder=10,
+    continuous=True
+)
 
 
+vatest.copyParameters(va)
 
-
-# lowerbound = np.array([])
-# testlowerbound = np.array([])
-
-# begin = time.time()
-# pbar = progressbar.ProgressBar(maxval=n_iter).start()
-# for j in xrange(n_iter):
-#     va.lowerbound = 0
-#     print 'Iteration:', j
-#     va.iterate(data)
-#     end = time.time()
-#     print("Iteration %d, lower bound = %.2f,"
-#           " time = %.2fs"
-#           % (j, va.lowerbound/N, end - begin))
-#     begin = end
-
-#     if j % 5 == 0:
-#         print "Calculating test lowerbound"
-#         testlowerbound = np.append(testlowerbound,va.getTestLowerBound(x_test))
-
-#     pbar.update()
-
-# pbar.finish()
-
+testLogLhood = vatest.getTestLowerBound()
+print testLogLhood
