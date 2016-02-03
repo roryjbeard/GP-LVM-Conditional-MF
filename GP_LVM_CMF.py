@@ -107,7 +107,7 @@ class SGPDV(object):
         Q_B_mat = np.zeros((self.Q, self.B), dtype=precision)
         R_H_mat = np.zeros((self.R, self.H), dtype=precision)
         R_vec   = np.zeros((self.R, 1), dtype=precision)
-        H_vec   = np.zeros((self.H, 1), dtype=precision) 
+        H_vec   = np.zeros((self.H, 1), dtype=precision)
         M_vec   = np.zeros((self.M, 1), dtype=precision)
         B_vec      = np.zeros((self.B,), dtype=np.int32 )
         BR_BR_mat  = np.zeros((self.B*self.R, self.B*self.R), dtype=precision)
@@ -164,7 +164,7 @@ class SGPDV(object):
             self.W1_qX = th.shared(H_P_mat, name='W1_qX')
             self.b1_qX = th.shared(H_vec,   name='b1_qX', broadcastable=(False,True))
             self.W2_qX = th.shared(R_H_mat, name='W2_qX')
-            self.b2_qX = th.shared(R_vec,   name='b2_qX', broadcastable=(False,True)) 
+            self.b2_qX = th.shared(R_vec,   name='b2_qX', broadcastable=(False,True))
             self.W3_qX = th.shared(H_vec.T, name='W3_qX')
             self.b3_qX = th.shared(One_One_mat, name='b3_qX', broadcastable=(False,True))
 
@@ -261,7 +261,7 @@ class SGPDV(object):
             self.rX_vars = [self.Tau, self.tau_full]
 
         elif self.encoderType == 'MLP':
-            
+
             self.W1_rX = th.shared(H_QpP_mat, name='W1_rX')
             self.b1_rX = th.shared(H_vec,     name='b1_rX', broadcastable=(False,True))
             self.W2_rX = th.shared(R_H_mat,   name='W2_rX')
@@ -296,7 +296,7 @@ class SGPDV(object):
 
         elif self.encoderType == 'kernel':
 
-            #Tau_r [BxB] =  
+            #Tau_r [BxB] =
             Tau_r = kfactory.kernel(T.concatenate((self.z,self.y_miniBatch.T)).T, None, self.log_omega, 'Tau_r')
             (cTau_r,iTau_r,logDetTau_r) = cholInvLogDet(Tau_r, self.B, self.jitter)
 
@@ -396,14 +396,14 @@ class SGPDV(object):
             elif var.name.startswith('W1') or \
                  var.name.startswith('W2') or \
                  var.name.startswith('W3'):
-                
+
                 # Hidden layer weights are uniformly sampled from a symmetric interval
                 # following [Xavier, 2010]
                 print var.name
                 X = var.get_value().shape[0]
                 Y = var.get_value().shape[1]
                 symInterval = np.sqrt(6. / (X + Y))
-                X_Y_mat = precision( np.random.uniform(size=(X, Y), 
+                X_Y_mat = precision( np.random.uniform(size=(X, Y),
                     low=-symInterval, high=symInterval) )
 
                 var.set_value(X_Y_mat)
@@ -420,7 +420,7 @@ class SGPDV(object):
                 var.set_value( precision( np.random.randn() ) )
             else:
                 raise RuntimeError('Unknown randomisation type')
-                
+
         members = [attr for attr in dir(self)]
 
         for name in members:
@@ -428,19 +428,19 @@ class SGPDV(object):
             if type(var) == T.sharedvar.ScalarSharedVariable or \
                type(var) == T.sharedvar.TensorSharedVariable:
                 rnd( var )
-        
+
         if not self.encode_qX:
             if rndQR:
                 self.Phi_full_lower = np.tril( rnd(self.Phi_full_lower) )
             else:
                 self.Phi_full_lower = np.eye( self.Phi_full_lower.shape[0], dtype=precision )
-            
+
         if not self.encode_rX:
             if rndQR:
-                self.Tau_full_lower = np.tril( rnd(self.Tau_full_lower) )            
+                self.Tau_full_lower = np.tril( rnd(self.Tau_full_lower) )
             else:
                 self.Tau_full_lower = np.eye( self.Tau_full_lower.shape[0], dtype=precision )
-            
+
         if not self.encode_ru:
             if rndQR:
                 self.Upsilon_lower = np.tril( rnd(self.Upsilon_lower) )
@@ -478,7 +478,7 @@ class SGPDV(object):
 
 
     def contrainKernelParameters(self):
-        
+
         def contrain(variable, min_val, max_val):
             if type(variable) == T.sharedvar.ScalarSharedVariable:
                 old_val = variable.get_value()
@@ -487,8 +487,8 @@ class SGPDV(object):
                     print 'Constraining ' + variable.name
                     variable.set_value(new_val)
             elif type(variable) == T.sharedvar.TensorSharedVariable:
-                vals  = varibale.get_value()             
-                under = np.where(min_val > vals)                
+                vals  = varibale.get_value()
+                under = np.where(min_val > vals)
                 over  = np.where(vals > max_val)
                 if np.any(under):
                     vals[under] = min_val
@@ -498,12 +498,12 @@ class SGPDV(object):
                     vals[over] = max_val
                     print 'Constraining ' + variable.name + ' (max)'
                     variable.set_value(vals)
-                    
+
         constrain(self.log_sigma, self.log_sigma_min, self.log_sigma_max)
         constrain(self.log_gamma, self.log_gamma_min, self.log_gamma_max)
         constrain(self.log_theta, self.log_theta_min, self.log_theta_max)
         constrain(self.log_omega, self.log_omega_min, self.log_omega_max)
-        
+
     def log_p_y_z(self):
         # This always needs overloading (specifying) in the derived class
         return 0.0
@@ -730,8 +730,8 @@ class SGPDV(object):
 
                 # Set the new variable value
                 self.setVariableValues(variableValues)
-                self.constrainKernelParameters()                
-                
+                self.constrainKernelParameters()
+
                 self.jitter.set_value(self.jitterDefault)
                 lbTmp = self.jitterProtect(self.L_func)
                 lbTmp = lbTmp.flatten()
@@ -753,7 +753,7 @@ class SGPDV(object):
 
     def jitterProtect(self, func):
 
-        passed = False        
+        passed = False
         while not passed:
             try:
                 val = func()
@@ -781,7 +781,7 @@ class SGPDV(object):
 
         for i in range(len(self.gradientVariables)):
             name = self.gradientVariables[i].name
-            
+
             if name == 'Phi':
                 self.Phi_batch_lower = values[i]
                 Phi_batch = np.dot(self.Phi_batch_lower, self.Phi_batch_lower.T)
@@ -880,7 +880,7 @@ class SGPDV(object):
                 print var.name
                 print self.jitterProtect(var.eval)
                 self.jitter.set_value(self.jitterDefault)
-                        
+
         self.jitter.set_value(self.jitterDefault)
 
     def L_test(self, x, variable):
@@ -905,7 +905,7 @@ class SGPDV(object):
         pbar = progressbar.ProgressBar(maxval=num_minibatches).start()
         sum_of_log_likelihoods = 0.
         for i in xrange(num_minibatches):
-            summand = get_log_marginal_likelihood(i)
+            summand = self.get_log_marginal_likelihood(i)
             sum_of_log_likelihoods += summand
             pbar.update(i)
         pbar.finish()
