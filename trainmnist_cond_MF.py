@@ -5,7 +5,6 @@ import numpy as np
 import argparse
 import gzip, cPickle
 
-
 parser = argparse.ArgumentParser()
 
 args = parser.parse_args()
@@ -25,25 +24,38 @@ n_iter = 500
 dimZ = 2
 dimX = 5
 HU_decoder = 400
+batchSize = 100
 
-
-<<<<<<< HEAD
-batch_size = 100
-
-n_induce = 5
+numberOfInducingPoints = 5
 learning_rate = 1e-3
 
 r_is_nnet = False
 backConstrainX = False
 
 print "Initialising"
-va = VA(n_induce, batch_size, dimX, dimZ, x_train, HU_decoder, kernelType_='RBF', continuous_=True, backConstrainX=backConstrainX, r_is_nnet=r_is_nnet )
 
-va.construct_L()
+va = VA(
+    numberOfInducingPoints, # Number of inducing ponts in sparse GP
+    batchSize,              # Size of mini batch
+    dimX,                   # Dimensionality of the latent co-ordinates
+    dimZ,                   # Dimensionality of the latent variables
+    data,                   # [NxP] matrix of observations
+    kernelType='RBF',
+    encoderType_qX='MLP',  # 'FreeForm', 'MLP', 'Kernel'.
+    encoderType_rX='MLP',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+    encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
+    z_optimise=False,
+    numHiddenUnits_encoder=0,
+    numHiddentUnits_decoder=10,
+    continuous=True
+)
 
-va.setHyperparameters(0.01, 5*np.ones((2,)),
+va.construct_L_using_r()
+
+va.setKernelParameters(0.01, 5*np.ones((2,)),
     1e-100, 0.5,
     [1e-10,1e-10], [10,10] )
+
 va.randomise()
 va.sample()
 
@@ -55,7 +67,7 @@ f.write(str(temp))
 f.close()
 
 print "Training"
-lowerBounds = va.train_adagrad( n_iter, learning_rate )
+lowerBounds = va.train_adagrad( n_iter, learningRate=learning_rate )
 
 
 

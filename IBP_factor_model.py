@@ -19,12 +19,10 @@ class IBP_Factor(SGPDV):
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
             kernelType='RBF',
-            encode_qX=False,
-            encode_rX=False,
-            encode_ru=False,
-            encoderType='MLP',     # 0 = undefined, 1 = neural network, 2 = GP
+            encoderType_qX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel'.
+            encoderType_rX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+            encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
             z_optimise=False,
-            phi_optimise=True,
             numHiddenUnits_encoder=0,
             numHiddentUnits_decoder=10,
             continuous=True
@@ -38,12 +36,10 @@ class IBP_Factor(SGPDV):
             dimZ,
             data,
             kernelType,
-            encode_qX,
-            encode_rX,
-            encode_ru,
-            encoderType,
+            encoderType_qX,  # 'FreeForm', 'MLP', 'Kernel'.
+            encoderType_rX,  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+            encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
             z_optimise,
-            phi_optimise,
             numHiddenUnits_encoder
             )
 
@@ -59,32 +55,21 @@ class IBP_Factor(SGPDV):
         scalar    = np.zeros(1, dtype=floatX)
 
         #self.A       = th.shared( K_D_mat )
-        self.Phi_IBP = th.shared( K_D_D_ten )
-        self.phi_IBP = th.shared( K_D_mat)
-        self.tau_IBP = th.shared( K_2_mat )
-        self.mu_IBP  = th.shared( N_K_mat )
-        self.log_alpha_IBP   = th.shared(scalar)
-        self.log_sigma_y = th.shared(scalar)
-        self.log_sigma_A = th.shared(scalar)
-
-
-        self.Phi_IBP.name = 'Phi_IBP'
-        self.phi_IBP.name = 'phi_IBP'
-        self.tau_IBP.name = 'tau_IBP'
-        self.log_alpha_IBP.name   = 'log_alpha_IBP'
-        self.log_sigma_y.name = 'log_sigma_y'
-        self.log_sigma_A.name = 'log_sigma_A'
+        self.Phi_IBP = th.shared( K_D_D_ten, name='Phi_IBP')
+        self.phi_IBP = th.shared( K_D_mat,   name='phi_IBP')
+        self.tau_IBP = th.shared( K_2_mat,   name='tau_IBP')
+        self.mu_IBP  = th.shared( N_K_mat,   name='mu_IBP')
+        self.log_alpha_IBP = th.shared(scalar, name='log_alpha_IBP')
+        self.log_sigma_y = th.shared(scalar, name='log_sigma_y')
+        self.log_sigma_A = th.shared(scalar, name='log_sigma_A')
 
         self.alpha_IBP   = T.exp(self.log_alpha_IBP)
         self.sigma_y = T.exp(self.log_sigma_y)
         self.sigma_A = T.exp(self.log_sigma_A)
 
-
         self.gradientVariables.extend([self.A,self.Phi_IBP,self.phi_IBP,self.tau_IBP,self.alpha_IBP])
 
         self.z_IBP_samp = T.nnet.sigmoid(self.z)
-
-
 
     def get_tensor_chols_scan(self, tensor_in):
 
