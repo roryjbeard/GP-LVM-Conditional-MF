@@ -27,7 +27,6 @@ dimX = 5
 HU_decoder = 400
 
 
-<<<<<<< HEAD
 batch_size = 100
 
 n_induce = 5
@@ -56,6 +55,9 @@ f.close()
 
 print "Training"
 lowerBounds = va.train_adagrad( n_iter, learning_rate )
+
+print "Testing"
+
 
 
 
