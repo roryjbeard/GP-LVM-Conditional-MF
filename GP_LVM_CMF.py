@@ -13,7 +13,7 @@ from testTools import checkgrad
 
 # precision = np.float64
 precision = th.config.floatX
-log2pi = T.constant(np.log(2*np.pi).astype(theano.config.floatX))
+log2pi = T.constant(np.log(2*np.pi).astype(th.config.floatX))
 
 class kernelFactory(object):
     def __init__(self, kernelType_, eps_=1e-4):
@@ -392,7 +392,7 @@ class SGPDV(object):
 
         def rnd(var):
             if type(var) == np.ndarray:
-                return sig*np.random.randn( *var.shape ) 
+                return sig*np.random.randn( *var.shape )
             elif var.name == 'y':
                 pass
             elif var.name == 'currentBatch':
@@ -414,7 +414,7 @@ class SGPDV(object):
                 symInterval = 4.0*np.sqrt(6. / (X + Y))
                 X_Y_mat =  np.random.uniform(size=(X, Y),
 
-                    low=-symInterval, high=symInterval) 
+                    low=-symInterval, high=symInterval)
 
                 var.set_value(X_Y_mat)
 
@@ -467,24 +467,24 @@ class SGPDV(object):
             omega=[], omega_min=-np.inf, omega_max=np.inf
         ):
 
-        self.log_theta.set_value(  np.log(np.array(theta).flatten()) ) 
+        self.log_theta.set_value(  np.log(np.array(theta).flatten()) )
         self.log_sigma.set_value( np.log(sigma)  )
 
         self.log_theta_min = np.log( np.array(theta_min).flatten()  )
         self.log_theta_max =  np.log( np.array(theta_max).flatten()  )
 
-        self.log_sigma_min =  np.log(sigma_min) 
-        self.log_sigma_max = np.log(sigma_max) 
+        self.log_sigma_min =  np.log(sigma_min)
+        self.log_sigma_max = np.log(sigma_max)
 
         if self.encoderType_qX == 'Kernel':
-            self.log_gamma.set_value(  np.log(gamma) ) 
-            self.log_gamma_min =  np.log(gamma_min) 
-            self.log_gamma_max =  np.log(gamma_max) 
+            self.log_gamma.set_value(  np.log(gamma) )
+            self.log_gamma_min =  np.log(gamma_min)
+            self.log_gamma_max =  np.log(gamma_max)
 
         if self.encoderType_rX == 'Kernel':
-            self.log_omega.set_value( np.log(omega) ) 
-            self.log_omega_min = np.log(omega_min) 
-            self.log_omega_max =  np.log(omega_max) 
+            self.log_omega.set_value( np.log(omega) )
+            self.log_omega_min = np.log(omega_min)
+            self.log_omega_max =  np.log(omega_max)
 
 
     def constrainKernelParameters(self):
