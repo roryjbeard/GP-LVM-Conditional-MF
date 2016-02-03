@@ -55,7 +55,7 @@ class SGPDV(object):
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
             kernelType='RBF',
-            encoderType=None,      # 0 = undefined, 1 = neural network, 2 = GP
+            encoderType=None,      # None = undefined, 'MLP' = neural network, 'kernel' = GP
             encode_qX=False,
             encode_rX=False,
             encode_ru=False,
@@ -524,6 +524,8 @@ class SGPDV(object):
                     - 0.5 * nlinalg.trace(T.dot(self.iSigma, T.dot((self.f - self.mu).T, (self.f - self.mu))))
         return log_q_f_uX_
 
+    def additionalBoundTerms(self):
+        return 0
 
     def construct_L(self,
             p_z_gaussian=True,
@@ -531,7 +533,7 @@ class SGPDV(object):
             q_f_Xu_equals_r_f_Xuz=True
         ):
 
-        self.L = self.log_p_y_z()
+        self.L = self.log_p_y_z() + self.addtionalBoundTerms()
         self.L.name = 'L'
 
         if p_z_gaussian and q_f_Xu_equals_r_f_Xuz:
@@ -545,7 +547,7 @@ class SGPDV(object):
             self.L += self.log_r_uX_z() -self.log_q_uX()
 
         if not q_f_Xu_equals_r_f_Xuz:
-             assert(False) # Case not implemented
+             raise RuntimeError('Case not implemented')
 
         self.dL = T.grad( self.L, self.gradientVariables )
 

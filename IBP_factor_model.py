@@ -2,10 +2,14 @@
 import numpy as np
 import theano as th
 import theano.tensor as T
-from theano.tensor import slinalg, nlinalg
-import progressbar
+from theano.tensor import nlinalg
 
-from GP_LVM_CMF import SGPDV, kernelFactory
+from utils import jitterChol, t_repeat
+
+from GP_LVM_CMF import SGPDV
+
+floatX = th.config.floatX
+log2pi = T.constant(np.log(2*np.pi).astype(floatX))
 
 class IBP_Factor(SGPDV):
     def __init__(self,
@@ -18,7 +22,7 @@ class IBP_Factor(SGPDV):
             encode_qX=False,
             encode_rX=False,
             encode_ru=False,
-            encoder_type='MLP',     # 0 = undefined, 1 = neural network, 2 = GP
+            encoderType='MLP',     # 0 = undefined, 1 = neural network, 2 = GP
             z_optimise=False,
             phi_optimise=True,
             numHiddenUnits_encoder=0,
@@ -37,33 +41,15 @@ class IBP_Factor(SGPDV):
             encode_qX,
             encode_rX,
             encode_ru,
-            encoder_type,
+            encoderType,
             z_optimise,
             phi_optimise,
             numHiddenUnits_encoder
-
             )
-
-        numberOfInducingPoints, # Number of inducing ponts in sparse GP
-        batchSize,              # Size of mini batch
-        dimX,                   # Dimensionality of the latent co-ordinates
-        dimZ,                   # Dimensionality of the latent variables
-        data,                   # [NxP] matrix of observations
-        kernelType,
-        encoder,              # 0 = undefined, 1 = neural network, 2 = GP
-        encode_qX,
-        encode_rX,
-        encode_ru,
-        z_optimise,
-        phi_optimise,
-        numHiddenUnits_encoder
-
-
-        floatX = th.config.floatX
 
         self.K = dimZ # max number of features
         self.D = data.shape[1] # dimensionality of features
-        self.continuous = continuous_
+        self.continuous = continuous
 
         # Suitably sized zero matrices
         K_D_mat   = np.zeros((self.K,self.D), dtype=floatX)
@@ -98,18 +84,18 @@ class IBP_Factor(SGPDV):
 
         self.z_IBP_samp = T.nnet.sigmoid(self.z)
 
-        log2pi = T.constant(np.log(2*np.pi).astype(floatX))
 
-    def get_tensor_chols_scan(tensor_in):
 
-        result, updates = th.scan(fn=lambda tensor_in: slinalg.cholesky(tensor_in),
+    def get_tensor_chols_scan(self, tensor_in):
+
+        result, updates = th.scan(fn=lambda tensor_in: jitterChol(tensor_in,self.D,self.jitter),
                                         outputs_info=None,
                                         sequences=[tensor_in],
                                         non_sequences=[])
 
         return result
 
-    def get_tensor_traces_scan(tensor_in):
+    def get_tensor_traces_scan(self, tensor_in):
 
         result, updates = th.scan(fn=lambda tensor_in: nlinalg.trace(tensor_in),
                                           outputs_info=None,
@@ -118,7 +104,7 @@ class IBP_Factor(SGPDV):
 
         return result
 
-    def get_tensor_logdets_scan(tensor_in):
+    def get_tensor_logdets_scan(self, tensor_in):
 
         result, updates = th.scan(fn=lambda tensor_in: 2*T.sum(T.log(T.diag(tensor_in))),
                                         outputs_info=None,
@@ -130,13 +116,11 @@ class IBP_Factor(SGPDV):
 
     def randomise(self, sig=1):
 
-        super(VA,self).randomise(sig)
-
-        # TO DO
-
-        self.Phi_chols = get_tensor_chols_scan(self.Phi_IBP)
-        self.Phi_traces = get_tensor_traces_scan(self.Phi_IBP)
-        self.Phi_logdets = get_tensor_logdets_scan(self.Phi_chols)
+        super(IBP_Factor,self).randomise(sig)
+        
+        self.Phi_chols   = self.get_tensor_chols_scan(self.Phi_IBP)
+        self.Phi_traces  = self.get_tensor_traces_scan(self.Phi_IBP)
+        self.Phi_logdets = self.get_tensor_logdets_scan(self.Phi_chols)
 
     def log_p_v(self):
         term = T.sum(T.log(self.alpha_IBP) \
@@ -148,9 +132,9 @@ class IBP_Factor(SGPDV):
         self.digams = T.psi(self.tau_IBP)
         self.digams_1p2 = T.psi(self.tau_IBP[:,0] + self.tau_IBP[:,1])
 
-        self.digams_1_cumsum   = T.extra_ops.cumsum(T.concatenate((T.zeros(1), digams[:,0])))[0:-1]
-        self.digams_2_cumsum   = T.extra_ops.cumsum(digams[:,1])
-        self.digams_1p2_cumsum = T.extra_ops.cumsum(digams_1p2)
+        self.digams_1_cumsum   = T.extra_ops.cumsum(T.concatenate((T.zeros(1), self.digams[:,0])))[0:-1]
+        self.digams_2_cumsum   = T.extra_ops.cumsum(self.digams[:,1])
+        self.digams_1p2_cumsum = T.extra_ops.cumsum(self.digams_1p2)
 
         tractable_part = T.sum(T.dot(self.z_IBP_samp.T, self.digams_2_cumsum-self.digams_1p2_cumsum))
         intractable_part = T.sum(T.dot((1-self.z_IBP_samp) ,self.lower_lower()))
@@ -171,11 +155,11 @@ class IBP_Factor(SGPDV):
     def log_p_y_I_zA(self):
 
         sum_y_outers = T.sum(self.Y**2)
-        sum_z_IBP_mean_phi_y = T.sum( T.dot( (T.dot(self.phi_IBP, self.Y.T)).T, z_IBP_mean ) )
+        sum_z_IBP_mean_phi_y = T.sum( T.dot( (T.dot(self.phi_IBP, self.Y.T)).T,self.z_IBP_mean ) )
         # sum_z_IBP_mean_phi_outer = T.tril(T.dot(z_IBP_mean.T, z_IBP_mean)) * T.tril()
         # sum_z_IBP_mean_phi_Phi = T.sum( T.dot(z_IBP_mean.T, (self.Phi_traces+T.sum(self.phi_IBP**2, 1)) )  )
-        sum_2ndOrder_term = T.sum( T.dot(z_IBP_samp.T, T.dot(T.dot(self.phi_IBP, self.phi_IBP.T)
-                          + T.diag(T.diag(get_tensor_traces_scan(self.Phi_IBP))), z_IBP_samp)) )
+        sum_2ndOrder_term = T.sum( T.dot(self.z_IBP_samp.T, T.dot(T.dot(self.phi_IBP, self.phi_IBP.T)
+                          + T.diag(T.diag(self.get_tensor_traces_scan(self.Phi_IBP))), self.z_IBP_samp)) )
 
         term = -0.5*self.D*self.B*(log2pi*self.sigma_y**2) \
              -0.5*(self.sigma_y**-2)*(sum_y_outers -2*sum_z_IBP_mean_phi_y \
@@ -198,7 +182,7 @@ class IBP_Factor(SGPDV):
         return 0.5*self.D*self.K(log2pi+1.0) + 0.5*T.sum(self.Phi_logdets)
 
 
-    def additional_bound_terms(self):
+    def additionalBoundTerms(self):
         return self.log_p_v + self.log_p_z_IBP + self.log_p_A \
                 + self.log_p_y_I_zA + self.entropy_pi + self.entropy_A
 
@@ -234,17 +218,15 @@ class IBP_Factor(SGPDV):
         '''Evaluates the intractable term in the lower bound which itself
          must be lower bounded'''
 
-         a = self.get_aux_mult()
+        a = self.get_aux_mult()
 
-         reversed_cum_probs = T.extra_ops.cumsum(a[:,::-1],1)
-         dot_prod_m   = T.dot(reversed_cum_probs, digams_1p2)
-         dot_prod_mp1 = T.dot(T.concatenate((reversed_cum_probs[:,1:],T.zeros((self.K,1))),1), digams[:,0])
-
-         # final entropy term
-         triu_ones = T.triu(T.ones_like(a)) - T.eye(self.K)
-         aloga = T.sum(T.tril(a)*T.log(T.tril(a)+triu_ones),1)
-
-         return T.dot(a, digams[:,1]) + dot_prod_m + dot_prod_mp1 - aloga
+        reversed_cum_probs = T.extra_ops.cumsum(a[:,::-1],1)
+        dot_prod_m   = T.dot(reversed_cum_probs, self.digams_1p2)
+        dot_prod_mp1 = T.dot(T.concatenate((reversed_cum_probs[:,1:],T.zeros((self.K,1))),1), self.digams[:,0])
+        # final entropy term
+        triu_ones = T.triu(T.ones_like(a)) - T.eye(self.K)
+        aloga = T.sum(T.tril(a)*T.log(T.tril(a)+triu_ones),1)
+        return T.dot(a, self.digams[:,1]) + dot_prod_m + dot_prod_mp1 - aloga
 
 
     def get_aux_mult(self):

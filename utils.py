@@ -32,12 +32,21 @@ def invLogDet( C ):
     logDetA.name = 'logDet' + C.name[1:]    
     return(iA, logDetA)
     
-def cholInvLogDet( A, dim, jitter, fast=False ):
+def jitterChol(A, dim, jitter):
 
     A_jitter = A + jitter * T.eye(dim, dtype='float32')
 
     cA = slinalg.cholesky(A_jitter)
-    cA.name = 'c' + A.name
+    cA.name = 'c' + A.name    
+
+    return cA
+    
+def cholInvLogDet(A, dim, jitter, fast=False):
+
+    A_jitter = A + jitter * T.eye(dim, dtype='float32')
+
+    cA = slinalg.cholesky(A_jitter)
+    cA.name = 'c' + A.name 
 
     if fast:
         (iA,logDetA) = invLogDet(cA)
