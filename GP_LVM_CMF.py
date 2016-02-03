@@ -13,7 +13,7 @@ from testTools import checkgrad
 
 # precision = np.float64
 precision = th.config.floatX
-log2pi = T.constant(np.log(2*np.pi).astype(theano.config.floatX))
+log2pi = T.constant(np.log(2*np.pi).astype(th.config.floatX))
 
 class kernelFactory(object):
     def __init__(self, kernelType_, eps_=1e-4):
