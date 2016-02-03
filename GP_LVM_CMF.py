@@ -11,7 +11,8 @@ from copy import deepcopy
 from utils import *
 from testTools import checkgrad
 
-precision = np.float64
+#precision = np.float64
+precision = th.config.floatX
 log2pi = precision(np.log(2*np.pi))
 
 class kernelFactory(object):
