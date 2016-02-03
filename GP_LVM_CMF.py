@@ -11,10 +11,9 @@ from copy import deepcopy
 from utils import *
 from testTools import checkgrad
 
-
 # precision = np.float64
 precision = th.config.floatX
-log2pi = T.constant(np.log(2*np.pi).astype(th.config.floatX))
+log2pi = T.constant(np.log(2*np.pi).astype(theano.config.floatX))
 
 class kernelFactory(object):
     def __init__(self, kernelType_, eps_=1e-4):
@@ -68,7 +67,7 @@ class SGPDV(object):
         self.numTestSamples = 5000
 
         # set the data
-        data = precision(np.array(data))
+        data = np.array(data)
         self.N = data.shape[0]  # Number of observations
         self.P = data.shape[1]  # Dimension of each observation
         self.M = numberOfInducingPoints
@@ -125,8 +124,8 @@ class SGPDV(object):
         self.y_miniBatch.name = 'y_minibatch'
 
         # This is for numerical stability of cholesky
-        self.jitterDefault = precision(1e-4)
-        self.jitterGrowthFactor = precision(1.1)
+        self.jitterDefault =1e-4
+        self.jitterGrowthFactor = 1.1
         self.jitter = th.shared(self.jitterDefault, name='jitter')
 
         kfactory = kernelFactory(kernelType)
@@ -393,7 +392,7 @@ class SGPDV(object):
 
         def rnd(var):
             if type(var) == np.ndarray:
-                return precision( sig*np.random.randn( *var.shape ) )
+                return sig*np.random.randn( *var.shape ) 
             elif var.name == 'y':
                 pass
             elif var.name == 'currentBatch':
@@ -413,9 +412,9 @@ class SGPDV(object):
                 Y = var.get_value().shape[1]
 
                 symInterval = 4.0*np.sqrt(6. / (X + Y))
-                X_Y_mat = precision( np.random.uniform(size=(X, Y),
+                X_Y_mat =  np.random.uniform(size=(X, Y),
 
-                    low=-symInterval, high=symInterval) )
+                    low=-symInterval, high=symInterval) 
 
                 var.set_value(X_Y_mat)
 
@@ -428,7 +427,7 @@ class SGPDV(object):
             elif type(var) == T.sharedvar.TensorSharedVariable:
                 var.set_value( rnd( var.get_value() ) )
             elif type(var) == T.sharedvar.ScalarSharedVariable:
-                var.set_value( precision( np.random.randn() ) )
+                var.set_value(  np.random.randn()  )
             else:
                 raise RuntimeError('Unknown randomisation type')
 
@@ -468,24 +467,24 @@ class SGPDV(object):
             omega=[], omega_min=-np.inf, omega_max=np.inf
         ):
 
-        self.log_theta.set_value( precision( np.log(np.array(theta).flatten()) ) )
-        self.log_sigma.set_value( precision( np.log(sigma) ) )
+        self.log_theta.set_value(  np.log(np.array(theta).flatten()) ) 
+        self.log_sigma.set_value( np.log(sigma)  )
 
-        self.log_theta_min = precision( np.log( np.array(theta_min).flatten() ) )
-        self.log_theta_max = precision( np.log( np.array(theta_max).flatten() ) )
+        self.log_theta_min = np.log( np.array(theta_min).flatten()  )
+        self.log_theta_max =  np.log( np.array(theta_max).flatten()  )
 
-        self.log_sigma_min = precision( np.log(sigma_min) )
-        self.log_sigma_max = precision( np.log(sigma_max) )
+        self.log_sigma_min =  np.log(sigma_min) 
+        self.log_sigma_max = np.log(sigma_max) 
 
         if self.encoderType_qX == 'Kernel':
-            self.log_gamma.set_value( precision( np.log(gamma) ) )
-            self.log_gamma_min = precision( np.log(gamma_min) )
-            self.log_gamma_max = precision( np.log(gamma_max) )
+            self.log_gamma.set_value(  np.log(gamma) ) 
+            self.log_gamma_min =  np.log(gamma_min) 
+            self.log_gamma_max =  np.log(gamma_max) 
 
         if self.encoderType_rX == 'Kernel':
-            self.log_omega.set_value( precision( np.log(omega) ) )
-            self.log_omega_min = precision( np.log(omega_min) )
-            self.log_omega_max = precision( np.log(omega_max) )
+            self.log_omega.set_value( np.log(omega) ) 
+            self.log_omega_min = np.log(omega_min) 
+            self.log_omega_max =  np.log(omega_max) 
 
 
     def constrainKernelParameters(self):
@@ -713,7 +712,7 @@ class SGPDV(object):
             self.Tau.set_value(Tau_batch)
 
         def rnd( rv ):
-            rv.set_value( precision( np.random.randn( *(rv.get_value().shape) ) ) )
+            rv.set_value( np.random.randn( *(rv.get_value().shape) )  )
 
         rnd(self.alpha)
         rnd(self.beta)
