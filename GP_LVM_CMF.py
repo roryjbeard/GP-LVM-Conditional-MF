@@ -574,6 +574,9 @@ class SGPDV(object):
         self.L_func  = th.function([], self.L)
         self.dL_func = th.function([], self.dL)
 
+    def construct_L_predictive(self):
+        self.L = self.log_p_y_z()
+
     def log_r_uX_z(self):
         # use this function if we don't want to exploit gaussianity
 
@@ -860,9 +863,9 @@ class SGPDV(object):
 
         return values
 
-    def getTestLowerBound(self):
+    def getTestPredictiveLhood(self):
 
-        self.lBoundTest = 0.
+        self.lHoodTest = 0.
         self.batchIndiciesRemaining = np.int32( range(self.N) )
         while len(self.batchIndiciesRemaining) > 0:
 
@@ -872,9 +875,9 @@ class SGPDV(object):
                 else:
                     resampleMiniBatch=False
                 self.sample(testing=True, sampleRemaining=True, resampleMiniBatch=resampleMiniBatch)
-                self.lBoundTest += self.L_func()
+                self.lHoodTest += self.L_func()
 
-        return self.lBoundTest / self.numTestSamples
+        return self.lHoodTest / self.numTestSamples
 
     def copyParameters(self, other):
 
