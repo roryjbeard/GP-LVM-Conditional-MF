@@ -13,7 +13,7 @@ from testTools import checkgrad
 
 # precision = np.float64
 precision = th.config.floatX
-log2pi = T.constant(np.log(2*np.pi).astype(th.config.floatX))
+log2pi = T.constant(np.log(2*np.pi) )
 
 class kernelFactory(object):
     def __init__(self, kernelType_, eps_=1e-4):
@@ -416,7 +416,7 @@ class SGPDV(object):
 
                     low=-symInterval, high=symInterval)
 
-                var.set_value(X_Y_mat)
+                var.set_value(X_Y_mat )
 
             elif var.name.startswith('b1') or \
                  var.name.startswith('b2') or \
@@ -425,7 +425,7 @@ class SGPDV(object):
                 var.set_value(np.zeros(var.get_value().shape, dtype=precision))
 
             elif type(var) == T.sharedvar.TensorSharedVariable:
-                var.set_value( rnd( var.get_value() ) )
+                var.set_value( rnd( var.get_value() )  )
             elif type(var) == T.sharedvar.ScalarSharedVariable:
                 var.set_value(  np.random.randn()  )
             else:
@@ -456,7 +456,7 @@ class SGPDV(object):
                 self.Upsilon_lower = np.tril( rnd(self.Upsilon_lower) )
             else:
                 self.Upsilon_lower = np.eye( self.Upsilon_lower.shape[0], dtype=precision )
-            self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T) )
+            self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T)  )
 
 
     def setKernelParameters(self,
@@ -467,22 +467,22 @@ class SGPDV(object):
             omega=[], omega_min=-np.inf, omega_max=np.inf
         ):
 
-        self.log_theta.set_value(  np.log(np.array(theta).flatten()) )
-        self.log_sigma.set_value( np.log(sigma)  )
+        self.log_theta.set_value(  np.log(np.array(theta).flatten())  )
+        self.log_sigma.set_value( np.log(sigma)   )
 
-        self.log_theta_min = np.log( np.array(theta_min).flatten()  )
+        self.log_theta_min = np.log( np.array(theta_min).flatten()   )
         self.log_theta_max =  np.log( np.array(theta_max).flatten()  )
 
         self.log_sigma_min =  np.log(sigma_min)
         self.log_sigma_max = np.log(sigma_max)
 
         if self.encoderType_qX == 'Kernel':
-            self.log_gamma.set_value(  np.log(gamma) )
+            self.log_gamma.set_value(  np.log(gamma)  )
             self.log_gamma_min =  np.log(gamma_min)
             self.log_gamma_max =  np.log(gamma_max)
 
         if self.encoderType_rX == 'Kernel':
-            self.log_omega.set_value( np.log(omega) )
+            self.log_omega.set_value( np.log(omega)  )
             self.log_omega_min = np.log(omega_min)
             self.log_omega_max =  np.log(omega_max)
 
@@ -495,7 +495,7 @@ class SGPDV(object):
                 new_val = np.max([np.min([old_val,max_val]),min_val])
                 if not old_val == new_val:
                     print 'Constraining ' + variable.name
-                    variable.set_value(new_val)
+                    variable.set_value(new_val )
             elif type(variable) == T.sharedvar.TensorSharedVariable:
 
                 vals  = variable.get_value()
@@ -504,11 +504,11 @@ class SGPDV(object):
                 if np.any(under):
                     vals[under] = min_val
                     print 'Constraining ' + variable.name + ' (min)'
-                    variable.set_value(vals)
+                    variable.set_value(vals )
                 if np.any(over):
                     vals[over] = max_val
                     print 'Constraining ' + variable.name + ' (max)'
-                    variable.set_value(vals)
+                    variable.set_value(vals )
 
         constrain(self.log_sigma, self.log_sigma_min, self.log_sigma_max)
         constrain(self.log_theta, self.log_theta_min, self.log_theta_max)
@@ -703,16 +703,16 @@ class SGPDV(object):
         if self.encoderType_qX == 'FreeForm':
             self.Phi_batch_lower = self.Phi_full_lower[currentBatch_][:,currentBatch_]
             Phi_batch = np.dot(self.Phi_batch_lower, self.Phi_batch_lower.T)
-            self.Phi.set_value(Phi_batch)
+            self.Phi.set_value(Phi_batch )
 
         if self.encoderType_rX == 'FreeForm':
             TauIdx = (self.TauRange[currentBatch_,:]).flatten()
             self.Tau_batch_lower = self.Tau_full_lower[TauIdx][:,TauIdx]
             Tau_batch = np.dot(self.Tau_batch_lower, self.Tau_batch_lower.T)
-            self.Tau.set_value(Tau_batch)
+            self.Tau.set_value(Tau_batch )
 
         def rnd( rv ):
-            rv.set_value( np.random.randn( *(rv.get_value().shape) )  )
+            rv.set_value( np.random.randn( *(rv.get_value().shape) ).astype(th.config.floatX)   )
 
         rnd(self.alpha)
         rnd(self.beta)
@@ -766,7 +766,7 @@ class SGPDV(object):
                 self.setVariableValues(variableValues)
                 self.constrainKernelParameters()
 
-                self.jitter.set_value(self.jitterDefault)
+                self.jitter.set_value(self.jitterDefault )
                 lbTmp = self.jitterProtect(self.L_func)
                 lbTmp = lbTmp.flatten()
                 self.lowerBound = lbTmp[0]
@@ -794,7 +794,7 @@ class SGPDV(object):
                 passed = True
             except np.linalg.LinAlgError:
                 print 'Increasing value of jitter'
-                self.jitter.set_value(self.jitter.get_value()*self.jitterGrowthFactor)
+                self.jitter.set_value(self.jitter.get_value()*self.jitterGrowthFactor )
         return val
 
 
@@ -819,7 +819,7 @@ class SGPDV(object):
             if name == 'Phi':
                 self.Phi_batch_lower = values[i]
                 Phi_batch = np.dot(self.Phi_batch_lower, self.Phi_batch_lower.T)
-                self.Phi.set_value(Phi_batch)
+                self.Phi.set_value(Phi_batch )
                 currentBatch_ = self.currentBatch.get_value()
                 for b in range(self.B):
                     n = currentBatch_[b]
@@ -828,7 +828,7 @@ class SGPDV(object):
             elif name == 'Tau':
                 self.Tau_batch_lower = values[i]
                 Tau_batch = np.dot(self.Tau_batch_lower, self.Tau_batch_lower.T)
-                self.Tau.set_value(Tau_batch)
+                self.Tau.set_value(Tau_batch )
                 currentBatch_ = self.currentBatch.get_value()
                 TauIdx = (self.TauRange[currentBatch_,:]).flatten()
                 for br in range(self.B*self.R):
@@ -837,10 +837,10 @@ class SGPDV(object):
 
             elif name == 'Upsilon':
                 self.Upsilon_lower = values[i]
-                self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T) )
+                self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T)  )
 
             else:
-                self.gradientVariables[i].set_value( values[i] )
+                self.gradientVariables[i].set_value( values[i]  )
 
 
     def getVariableValues(self):
@@ -906,7 +906,7 @@ class SGPDV(object):
                     type(selfVar) == T.sharedvar.TensorSharedVariable) and \
                     type(selfVar) == type(otherVar):
                         print 'copying ' + selfVar.name
-                        selfVar.set_value( otherVar.get_value() )
+                        selfVar.set_value( otherVar.get_value()  )
 
     def printSharedVariables(self):
 
@@ -926,18 +926,18 @@ class SGPDV(object):
             if type(var) == va.z.__class__:
                 print var.name
                 print self.jitterProtect(var.eval)
-                self.jitter.set_value(self.jitterDefault)
+                self.jitter.set_value(self.jitterDefault )
 
-        self.jitter.set_value(self.jitterDefault)
+        self.jitter.set_value(self.jitterDefault )
 
     def L_test(self, x, variable):
 
-        variable.set_value( np.reshape(x, variable.get_value().shape) )
+        variable.set_value( np.reshape(x, variable.get_value().shape)  )
         return self.L_func()
 
     def dL_test(self, x, variable):
 
-        variable.set_value( np.reshape(x, variable.get_value().shape) )
+        variable.set_value( np.reshape(x, variable.get_value().shape)  )
         dL_var = []
         dL_all = self.lowerTriangularGradients( self.dL_func() )
         for i in range(len(self.gradientVariables)):
