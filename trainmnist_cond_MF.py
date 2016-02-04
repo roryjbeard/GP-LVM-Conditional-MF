@@ -60,11 +60,13 @@ va.setKernelParameters(0.01, 5*np.ones((2,)),
 va.randomise()
 
 print "Training"
-
-for i in range(8):
+learning_rate = 1e-3
+numberOfEpochs = 1
+va.train_adagrad( numberOfIterations=None, numberOfEpochs=numberOfEpochs, learningRate=learning_rate )
+for i in range(1,8):
 
     learning_rate = 1e-4*round(10.**(1-(i-1)/7.), 1)
-    va.train_adagrad( numberOfIterations=None, numberOfEpochs=np.int32(3**(i-1)), learningRate=learning_rate )
+    va.train_adagrad( numberOfIterations=None, numberOfEpochs=3**(i-1), learningRate=learning_rate )
 
 
     # print va.L_func()
