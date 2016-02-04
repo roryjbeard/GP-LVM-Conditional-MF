@@ -2,7 +2,6 @@ import numpy as np
 import theano as th
 from theano import tensor as T
 from theano.tensor import slinalg, nlinalg
-from theano.sandbox.rng_mrg import MRG_RandomStreams
 
 
 
@@ -24,30 +23,30 @@ def srng(seed=123):
 
 
 def invLogDet( C ):
-    # Return inv(A) and log det A where A = C . C^T
+    # Return inv(A) and log det A where A = C . C^T 
     iC = nlinalg.matrix_inverse(C)
     iC.name = 'i' + C.name
     iA  = T.dot( iC.T, iC )
-    iA.name    = 'i' + C.name[1:]
+    iA.name    = 'i' + C.name[1:]        
     logDetA = 2.0*T.sum( T.log( T.abs_( T.diag(C) ) ) )
-    logDetA.name = 'logDet' + C.name[1:]
+    logDetA.name = 'logDet' + C.name[1:]    
     return(iA, logDetA)
-
+    
 def jitterChol(A, dim, jitter):
 
     A_jitter = A + jitter * T.eye(dim, dtype='float32')
 
     cA = slinalg.cholesky(A_jitter)
-    cA.name = 'c' + A.name
+    cA.name = 'c' + A.name    
 
     return cA
-
+    
 def cholInvLogDet(A, dim, jitter, fast=False):
 
     A_jitter = A + jitter * T.eye(dim, dtype='float32')
 
     cA = slinalg.cholesky(A_jitter)
-    cA.name = 'c' + A.name
+    cA.name = 'c' + A.name 
 
     if fast:
         (iA,logDetA) = invLogDet(cA)
@@ -58,8 +57,8 @@ def cholInvLogDet(A, dim, jitter, fast=False):
         logDetA.name = 'logDet' + A.name
 
     return(cA, iA, logDetA)
-
-
+    
+    
 def log_mean_exp_stable(x, axis):
     m = T.max(x, axis=axis, keepdims=True)
     return m + T.log(T.mean(T.exp(x - m), axis=axis, keepdims=True))
