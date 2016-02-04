@@ -64,5 +64,12 @@ def log_mean_exp_stable(x, axis):
     return m + T.log(T.mean(T.exp(x - m), axis=axis, keepdims=True))
 
 
+def mypow(base,exponent,usePycuda):
+    if pycuda:
+        
+        
+    else:
+        return base**exponent
+
 
 
