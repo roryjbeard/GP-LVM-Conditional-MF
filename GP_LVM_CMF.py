@@ -120,8 +120,11 @@ class SGPDV(object):
         #Mini batch indicator varible
         self.currentBatch = th.shared(B_vec, name='currentBatch')
 
+        self.batchStart   = th.shared(np.int32(0))
         self.y_miniBatch = self.y[self.currentBatch,:]
+        self.y_miniBatch2 = self.y[self.batchStart:self.batchStart+self.B,:]
         self.y_miniBatch.name = 'y_minibatch'
+        self.y_miniBatch2.name = 'y_minibatch2'
 
         # This is for numerical stability of cholesky
         self.jitterDefault =1e-4
@@ -141,6 +144,11 @@ class SGPDV(object):
         self.beta  = th.shared(B_R_mat, name='beta')
         self.eta   = th.shared(Q_B_mat, name='eta')
         self.xi    = th.shared(Q_B_mat, name='xi')
+
+        # self.alpha = srng.normal(Q_M_mat)
+        # self.beta = srng.normal(B_R_mat)
+        # self.eta = srng.normal(Q_B_mat)
+        # self.xi = srng.normal(Q_B_mat)
 
         # Compute parameters of q(X)
         if encoderType_qX == 'FreeForm':
@@ -395,8 +403,8 @@ class SGPDV(object):
                 return sig*np.random.randn( *var.shape )
             elif var.name == 'y':
                 pass
-            elif var.name == 'currentBatch':
-                pass
+            # elif var.name == 'currentBatch':
+            #     pass
             elif var.name == 'y_miniBatch':
                 pass
             elif var.name == 'jitter':
@@ -679,28 +687,29 @@ class SGPDV(object):
 
     def sample(self, testing=False, sampleRemaining=False, resampleMiniBatch=False):
 
-        if resampleMiniBatch==False:
-            pass
-        else:
+        # if resampleMiniBatch==False:
+        #     pass
+        # else:
 
-            if sampleRemaining:
-                if len(self.batchIndiciesRemaining) >= self.B:
-                    if testing:
-                        currentBatch_ = np.int32(self.batchIndiciesRemaining)
-                    else:
-                        currentBatch_ = np.int32( np.sort ( np.random.choice(self.batchIndiciesRemaining, self.B, replace=False) ) )
-                        self.batchIndiciesRemaining = np.delete(self.batchIndiciesRemaining, currentBatch_)
-                else:
-                    # not enough left for a full batch
-                    alreadyPicked  = np.delete( range(self.N), self.batchIndiciesRemaining )
-                    paddingSamples = np.random.choice( alreadyPicked, replace=False )
-                    currentBatch_  = self.batchIndiciesRemaining
-                    currentBatch_.extend( paddingSamples )
-                    self.batchIndiciesRemaining = []
-            else:
-                currentBatch_ = np.int32( np.sort( np.random.choice(self.N,self.B,replace=False) ) )
+        #     if sampleRemaining:
+        #         if len(self.batchIndiciesRemaining) >= self.B:
+        #             if testing:
+        #                 currentBatch_ = np.int32(self.batchIndiciesRemaining)
+        #             else:
+        #                 currentBatch_ = np.int32( np.sort ( np.random.choice(self.batchIndiciesRemaining, self.B, replace=False) ) )
+        #                 self.batchIndiciesRemaining = np.delete(self.batchIndiciesRemaining, currentBatch_)
+        #                 currentBatch_ = srng.choice(self.batchIndiciesRemaining, self.B, replace=False, dtype='int32')
+        #                 batchIndiciesRemaining_ = []
+        #             # not enough left for a full batch
+        #             alreadyPicked  = np.delete( range(self.N), self.batchIndiciesRemaining )
+        #             paddingSamples = np.random.choice( alreadyPicked, replace=False )
+        #             currentBatch_  = self.batchIndiciesRemaining
+        #             currentBatch_.extend( paddingSamples )
+        #             self.batchIndiciesRemaining = []
+        #     else:
+        #         currentBatch_ = np.int32( np.sort( np.random.choice(self.N,self.B,replace=False) ) )
 
-            self.currentBatch.set_value(currentBatch_)
+        #     self.currentBatch.set_value(currentBatch_)
 
         # These do not automatically update with currentBatch
         if self.encoderType_qX == 'FreeForm':
@@ -722,6 +731,15 @@ class SGPDV(object):
         rnd(self.eta)
         rnd(self.xi)
 
+    # def sample_gpu(self, idx):
+    #     iter_func = th.function([idx], getMiniBatchFromIndex(idx))
+
+
+    #     def getMiniBatchFromIndex(idx):
+    #         return [idx*self.B: (idx+1)*self.B]
+
+    #     self.currentBatch = iter_func(idx)
+
     def train_adagrad(self, numberOfIterations, numberOfEpochs=0, learningRate=1e-3, fudgeFactor=1e-6):
 
         lowerBounds = []
@@ -733,7 +751,7 @@ class SGPDV(object):
         variableValues = self.getVariableValues()
         totalGradients = [0]*len(self.gradientVariables)
 
-        useRemainingList = numberOfEpochs > 0
+        # useRemainingList = numberOfEpochs > 0
         if numberOfEpochs == 0:
             numberOfEpochs = 1
 
@@ -746,12 +764,15 @@ class SGPDV(object):
 
 
         for ep in range(numberOfEpochs):
-            if useRemainingList:
-                self.batchIndiciesRemaining = np.int32( range(self.N) )
+
+            self.batchStart.set_value(0.)
+            # if useRemainingList:
+            #     self.batchIndiciesRemaining = np.int32( range(self.N) )
 
             for it in range(numberOfIterations):
                 #...generate and set value for a minibatch...
                 self.sample(useRemainingList)
+                self.sample_gpu(it)
                 #...compute the gradient for this mini-batch
                 grads = self.lowerTriangularGradients(self.jitterProtect(self.dL_func))
                 # For each gradient variable returned by the gradient function
@@ -782,6 +803,10 @@ class SGPDV(object):
                       % (ep, it, wallClock, stepTime, self.lowerBound))
 
                 lowerBounds.append( (self.lowerBound, wallClock) )
+
+                self.batchStart.set_value(np.min(self.batchStart.get_value(), self.N-self.B))
+            self.permutation = np.random.RandomState().permutation(self.N)
+            self.data = self.data[self.permutation]
 
             # pbar.update(ep*numberOfIterations+it)
         # pbar.finish()
@@ -865,15 +890,19 @@ class SGPDV(object):
 
     def getTestPredictiveLhood(self):
 
+        numberOfIterations = np.int32(np.ceil(self.N/self.B))
+
         self.lHoodTest = 0.
-        self.batchIndiciesRemaining = np.int32( range(self.N) )
-        while len(self.batchIndiciesRemaining) > 0:
+        self.batchStart.set_value(0.)
+        # self.batchIndiciesRemaining = np.int32( range(self.N) )
+        for n in range(numberOfIterations):
 
             for k in range(self.numTestSamples):
-                if k == 0:
-                    resampleMiniBatch=True
-                else:
-                    resampleMiniBatch=False
+
+                # if k == 0:
+                #     resampleMiniBatch=True
+                # else:
+                #     resampleMiniBatch=False
                 self.sample(testing=True, sampleRemaining=True, resampleMiniBatch=resampleMiniBatch)
                 self.lHoodTest += self.L_func()
 
@@ -1097,83 +1126,87 @@ if __name__ == "__main__":
     #nnumberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits
     va = VA( 3, 20, 2, 2, np.random.rand(40,3), encoderType_qX='FreeForm', encoderType_rX='FreeForm', encoderType_ru='FreeForm', numHiddenUnits_encoder=5)
 
-    log_p_y_z_eqn = va.log_p_y_z()
-    log_p_y_z_var = [va.Xu]
-    log_p_y_z_var.extend(va.qf_vars)
-    log_p_y_z_var.extend(va.qu_vars)
-    log_p_y_z_var.extend(va.qX_vars)
-    log_p_y_z_var.extend(va.likelihoodVariables)
-    log_p_y_z_grad = T.grad(log_p_y_z_eqn, log_p_y_z_var)
+    # va.fromBatch.set_value(2)
+    # va.toBatch.s
+    # print va.y_miniBatch2.eval()
 
-    KL_qr_eqn = va.KL_qr()
-    KL_qr_var = []
-    KL_qr_var.extend(va.qu_vars)
-    KL_qr_var.extend(va.qX_vars)
-    KL_qr_var.extend(va.rX_vars)
-    KL_qr_var.extend(va.ru_vars)
-    KL_qr_grad = T.grad(KL_qr_eqn, KL_qr_var)
+#     log_p_y_z_eqn = va.log_p_y_z()
+#     log_p_y_z_var = [va.Xu]
+#     log_p_y_z_var.extend(va.qf_vars)
+#     log_p_y_z_var.extend(va.qu_vars)
+#     log_p_y_z_var.extend(va.qX_vars)
+#     log_p_y_z_var.extend(va.likelihoodVariables)
+#     log_p_y_z_grad = T.grad(log_p_y_z_eqn, log_p_y_z_var)
 
-    KL_qp_eqn = va.KL_qp()
-    KL_qp_var = []
-    KL_qp_var.extend(va.qu_vars)
-    KL_qp_var.extend(va.qX_vars)
+#     KL_qr_eqn = va.KL_qr()
+#     KL_qr_var = []
+#     KL_qr_var.extend(va.qu_vars)
+#     KL_qr_var.extend(va.qX_vars)
+#     KL_qr_var.extend(va.rX_vars)
+#     KL_qr_var.extend(va.ru_vars)
+#     KL_qr_grad = T.grad(KL_qr_eqn, KL_qr_var)
 
-    log_r_uX_z_eqn = va.log_r_uX_z()
-    log_r_uX_z_var = []
-    log_r_uX_z_var.extend(va.ru_vars)
-    log_r_uX_z_var.extend(va.rX_vars)
-    T.grad(log_r_uX_z_eqn, log_r_uX_z_var)
+#     KL_qp_eqn = va.KL_qp()
+#     KL_qp_var = []
+#     KL_qp_var.extend(va.qu_vars)
+#     KL_qp_var.extend(va.qX_vars)
 
-    log_q_uX_equ = va.log_q_uX()
-    log_q_uX_var = []
-    log_q_uX_var.extend(va.qu_vars)
-    log_q_uX_var.extend(va.qX_vars)
-    T.grad(log_q_uX_equ, log_q_uX_var)
-#
-#    va.gradientVariables = [va.upsilon]
-#
-    va.construct_L_using_r( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L_using_r( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L_using_r( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L_using_r( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
-#
-    va.randomise(rndQR=False)
+#     log_r_uX_z_eqn = va.log_r_uX_z()
+#     log_r_uX_z_var = []
+#     log_r_uX_z_var.extend(va.ru_vars)
+#     log_r_uX_z_var.extend(va.rX_vars)
+#     T.grad(log_r_uX_z_eqn, log_r_uX_z_var)
 
-    va.sample()
+#     log_q_uX_equ = va.log_q_uX()
+#     log_q_uX_var = []
+#     log_q_uX_var.extend(va.qu_vars)
+#     log_q_uX_var.extend(va.qX_vars)
+#     T.grad(log_q_uX_equ, log_q_uX_var)
+# #
+# #    va.gradientVariables = [va.upsilon]
+# #
+#     va.construct_L_using_r( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+# #    va.construct_L_using_r( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+# #    va.construct_L_using_r( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
+# #    va.construct_L_using_r( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
+# #
+#     va.randomise(rndQR=False)
 
-    va.setKernelParameters(0.01, 1*np.ones((2,)),gamma=1*np.ones((2,)),omega=1*np.ones((2,)) )
+#     va.sample()
 
-    va.printSharedVariables()
+#     va.setKernelParameters(0.01, 1*np.ones((2,)),gamma=1*np.ones((2,)),omega=1*np.ones((2,)) )
 
-    va.printTheanoVariables()
+#     va.printSharedVariables()
 
-    print 'log_p_y_z'
-    print th.function([], va.log_p_y_z())()
+#     va.printTheanoVariables()
 
-    print 'KL_qp'
-    print th.function([], va.KL_qp())()
+#     print 'log_p_y_z'
+#     print th.function([], va.log_p_y_z())()
 
-    print 'KL_qr'
-    print th.function([], va.KL_qr())()
+#     print 'KL_qp'
+#     print th.function([], va.KL_qp())()
 
-    print 'log_q_f_uX'
-    print th.function([], va.log_q_f_uX())()
+#     print 'KL_qr'
+#     print th.function([], va.KL_qr())()
 
-    print 'log_r_uX_z'
-    print th.function([], va.log_r_uX_z())()
+#     print 'log_q_f_uX'
+#     print th.function([], va.log_q_f_uX())()
 
-    for i in range(len(va.gradientVariables)):
-        f  = lambda x: va.L_test( x, va.gradientVariables[i] )
-        df = lambda x: va.dL_test( x, va.gradientVariables[i] )
-        x0 = va.gradientVariables[i].get_value().flatten()
-        print va.gradientVariables[i].name
-        checkgrad( f, df, x0, disp=False, useAssert=False )
+#     print 'log_r_uX_z'
+#     print th.function([], va.log_r_uX_z())()
 
-    print 'L_func'
-    print va.jitterProtect(va.L_func)
+#     for i in range(len(va.gradientVariables)):
+#         f  = lambda x: va.L_test( x, va.gradientVariables[i] )
+#         df = lambda x: va.dL_test( x, va.gradientVariables[i] )
+#         x0 = va.gradientVariables[i].get_value().flatten()
+#         print va.gradientVariables[i].name
+#         checkgrad( f, df, x0, disp=False, useAssert=False )
 
-    print 'dL_func'
-    print va.jitterProtect(va.dL_func)
+#     print 'L_func'
+#     print va.jitterProtect(va.L_func)
+
+#     print 'dL_func'
+#     print va.jitterProtect(va.dL_func)
 
 
 

@@ -99,5 +99,7 @@ vatest = va = VA(
 
 vatest.copyParameters(va)
 
-testLogLhood = vatest.getTestLowerBound()
+vatest.construct_L_predictive()
+
+testLogLhood = vatest.getTestPredictiveLhood()
 print testLogLhood
