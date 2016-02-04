@@ -754,9 +754,9 @@ class SGPDV(object):
                 # For each gradient variable returned by the gradient function
                 for i in range(len(self.gradientVariables)):
                     if np.all(totalGradients[i]) == 0: # If not initialised (i.e. == 0)
-                        totalGradients[i] =  grads[i]**2
+                        totalGradients[i] =  np.float32(grads[i])**2
                     else:
-                        totalGradients[i] += grads[i]**2
+                        totalGradients[i] += np.float32(grads[i])**2
 
                     adjustedGrad = grads[i] / (fudgeFactor + np.sqrt(totalGradients[i]))
 
