@@ -1,9 +1,12 @@
 
 
-from GP_LVM_CMF import VA
+from Auto_encoder_model import VA
 import numpy as np
 import argparse
 import gzip, cPickle
+import os
+
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 parser = argparse.ArgumentParser()
 
@@ -17,7 +20,6 @@ f = gzip.open('mnist.pkl.gz', 'rb')
 f.close()
 
 data = x_train
-n_iter = 500
 
 [N,dimX] = data.shape
 
@@ -59,14 +61,18 @@ va.setKernelParameters(0.01, 5*np.ones((2,)),
 
 va.randomise()
 
+va.constructUpdateFunction()
+
 print "Training"
 learning_rate = 1e-3
 numberOfEpochs = 1
-va.train_adagrad( numberOfIterations=None, numberOfEpochs=numberOfEpochs, learningRate=learning_rate )
-for i in range(1,8):
 
-    learning_rate = 1e-4*round(10.**(1-(i-1)/7.), 1)
-    va.train_adagrad( numberOfIterations=None, numberOfEpochs=3**(i-1), learningRate=learning_rate )
+va.train(numberOfEpochs=numberOfEpochs, maxIters=10)
+
+#for i in range(1,8):
+#
+#    learning_rate = 1e-4*round(10.**(1-(i-1)/7.), 1)
+#    va.train_adagrad(numberOfEpochs=3**(i-1), learningRate=learning_rate )
 
 
     # print va.L_func()
@@ -77,27 +83,27 @@ for i in range(1,8):
     # f.close()
 
 
-lowerBounds = va.train_adagrad( n_iter, learningRate=learning_rate )
-
-print "Testing"
-vatest = va = VA(
-    numberOfInducingPoints, # Number of inducing ponts in sparse GP
-    batchSize,              # Size of mini batch
-    dimX,                   # Dimensionality of the latent co-ordinates
-    dimZ,                   # Dimensionality of the latent variables
-    x_test,                   # [NxP] matrix of observations
-    kernelType='RBF',
-    encoderType_qX='MLP',  # 'FreeForm', 'MLP', 'Kernel'.
-    encoderType_rX='MLP',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
-    encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
-    z_optimise=False,
-    numHiddenUnits_encoder=0,
-    numHiddentUnits_decoder=10,
-    continuous=True
-)
-
-
-vatest.copyParameters(va)
-
-testLogLhood = vatest.getTestLowerBound()
-print testLogLhood
+#lowerBounds = va.train_adagrad( n_iter, learningRate=learning_rate )
+#
+#print "Testing"
+#vatest = va = VA(
+#    numberOfInducingPoints, # Number of inducing ponts in sparse GP
+#    batchSize,              # Size of mini batch
+#    dimX,                   # Dimensionality of the latent co-ordinates
+#    dimZ,                   # Dimensionality of the latent variables
+#    x_test,                   # [NxP] matrix of observations
+#    kernelType='RBF',
+#    encoderType_qX='MLP',  # 'FreeForm', 'MLP', 'Kernel'.
+#    encoderType_rX='MLP',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+#    encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
+#    z_optimise=False,
+#    numHiddenUnits_encoder=0,
+#    numHiddentUnits_decoder=10,
+#    continuous=True
+#)
+#
+#
+#vatest.copyParameters(va)
+#
+#testLogLhood = vatest.getTestLowerBound()
+#print testLogLhood

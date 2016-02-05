@@ -64,12 +64,14 @@ def log_mean_exp_stable(x, axis):
     return m + T.log(T.mean(T.exp(x - m), axis=axis, keepdims=True))
 
 
-def mypow(base,exponent,usePycuda):
-    if pycuda:
-        
-        
-    else:
-        return base**exponent
+def shared_zeros_like(shared_var):
+    return th.shared(np.zeros(shared_var.get_value(borrow=True).shape).astype(shared_var.dtype),
+                         broadcastable=shared_var.broadcastable)
+
+
+def shared_ones_like(shared_var):
+    return th.shared(np.ones(shared_var.get_value(borrow=True).shape).astype(shared_var.dtype),
+                         broadcastable=shared_var.broadcastable)
 
 
 
