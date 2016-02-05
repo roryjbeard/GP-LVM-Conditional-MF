@@ -67,6 +67,8 @@ print "Training"
 learning_rate = 1e-3
 numberOfEpochs = 1
 
+va.printDataTypes()
+
 va.train(numberOfEpochs=numberOfEpochs, maxIters=10)
 
 #for i in range(1,8):

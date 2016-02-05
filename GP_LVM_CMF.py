@@ -71,7 +71,7 @@ class SGPDV(object):
         self.numTestSamples = 5000
 
         # set the data
-        data = np.array(data)
+        data = np.asarray(data, dtype=precision)
         self.N = data.shape[0]  # Number of observations
         self.P = data.shape[1]  # Dimension of each observation
         self.M = numberOfInducingPoints
@@ -142,8 +142,8 @@ class SGPDV(object):
         self.y_miniBatch.name = 'y_miniBatch'
 
         # This is for numerical stability of cholesky
-        self.jitterDefault =1e-4
-        self.jitterGrowthFactor = 1.1
+        self.jitterDefault = np.float32(1e-4)
+        self.jitterGrowthFactor = np.float32(1.1)
         self.jitter = th.shared(np.asarray(self.jitterDefault,dtype=precision), name='jitter')
 
         kfactory = kernelFactory(kernelType)
@@ -493,24 +493,24 @@ class SGPDV(object):
             omega=[], omega_min=-np.inf, omega_max=np.inf
         ):
 
-        self.log_theta.set_value( np.log(np.asarray(theta, dtype=precision).flatten() ) )
-        self.log_sigma.set_value( np.log(np.asarray(sigma, dtype=precision) ) )
+        self.log_theta.set_value( np.asarray(np.log(theta), dtype=precision).flatten() ) 
+        self.log_sigma.set_value( np.asarray(np.log(sigma), dtype=precision) )
 
-        self.log_theta_min = np.log( np.array(theta_min).flatten()   )
-        self.log_theta_max =  np.log( np.array(theta_max).flatten()  )
+        self.log_theta_min = np.array(np.log(theta_min), dtype=precision).flatten()
+        self.log_theta_max = np.array(np.log(theta_max), dtype=precision).flatten()
 
-        self.log_sigma_min =  np.log(sigma_min)
-        self.log_sigma_max = np.log(sigma_max)
+        self.log_sigma_min = np.float32(np.log(sigma_min))
+        self.log_sigma_max = np.float32(np.log(sigma_max))
 
         if self.encoderType_qX == 'Kernel':
-            self.log_gamma.set_value(  np.log(gamma)  )
-            self.log_gamma_min =  np.log(gamma_min)
-            self.log_gamma_max =  np.log(gamma_max)
+            self.log_gamma.set_value(np.asarray(np.log(gamma), dtype=precision).flatten() ) 
+            self.log_gamma_min =  np.array(np.log(gamma_min), dtype=precision).flatten()
+            self.log_gamma_max =  np.array(np.log(gamma_max), dtype=precision).flatten()
 
         if self.encoderType_rX == 'Kernel':
-            self.log_omega.set_value( np.log(omega)  )
-            self.log_omega_min = np.log(omega_min)
-            self.log_omega_max =  np.log(omega_max)
+            self.log_omega.set_value( np.asarray(np.log(omega), dtype=precision).flatten() ) 
+            self.log_omega_min = np.array(np.log(omega_min), dtype=precision).flatten()
+            self.log_omega_max = np.array(np.log(omega_max), dtype=precision).flatten()
 
 
     def constrainKernelParameters(self):
@@ -837,6 +837,13 @@ class SGPDV(object):
                type(var) == T.sharedvar.TensorSharedVariable:
                 print var.name
                 print var.get_value()
+
+    def printDataTypes(self):
+
+        members = [attr for attr in dir(self)]
+        for name in members:
+            var = getattr(self,name)
+            print name + "\t" + str(type(var))
 
     def printTheanoVariables(self):
 
