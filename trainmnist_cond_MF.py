@@ -55,7 +55,7 @@ va = VA(
 
 va.construct_L_using_r()
 
-va.setKernelParameters([0.01], 5*np.ones((2,)),
+va.setKernelParameters(0.01, 5*np.ones((2,)),
     1e-100, 0.5,
     [1e-10,1e-10], [10,10] )
 

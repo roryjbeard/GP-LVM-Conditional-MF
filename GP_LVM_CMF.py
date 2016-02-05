@@ -144,7 +144,7 @@ class SGPDV(object):
         # This is for numerical stability of cholesky
         self.jitterDefault =1e-4
         self.jitterGrowthFactor = 1.1
-        self.jitter = th.shared(np.asanyarray(self.jitterDefault,dtype=precision), name='jitter')
+        self.jitter = th.shared(np.asarray(self.jitterDefault,dtype=precision), name='jitter')
 
         kfactory = kernelFactory(kernelType)
 
@@ -271,7 +271,7 @@ class SGPDV(object):
         # Sample f from q(f|u,X) = N( mu_q, Sigma ) [QxB]
         self.f  = self.mu + ( T.dot(self.cSigma, self.xi.T) ).T
         # Sample z from q(z|f) = N(z,f,I*sigma^2) [QxB]
-        self.z  = self.f + T.exp(self.log_sigma[0]) * self.eta
+        self.z  = self.f + T.exp(self.log_sigma) * self.eta
 
         self.u.name  = 'u'
         self.mu.name = 'mu'
@@ -494,7 +494,7 @@ class SGPDV(object):
         ):
 
         self.log_theta.set_value( np.log(np.asarray(theta, dtype=precision).flatten() ) )
-        self.log_sigma.set_value( np.log(np.asarray(sigma, dtype=precision).flatten() ) )
+        self.log_sigma.set_value( np.log(np.asarray(sigma, dtype=precision) ) )
 
         self.log_theta_min = np.log( np.array(theta_min).flatten()   )
         self.log_theta_max =  np.log( np.array(theta_max).flatten()  )
