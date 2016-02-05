@@ -28,7 +28,7 @@ class VA(SGPDV):
             encoderType_qX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel'.
             encoderType_rX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
             encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
-            z_optimise=False,
+            Xu_optimise=False,
             numHiddenUnits_encoder=0,
             numHiddentUnits_decoder=10,
             continuous=True
@@ -44,7 +44,7 @@ class VA(SGPDV):
             encoderType_qX,
             encoderType_rX,
             encoderType_ru,
-            z_optimise,
+            Xu_optimise,
             numHiddenUnits_encoder
         )
 

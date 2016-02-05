@@ -63,6 +63,10 @@ def log_mean_exp_stable(x, axis):
     m = T.max(x, axis=axis, keepdims=True)
     return m + T.log(T.mean(T.exp(x - m), axis=axis, keepdims=True))
 
+def np_log_mean_exp_stable(x, axis=0):
+    m = np.max(x, axis=axis, keepdims=True)
+    return m + np.log(np.mean(np.exp(x - m), axis=axis, keepdims=True))
+
 
 def shared_zeros_like(shared_var):
     return th.shared(np.zeros(shared_var.get_value(borrow=True).shape).astype(shared_var.dtype),

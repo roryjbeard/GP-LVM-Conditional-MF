@@ -5,13 +5,12 @@ import theano as th
 import theano.tensor as T
 from theano.tensor import slinalg, nlinalg
 from theano.tensor.shared_randomstreams import RandomStreams
-from theano import sandbox
 # import progressbar
 import time
 import collections
 
 from optimisers import Adam
-from utils import cholInvLogDet
+from utils import cholInvLogDet, np_log_mean_exp_stable
 
 # precision = np.float64
 precision = th.config.floatX
@@ -63,9 +62,8 @@ class SGPDV(object):
             encoderType_qX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel'.
             encoderType_rX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
             encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
-            z_optimise=False,
+            Xu_optimise=False,
             numberOfEncoderHiddenUnits=0
-
         ):
 
         self.numTestSamples = 5000
@@ -83,7 +81,7 @@ class SGPDV(object):
         self.encoderType_qX = encoderType_qX
         self.encoderType_rX = encoderType_rX
         self.encoderType_ru = encoderType_ru
-        self.z_optimise  = z_optimise
+        self.Xu_optimise = Xu_optimise
 
         self.y = th.shared(data)
         self.y.name = 'y'
@@ -119,8 +117,8 @@ class SGPDV(object):
             NR_NR_mat  = np.zeros((self.N*self.R, self.N*self.R), dtype=precision)
         #Mini batch indicator varible
     
-        self.numberofIterationsPerEpoch = int( np.ceil( np.float32( self.N ) / self.B ) )
-        numPad = self.numberofIterationsPerEpoch * self.B - self.N
+        self.numberofBatchesPerEpoch = int( np.ceil( np.float32( self.N ) / self.B ) )
+        numPad = self.numberofBatchesPerEpoch * self.B - self.N
         
         self.batchStream = srng.permutation(n=self.N)
         self.padStream   = srng.choice(size=(numPad,), a=self.N,
@@ -132,7 +130,7 @@ class SGPDV(object):
         self.iterator     = th.shared(0)
         self.iterator.name = 'iterator'        
 
-        self.allBatches   = T.reshape( T.concatenate((self.batchStream,self.padStream)), [self.numberofIterationsPerEpoch,self.B] )
+        self.allBatches   = T.reshape( T.concatenate((self.batchStream,self.padStream)), [self.numberofBatchesPerEpoch,self.B] )
         self.currentBatch = T.flatten( self.allBatches[self.iterator,:] )
         
         self.allBatches.name = 'allBatches'
@@ -419,7 +417,7 @@ class SGPDV(object):
 
         # Gradient variables - should be all the th.shared variables
         # We always want to optimise these variables
-        if self.z_optimise:
+        if self.Xu_optimise:
             self.gradientVariables = [self.Xu]
         else:
             self.gradientVariables = []
@@ -430,7 +428,7 @@ class SGPDV(object):
         self.gradientVariables.extend(self.rX_vars)
         self.gradientVariables.extend(self.ru_vars)
 
-        self.profmode = th.ProfileMode(optimizer='fast_run', linker=th.gof.OpWiseCLinker())
+        #self.profmode = th.ProfileMode(optimizer='fast_run', linker=th.gof.OpWiseCLinker())
 
     def randomise(self, sig=1, rndQR=False):
 
@@ -453,7 +451,6 @@ class SGPDV(object):
 
                 # Hidden layer weights are uniformly sampled from a symmetric interval
                 # following [Xavier, 2010]
-                print var.name
                 X = var.get_value().shape[0]
                 Y = var.get_value().shape[1]
 
@@ -482,8 +479,8 @@ class SGPDV(object):
             var = getattr(self,name)
             if type(var) == T.sharedvar.ScalarSharedVariable or \
                type(var) == T.sharedvar.TensorSharedVariable:
+                print 'Randomising ' + var.name
                 rnd( var )
-
 
     def setKernelParameters(self,
             sigma, theta,
@@ -705,7 +702,7 @@ class SGPDV(object):
         
         updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)        
         
-        self.updateFunction = th.function([], None, updates=updates, no_default_updates=True,  mode=self.profmode)        
+        self.updateFunction = th.function([], None, updates=updates, no_default_updates=True)#,  mode=self.profmode)        
     
     def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf):
 
@@ -723,15 +720,14 @@ class SGPDV(object):
             
             self.epochSample()
 
-            for it in range(self.numberofIterationsPerEpoch):
+            for it in range(self.numberofBatchesPerEpoch):
 
-                self.sample()                
-                self.jitterProtect(self.updateFunction)
+                self.sample()
+                self.iterator.set_value(self.iterator.get_value()+1)
+                self.jitterProtect(self.updateFunction, reset=False)
                 #self.constrainKernelParameters()
                 
-                self.jitter.set_value(self.jitterDefault)
-                
-                lbTmp = self.jitterProtect(self.L_func)              
+                lbTmp = self.jitterProtect(self.L_func)   
                 lbTmp = lbTmp.flatten()
                 self.lowerBound = lbTmp[0]
 
@@ -745,10 +741,10 @@ class SGPDV(object):
 
                 lowerBounds.append( (self.lowerBound, wallClock) )
                 
-                if ep*self.numberofIterationsPerEpoch + it > maxIters:
+                if ep*self.numberofBatchesPerEpoch + it > maxIters:
                     break
                 
-            if ep*self.numberofIterationsPerEpoch + it > maxIters:
+            if ep*self.numberofBatchesPerEpoch + it > maxIters:
                 break
             # pbar.update(ep*numberOfIterations+it)
         # pbar.finish()
@@ -769,7 +765,7 @@ class SGPDV(object):
         self.iterator.set_value(0)
 
 
-    def jitterProtect(self, func):
+    def jitterProtect(self, func, reset=True):
 
         passed = False
         while not passed:
@@ -779,24 +775,26 @@ class SGPDV(object):
             except np.linalg.LinAlgError:
                 print 'Increasing value of jitter'
                 self.jitter.set_value(self.jitter.get_value()*self.jitterGrowthFactor)
+        if reset:
+            self.jitter.set_value(self.jitterDefault)
         return val
 
 
-    def getTestPredictiveLhood(self):
+    def getMCLogLikelihood(self, numberOfTestSamples=100):
 
-        self.lHoodTest = 0.
-        self.batchIndiciesRemaining = np.int32( range(self.N) )
-        while len(self.batchIndiciesRemaining) > 0:
-
-            for k in range(self.numTestSamples):
-                if k == 0:
-                    resampleMiniBatch=True
-                else:
-                    resampleMiniBatch=False
-                self.sample(testing=True, sampleRemaining=True, resampleMiniBatch=resampleMiniBatch)
-                self.lHoodTest += self.L_func()
-
-        return self.lHoodTest / self.numTestSamples
+        self.epochSample()
+        ll = [0]*self.numberofBatchesPerEpoch*numberOfTestSamples
+        c = 0;
+        for i in range(self.numberofBatchesPerEpoch):
+            print '{} of {}, {} samples'.format(i, self.numberofBatchesPerEpoch, numberOfTestSamples) 
+            self.iterator.set_value(self.iterator.get_value()+1)
+            self.jitter.set_value(self.jitterDefault)            
+            for k in range(numberOfTestSamples):
+                self.sample()
+                ll[c] = self.jitterProtect( self.L_func, reset=False )
+                c += 1
+                
+        return np_log_mean_exp_stable(ll)
 
     def copyParameters(self, other):
 
@@ -809,15 +807,17 @@ class SGPDV(object):
                 raise RuntimeError('Incompatible configurations')
             elif name == 'y':
                 pass
-            elif name == 'y_batch':
-                pass
-            elif name == 'Phi':
+            elif name == 'Phi_full_sqrt':
                 pass
             elif name == 'phi_full':
                 pass
-            elif name == 'Tau':
+            elif name == 'Tau_full_sqrt':
                 pass
             elif name == 'tau_full':
+                pass
+            elif name == 'jitter':
+                pass
+            elif name == 'iterator':
                 pass
             else:
                 selfVar  = getattr(self,  name)
@@ -825,7 +825,7 @@ class SGPDV(object):
                 if (type(selfVar) == T.sharedvar.ScalarSharedVariable or \
                     type(selfVar) == T.sharedvar.TensorSharedVariable) and \
                     type(selfVar) == type(otherVar):
-                        print 'copying ' + selfVar.name
+                        print 'Copying ' + selfVar.name
                         selfVar.set_value( otherVar.get_value()  )
 
     def printSharedVariables(self):
@@ -838,12 +838,13 @@ class SGPDV(object):
                 print var.name
                 print var.get_value()
 
-    def printDataTypes(self):
+    def printMemberTypes(self, memberType=None):
 
         members = [attr for attr in dir(self)]
         for name in members:
             var = getattr(self,name)
-            print name + "\t" + str(type(var))
+            if memberType == None or type(var) == memberType:
+                print name + "\t" + str(type(var))
 
     def printTheanoVariables(self):
 
@@ -855,9 +856,7 @@ class SGPDV(object):
                 print var.name
                 var_fun = th.function([], var, no_default_updates=True)
                 print self.jitterProtect(var_fun)
-                self.jitter.set_value(self.jitterDefault)
 
-        self.jitter.set_value(self.jitterDefault)
 
     def L_test(self, x, variable):
 
@@ -875,20 +874,20 @@ class SGPDV(object):
 
         return dL_var
 
-    def measure_marginal_log_likelihood(self, dataset, subdataset, seed=123, minibatch_size=20, num_samples=50):
-        print "Measuring {} log likelihood".format(subdataset)
-
-        pbar = progressbar.ProgressBar(maxval=num_minibatches).start()
-        sum_of_log_likelihoods = 0.
-        for i in xrange(num_minibatches):
-            summand = self.get_log_marginal_likelihood(i)
-            sum_of_log_likelihoods += summand
-            pbar.update(i)
-        pbar.finish()
-
-        marginal_log_likelihood = sum_of_log_likelihoods/n_examples
-
-        return marginal_log_likelihood
+#    def measure_marginal_log_likelihood(self, dataset, subdataset, seed=123, minibatch_size=20, num_samples=50):
+#        print "Measuring {} log likelihood".format(subdataset)
+#
+#        pbar = progressbar.ProgressBar(maxval=num_minibatches).start()
+#        sum_of_log_likelihoods = 0.
+#        for i in xrange(num_minibatches):
+#            summand = self.get_log_marginal_likelihood(i)
+#            sum_of_log_likelihoods += summand
+#            pbar.update(i)
+#        pbar.finish()
+#
+#        marginal_log_likelihood = sum_of_log_likelihoods/n_examples
+#
+#        return marginal_log_likelihood
 
 
 

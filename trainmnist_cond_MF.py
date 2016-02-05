@@ -5,6 +5,7 @@ import numpy as np
 import argparse
 import gzip, cPickle
 import os
+import theano.tensor as T
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -27,13 +28,16 @@ dimZ = 20
 dimX = 5
 HU_decoder = 400
 batchSize = 100
-
-# numTestSamples = 5000
-
-numberOfInducingPoints = 5
-
-# learning_rate = 1e-3
-
+encoderType_qX='MLP'
+encoderType_rX='MLP'
+encoderType_ru='MLP'
+Xu_optimise=True
+kernelType='RBF'
+numHiddenUnits_encoder=0
+numHiddentUnits_decoder=400
+numberOfInducingPoints = 50
+learning_rate = 1e-3
+numTestSamples = 100
 
 print "Initialising"
 
@@ -43,13 +47,13 @@ va = VA(
     dimX,                   # Dimensionality of the latent co-ordinates
     dimZ,                   # Dimensionality of the latent variables
     x_train,                   # [NxP] matrix of observations
-    kernelType='RBF',
-    encoderType_qX='MLP',  # 'FreeForm', 'MLP', 'Kernel'.
-    encoderType_rX='MLP',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
-    encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
-    z_optimise=False,
-    numHiddenUnits_encoder=0,
-    numHiddentUnits_decoder=10,
+    kernelType=kernelType,
+    encoderType_qX=encoderType_qX,  # 'FreeForm', 'MLP', 'Kernel'.
+    encoderType_rX=encoderType_rX,  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+    encoderType_ru=encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
+    Xu_optimise=Xu_optimise,
+    numHiddenUnits_encoder=numHiddenUnits_encoder,
+    numHiddentUnits_decoder=numHiddentUnits_decoder,
     continuous=True
 )
 
@@ -67,7 +71,10 @@ print "Training"
 learning_rate = 1e-3
 numberOfEpochs = 1
 
-va.printDataTypes()
+#va.printMemberTypes()
+
+va.printMemberTypes(memberType=T.sharedvar.TensorSharedVariable)
+va.printMemberTypes(T.sharedvar.ScalarSharedVariable)
 
 va.train(numberOfEpochs=numberOfEpochs, maxIters=10)
 
@@ -87,25 +94,24 @@ va.train(numberOfEpochs=numberOfEpochs, maxIters=10)
 
 #lowerBounds = va.train_adagrad( n_iter, learningRate=learning_rate )
 #
-#print "Testing"
-#vatest = va = VA(
-#    numberOfInducingPoints, # Number of inducing ponts in sparse GP
-#    batchSize,              # Size of mini batch
-#    dimX,                   # Dimensionality of the latent co-ordinates
-#    dimZ,                   # Dimensionality of the latent variables
-#    x_test,                   # [NxP] matrix of observations
-#    kernelType='RBF',
-#    encoderType_qX='MLP',  # 'FreeForm', 'MLP', 'Kernel'.
-#    encoderType_rX='MLP',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
-#    encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
-#    z_optimise=False,
-#    numHiddenUnits_encoder=0,
-#    numHiddentUnits_decoder=10,
-#    continuous=True
-#)
-#
-#
-#vatest.copyParameters(va)
-#
-#testLogLhood = vatest.getTestLowerBound()
-#print testLogLhood
+print "Testing"
+vatest = va = VA(
+    numberOfInducingPoints, # Number of inducing ponts in sparse GP
+    batchSize,              # Size of mini batch
+    dimX,                   # Dimensionality of the latent co-ordinates
+    dimZ,                   # Dimensionality of the latent variables
+    x_test,                   # [NxP] matrix of observations
+    kernelType=kernelType,
+    encoderType_qX=encoderType_qX,  # 'FreeForm', 'MLP', 'Kernel'.
+    encoderType_rX=encoderType_rX,  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+    encoderType_ru=encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
+    Xu_optimise=Xu_optimise,
+    numHiddenUnits_encoder=numHiddenUnits_encoder,
+    numHiddentUnits_decoder=numHiddentUnits_decoder,
+    continuous=True
+)
+
+va.construct_L_using_r()
+vatest.copyParameters(va)
+testLogLhood = vatest.getMCLogLikelihood(numTestSamples)
+print testLogLhood
