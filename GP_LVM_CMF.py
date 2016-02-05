@@ -144,15 +144,15 @@ class SGPDV(object):
         # This is for numerical stability of cholesky
         self.jitterDefault =1e-4
         self.jitterGrowthFactor = 1.1
-        self.jitter = th.shared(self.jitterDefault, name='jitter')
+        self.jitter = th.shared(np.asanyarray(self.jitterDefault,dtype=precision), name='jitter')
 
         kfactory = kernelFactory(kernelType)
 
         # kernel parameters
-        self.log_theta = th.shared(np.zeros(self.numberOfKernelParameters), name='log_theta') # parameters of Kuu, Kuf, Kff
-        self.log_gamma = th.shared(np.zeros(self.numberOfKernelParameters), name='log_gamma') # parameters of qX
-        self.log_omega = th.shared(np.zeros(self.numberOfKernelParameters), name='log_omega') # parameters of qu
-        self.log_sigma = th.shared(0.0, name='log_sigma')  # standard deviation of q(z|f)
+        self.log_theta = th.shared(np.zeros(self.numberOfKernelParameters, dtype=precision), name='log_theta') # parameters of Kuu, Kuf, Kff
+        self.log_gamma = th.shared(np.zeros(self.numberOfKernelParameters, dtype=precision), name='log_gamma') # parameters of qX
+        self.log_omega = th.shared(np.zeros(self.numberOfKernelParameters, dtype=precision), name='log_omega') # parameters of qu
+        self.log_sigma = th.shared(np.asarray(0.0,dtype=precision), name='log_sigma')  # standard deviation of q(z|f)
 
         # Random variables
         self.alpha = srng.normal(size=(self.Q,self.M), avg=0.0, std=1.0, ndim=None)       
@@ -271,7 +271,7 @@ class SGPDV(object):
         # Sample f from q(f|u,X) = N( mu_q, Sigma ) [QxB]
         self.f  = self.mu + ( T.dot(self.cSigma, self.xi.T) ).T
         # Sample z from q(z|f) = N(z,f,I*sigma^2) [QxB]
-        self.z  = self.f + T.exp(self.log_sigma) * self.eta
+        self.z  = self.f + T.exp(self.log_sigma[0]) * self.eta
 
         self.u.name  = 'u'
         self.mu.name = 'mu'
@@ -436,7 +436,7 @@ class SGPDV(object):
 
         def rnd(var):
             if type(var) == np.ndarray:
-                return sig*np.random.randn( *var.shape )
+                return np.asarray(sig*np.random.randn(*var.shape), dtype=precision)
             elif var.name == 'y':
                 pass
             elif var.name == 'iterator':
@@ -458,8 +458,8 @@ class SGPDV(object):
                 Y = var.get_value().shape[1]
 
                 symInterval = 4.0*np.sqrt(6. / (X + Y))
-                X_Y_mat =  np.random.uniform(size=(X, Y),
-                    low=-symInterval, high=symInterval)
+                X_Y_mat =  np.asarray(np.random.uniform(size=(X, Y),
+                    low=-symInterval, high=symInterval), dtype=precision)
 
                 var.set_value(X_Y_mat )
 
@@ -493,8 +493,8 @@ class SGPDV(object):
             omega=[], omega_min=-np.inf, omega_max=np.inf
         ):
 
-        self.log_theta.set_value(  np.log(np.array(theta).flatten())  )
-        self.log_sigma.set_value( np.log(sigma)   )
+        self.log_theta.set_value( np.log(np.asarray(theta, dtype=precision).flatten() ) )
+        self.log_sigma.set_value( np.log(np.asarray(sigma, dtype=precision).flatten() ) )
 
         self.log_theta_min = np.log( np.array(theta_min).flatten()   )
         self.log_theta_max =  np.log( np.array(theta_max).flatten()  )
