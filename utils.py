@@ -36,7 +36,12 @@ def jitterChol(A, dim, jitter):
 
     A_jitter = A + jitter * T.eye(dim, dtype='float32')
 
-    cA = slinalg.cholesky(A_jitter)
+    #cA = slinalg.cholesky(A_jitter)
+    D, V = T.nlinalg.Eigh()(A_jitter)
+    D.name = 'd' + A.name    
+    V.name = 'v' + A.name
+    cA =  T.dot(V, T.diag(D))
+    
     cA.name = 'c' + A.name    
 
     return cA
@@ -45,7 +50,11 @@ def cholInvLogDet(A, dim, jitter, fast=False):
 
     A_jitter = A + jitter * T.eye(dim, dtype='float32')
 
-    cA = slinalg.cholesky(A_jitter)
+    D, V = T.nlinalg.Eigh()(A_jitter)
+    D.name = 'd' + A.name    
+    V.name = 'v' + A.name
+    cA =  T.dot(V, T.diag(T.sqrt(D)))
+    
     cA.name = 'c' + A.name 
 
     if fast:
