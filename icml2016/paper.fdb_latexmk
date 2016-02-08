@@ -1,5 +1,5 @@
 # Fdb version 3
-["pdflatex"] 1454681673 "paper.tex" "paper.pdf" "paper" 1454945580
+["pdflatex"] 1454681673 "paper.tex" "paper.pdf" "paper" 1454947283
   "/usr/local/texlive/2014/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2014/texmf-dist/fonts/map/fontname/texfonts.map" 1272929888 3287 e6b82fe08f5336d4d5ebc73fb1152e87 ""
   "/usr/local/texlive/2014/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1136768653 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -94,7 +94,7 @@
   "paper.out" 1454681674 0 d41d8cd98f00b204e9800998ecf8427e ""
   "paper.tex" 1454681624 19113 2d54a0c5661ae710e4034399a3796397 ""
   (generated)
+  "paper.pdf"
+  "paper.log"
   "paper.aux"
   "paper.out"
-  "paper.log"
-  "paper.pdf"
