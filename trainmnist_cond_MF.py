@@ -113,5 +113,6 @@ vatest = va = VA(
 
 va.construct_L_using_r()
 vatest.copyParameters(va)
+
 testLogLhood = vatest.getMCLogLikelihood(numTestSamples)
 print testLogLhood
