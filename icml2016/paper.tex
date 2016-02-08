@@ -82,12 +82,14 @@ submission guidelines. Abstracts should be a single paragraph, between 4--6 sent
 \section{Introduction}
 \label{sec:intro}
 
-We approach the problem of capturing the statistical dependence structure of the conditionally independent variational factors in a flexible, Bayesian nonparametric manner. We augment
+We approach the problem of capturing the statistical dependence structure of the conditionally independent variational factors in a flexible, Bayesian nonparametric manner. Considering at first a latent variable model with a latent variable for each datum as well as some global parameters, a traditional (mean field) variational approach is to learn a factored approximation to the posterior in which each latent variable is independently distributed and governed by its own variational parameter. Clearly this is an overly restrictive approximation since conditioning on the data statistically couples the latent variables. With careful design some statistical dependence may be retained with so-called \emph{structured mean field} approximations (SAUL AND JORDAN, WIERGERNINCK), but the design is highly model specific and not AUTOMATICALLY SCALABLE?
+A natural improvement is to couple the variational factors via a common variational prior, leading to a hierarchical variational approximation (RANGANATH 2015) which are richer and more expressive. HOWEVER THE NECESSARY CRUCIAL DESIGN CHOICES MAKE THIS PROCEDURE DIFFICULT TO AUTOMATE AND SCALE?
 
+Rather than designing model specific, parametric variational priors..., we take inspiration from the Bayesian non-parametric dimensionality reduction method of.. GP-LVM... to learn a flexible, non-linear mapping from a shared latent auxiliary space to each conditionally independent variational factor. The dependence is induced by a fixed number of latent coordinates, the locations of which are learned so as to induce the optimal dependence structure. We refer to this scheme as the GP-LVM-conditional mean field
 
-From the perspective of the variational principle, we propose a drop-in for mean field in which a rich, variational distribution is specified in the expanded space of variables we wish to infer augmented with auxiliary inference variables. This can be seen as specifying a hierarchical variational distribution (CITE RANAGNATH 2015)... integrating over the auxiliary inference parameters recovers a marginal distribution as an infinite mixture of augmented distributions...
+From the perspective of the variational principle, we propose a drop-in replacement for mean field inference in which a rich, variational distribution is specified in the expanded space of variables we wish to infer augmented with auxiliary inference variables. This can be seen as specifying a non-parametric hierarchical variational model (CITE RANAGNATH 2015)... integrating over the auxiliary inference parameters recovers a marginal distribution as an infinite mixture of augmented distributions...
 
-From the perspective of variational autoencoding, the GP-LVM-CMF scheme consists of a non-parametric inference network, or \emph{encoder}, which maps the augmented data-auxiliary variable space to the latent variable space. ... should be more flexible than rigidly encoding directly from the non-augmented data space (WHY EXACTLY???)
+From the perspective of recognition models and variational autoencoding, the GP-LVM-CMF scheme consists of a non-parametric inference network, or \emph{encoder}, which maps the augmented data-auxiliary variable space to the latent variable space. ... should be more flexible than rigidly encoding directly from the non-augmented data space (WHY EXACTLY???)
 
 
 The marginal variational distribution over the variables of interest, $q(Z,\eta)$, is itself intractable precluding the analyticity of the variational entropy... therefore we lower bound again...
@@ -110,7 +112,7 @@ Experiments:
 \label{subsec:vi}
 
 \begin{itemize}
-  \item Fixed form and factorised... fixed-point coordinate ascent update scheme. Loss of posterior statistical dependence - particularly bad for factor models.
+  \item Fixed form and factorised... fixed-point coordinate ascent update scheme. Loss of posterior statistical dependence - particularly bad for factor models... --> motivating the IBP experiments.
   \item Black-box approaches and SVI. Reparam trick for variance reduction, autoencoding and back-constraints for amortization.
   \item Augmented inference space, hierarchical variational distribution.
 \end{itemize}
@@ -118,8 +120,28 @@ Experiments:
 \subsection{The Bayesian GP-LVM}
 \label{subsec:gplvm}
 
+The GP-LVM was proposed by Lawrence as a Bayesian non-linear dimensionality reduction model and can be viewed as a multi-output GP regression model in which the inputs are unobserved and so treated as latent variables. In the original framework these inputs were optimised rather than integrated out for tractability.
+
+Denoting the $d^{th}$ column of the data matrix, $Y$, as $\mathbf{y}_d$ the likelihood function for the GP-LVM is
+%
+\begin{align}
+  p(Y|X) &= \prod_{d=1}^D p(\mathbf{y}_d | X),\\
+  p(\mathbf{y}_d) &= \mathcal{N}(\mathbf{y}_d|\mathbf{0}, K_{ff}+\beta^{-1}I)
+\end{align}
+%
+where the GPs are modelled as independent across the data dimensions.
+
+\begin{itemize}
+  \item GP-LVM
+  \item variational compression and SVGP.
+  \item Bayesian GP-LVM
+  \item Provides an extremely general, Bayesian and rich way of auxiliary object upon which to condition the mean field factors in order to couple them statistically.
+\end{itemize}
+
 \section{GP-LVM-Conditional Mean Field Variational Inference} % (fold)
 \label{sec:gplvmcmf}
+
+As is the case for the SVGP and the Bayesian GP-LVM, the inference model of the GP-LVM-CMF constructs a GP mapping to $N$ output values which is governed by a fixed number of auxiliary inducing variables. However the motivations for this conditional inducing structure are distinct in these three cases. For the sparse GP the desire is scalability; in particular to circumvent the costly $\mathcal{O}(N^3$ complexity of the covariance matrix inversion, which is then limited to $\mathcal{O}(N^2M)$ through variational compression. For the Bayesian GP-LVM the motivation is to be able to tractably integrate over the uncertainty associated with the unknown latent input locations. For the GP-LVM-CMF however there are no observations of the GP function values since they do not exist in the generative model, so their purpose here is to act as \emph{variational (pseudo) data} upon which the rest of the function values can be conditioned in the standard GP formulation.
 
 -------------THIS SHOULD POSSIBLY GO IN THE INTRO--------------
 
@@ -162,6 +184,8 @@ This lower bound is indistinguishable from the one we would arrive at if we were
 \subsection{Scalable and Amortised Inference}
 \label{subsec:scale}
 
+Hensman SVI GVGP does do some amortising since the global inducing variables provide a statistical conduit...
+
 Having forsaken analyticity in favour a rich and flexibly variational distribution, we must resort to gradient based methods to optimising the auxiliary lower bound with respect to the set of all parameters; generative, variational and auxiliary $\omega=\{\theta,\phi,\psi\}$, with a simulation-based stochastic approach in which we seek to optimise an MC estimate of the auxiliary lower bound:
 %
 \begin{align}
@@ -187,10 +211,36 @@ Variational compression ... sparse variational GPs ... set $r(F()|U,X,Z):=q(F()|
 
 Amortised inference ... VAE, back-constraints, ... we test several options: MLP vs kernel, q(X) vs r(U,X)...
 
+\subsection{Design Choices}
+\label{subsec:choices}
+
+The alternative configurations...
+
+\section{Related Work}
+\label{sec:related}
+
+Coupling mean field factors: Tran's Copula approach, the other copula approach ??, Michael Jordan paper.
+
+The independent works of Kingma and Welling and Rezende et al. popularised the modern approach of autoencoding in the variational framework, and spurred on a great research drive in variational approaches to deep learning. Highly sophisticated models such as DRAW - a method to.... - have at their core the VAE... Grosse et al considered an alternative variational lower bound based on importance weights to train a VAE. However in all these approaches, the
+
+deep gp - used autoencoding as backconstraints to make it scale (finite number of parameters)
+
+Salimans and Welling considered a Markov chain inference network in which the final ($T^th$) Markov transition in the chain produced the latent variable (sample), such that previous $T-1$ variables were treated as auxiliary variables. Collapsing over this expanded auxiliary space then resulted in a rich yet intractable mixture... and tractability was recovered through the use of an auxiliary distribution also of a Markov structure.
+
+Most similar in spirit to GP-LVM-CMF approach is that of the \emph{Variational Gaussian Process} developed independently by Tran et al., which was also used conditional GPs (conditioned on aux params) in the inference model to couple the factors. The key difference is that each latent variable is encoded with a \emph{separate} conditional GP... and the coupling between the latent variables was induced by evaluating each conditional GP at the same input location. This leads to coupling whereby each GP tends to be positive in similar regions ?????. In our approach the coupling is induced via the shared inducing coordinates... more faithfully to the spirit of the GP-LVM.
+
+\section{Experimental Setup}
+\label{sec:experiments}
+
+... free form q(X) means having to optimise the auxiliary latent coordinate of the test location just to be able to evaluate. Including an optimisation procedure in the predictive step is an interesting idea, but was avoided here for lack of space and clarity of discussion, so investigation was deferred to a future study.
+
+\section{Discussion and Future Work}
+\label{sec:discussion}
 
 \section{TO DO:}
 \begin{itemize}
   \item Graphs for the 3 models.
+  \item Algorithm in section \ref{sec:gplvmcmf}
 \end{itemize}
 
 \section{NOTES}
