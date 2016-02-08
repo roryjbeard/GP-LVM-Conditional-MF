@@ -519,7 +519,7 @@ class SGPDV(object):
 
         # generate standard gaussian random varibales        
         def rnd( rv ):
-            rv.set_value( np.random.randn( rv.get_value().shape ) )
+            rv.set_value( np.random.randn( rv.get_value().shape ).astype(th.config.floatX) )
         
         rnd( self.alpha )
         rnd( self.beta )
@@ -617,15 +617,15 @@ class SGPDV(object):
             if self.gradientVariables[i] == self.Upsilon:
                 self.Upsilon_lower = values[i]
                 #print  np.dot(self.Upsilon_lower, self.Upsilon_lower.T)
-                self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T) )
+                self.Upsilon.set_value( np.dot(self.Upsilon_lower, self.Upsilon_lower.T).astype(th.config.floatX) )
             elif self.gradientVariables[i] == self.Phi_full:
                 self.Phi_full_lower = values[i]
-                self.Phi_full.set_value( np.dot(self.Phi_full_lower, self.Phi_full_lower.T) )
+                self.Phi_full.set_value( np.dot(self.Phi_full_lower, self.Phi_full_lower.T).astype(th.config.floatX) )
             elif self.gradientVariables[i] == self.Tau_full:
                 self.Tau_full_lower = values[i]
-                self.Tau_full.set_value( np.dot(self.Tau_full_lower, self.Tau_full_lower.T) )
+                self.Tau_full.set_value( np.dot(self.Tau_full_lower, self.Tau_full_lower.T).astype(th.config.floatX) )
             else:
-                self.gradientVariables[i].set_value( values[i] )
+                self.gradientVariables[i].set_value( values[i].astype(th.config.floatX) )
 
     def getVariableValues(self):
 
@@ -642,7 +642,7 @@ class SGPDV(object):
                 values[i] = self.gradientVariables[i].get_value()
         return values
 
-    def getTestLowerBound(self):
+    def getTestPredictiveLhood(self):
         return 0
 
     def copyParameters(self, other):

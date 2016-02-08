@@ -99,5 +99,5 @@ vatest = va = VA(
 
 vatest.copyParameters(va)
 
-testLogLhood = vatest.getTestLowerBound()
+testPredLhood = vatest.getTestPredictiveLhood()
 print testLogLhood
