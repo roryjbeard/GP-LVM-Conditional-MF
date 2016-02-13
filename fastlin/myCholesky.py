@@ -5,12 +5,13 @@ Created on Sat Feb  6 19:19:05 2016
 @author: clloyd
 """
 
+import os
+from sys import platform
 from six.moves import xrange
-
 import numpy
 import scipy.linalg
 from theano.tensor import as_tensor_variable
-from theano.gof import Op, Apply
+from theano.gof import Op, COp, Apply
 
 
 class myCholesky(Op):
@@ -45,9 +46,8 @@ class myCholesky(Op):
         return [myCholeskyGrad(self.lower)(inputs[0], self(inputs[0]),
                                          gradients[0])]
 
-class myCholeskyGrad(Op):
-    """
-    """
+class myCholeskyGradSlow(Op):
+
 
     __props__ = ('lower', 'destructive')
 
@@ -83,8 +83,11 @@ class myCholeskyGrad(Op):
         dz = inputs[2]
         dx = outputs[0]
         N = x.shape[0]
+        print 'L = {}'.format(L)
+        print 'dz = {}'.format(dz)
         if self.lower:
             F = numpy.tril(dz)
+            print 'F_before = {}'.format(F)
             for k in xrange(N - 1, -1, -1):
                 for j in xrange(k + 1, N):
                     for i in xrange(j, N):
@@ -105,28 +108,56 @@ class myCholeskyGrad(Op):
                     F[k, j] /= L[k, k]
                     F[k, k] -= L[k, j] * F[k, j]
                 F[k, k] /= (2 * L[k, k])
+        print 'F_after = {}'.format(F)
         dx[0] = F
 
+class myCholeskyGrad(COp):
 
-    # def c_code(
+    __props__ = ('lower', 'destructive')
 
-#
-#    def infer_shape(self, node, shapes):
-#        return [shapes[0]]
-#        
-#        
-#          def c_libraries(self):
-#        return ldflags()
-#
-#    def c_compile_args(self):
-#        return ldflags(libs=False, flags=True)
-#
-#    def c_lib_dirs(self):
-#        return ldflags(libs=False, libs_dir=True)
-#       # Assume this is a list of strings
-       # ret = [os.path.dirname(cuda_ndarray.__file__)]
-      #  return ret
+    func_file = "./myCholeskyGrad.c"
+    func_name = "APPLY_SPECIFIC(apply_cholesky_grad)"
 
-#    def c_header_dirs(self):
-#        return ldflags(libs=False, include_dir=True)
+    def __init__(self, lower=True):
+        super(myCholeskyGrad, self).__init__(self.func_file, self.func_name)
+        self.lower = lower
+        self.destructive = False
+
+    def make_node(self, x, l, dz):
+        x = as_tensor_variable(x)
+        l = as_tensor_variable(l)
+        dz = as_tensor_variable(dz)
+        ULBO = self.lower
+        assert x.ndim == 2
+        assert l.ndim == 2
+        assert dz.ndim == 2
+        assert l.owner.op.lower == self.lower, (
+            "lower/upper mismatch between Cholesky op and CholeskyGrad op"
+        )
+        return Apply(self, [x, l, dz], [x.type()])
+
+    def c_headers(self):
+        print "************ c_headers ****************"
+        return ['choleskyGrad.h', 'iostream']
+
+    def c_header_dirs(self):
+        header_dir = os.path.dirname(os.path.realpath(__file__))
+        print "************ c_headers = {} ****************".format(header_dir)
+        return [header_dir]
+
+    def c_libraries(self):
+        print "************ c_libraries ****************"
+        return ['cholgrad']
+
+    def c_lib_dirs(self):
+        lib_dir = os.path.dirname(os.path.realpath(__file__))
+        print "************ c_lib_dirs = {} ****************",format(lib_dir)
+        return [lib_dir]
+
+    def get_op_params(self):
+        if self.lower:
+            UPLO = "'L'"
+        else:
+            UPLO = "'U'" 
+        return [('UPLO', UPLO)]
 
