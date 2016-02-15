@@ -2,7 +2,7 @@ import numpy as np
 import theano as th
 from theano import tensor as T
 from theano.tensor import slinalg, nlinalg
-
+from fastlin.myCholesky import myCholesky
 
 
 def t_repeat(x, num_repeats, axis):
@@ -36,13 +36,14 @@ def jitterChol(A, dim, jitter):
 
     A_jitter = A + jitter * T.eye(dim, dtype='float32')
 
-    #cA = slinalg.cholesky(A_jitter)
-    D, V = T.nlinalg.Eigh()(A_jitter)
-    D.name = 'd' + A.name    
-    V.name = 'v' + A.name
-    cA =  T.dot(V, T.diag(D))
+    # cA = slinalg.cholesky(A_jitter)
+    # D, V = T.nlinalg.Eigh()(A_jitter)
+    # D.name = 'd' + A.name    
+    # V.name = 'v' + A.name
+    # cA =  T.dot(V, T.diag(D))
     
-    cA.name = 'c' + A.name    
+    cA = myCholesky()(A_jitter)
+    cA.name = 'c' + A.name
 
     return cA
     
@@ -50,11 +51,12 @@ def cholInvLogDet(A, dim, jitter, fast=False):
 
     A_jitter = A + jitter * T.eye(dim, dtype='float32')
 
-    D, V = T.nlinalg.Eigh()(A_jitter)
-    D.name = 'd' + A.name    
-    V.name = 'v' + A.name
-    cA =  T.dot(V, T.diag(T.sqrt(D)))
+    # D, V = T.nlinalg.Eigh()(A_jitter)
+    # D.name = 'd' + A.name    
+    # V.name = 'v' + A.name
+    # cA =  T.dot(V, T.diag(T.sqrt(D)))
     
+    cA = myCholesky()(A_jitter)
     cA.name = 'c' + A.name 
 
     if fast:
