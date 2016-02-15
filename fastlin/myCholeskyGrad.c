@@ -95,8 +95,7 @@ int APPLY_SPECIFIC(apply_cholesky_grad)(PyArrayObject* input0,
         if(info != 0) {
             rCode = 3;
             Py_XDECREF(F);
-            std::string ermsg = std::string("choleskyGrad returned error code: ") + std::to_string(info);
-            PyErr_Format(PyExc_ValueError, ermsg.c_str());
+            PyErr_Format(PyExc_ValueError, "cholgrad library returned error code %d\n", info);
         }
         // We don't need the reference to L anymore
         Py_XDECREF(L);
