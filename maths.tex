@@ -40,13 +40,13 @@ The standard variational formulation is
 The GP-LVM-CMF variational joint in the augmented latent space is:
 %
 \begin{equation}
-    q(z,f,u,X) = \prod_{i=1}^N \{q(z_i|f(X_i))q(f(X_i)|u)\}q(u)q(X)
+    q(z,f,u,X) = \prod_{i=1}^N \{q(z_i|f(X_i))q(f(X_i)|u, X_i)\}q(u)q(X)
 \end{equation}
 %
 which induces an intractable variational marginal
 %
 \begin{equation}
-    q(z) = \int \prod_{i=1}^N \{q(z_i|f(X_i))q(f(X_i)|u)\}q(u)q(X) df du dX.
+    q(z) = \int \prod_{i=1}^N \{q(z_i|f(X_i))q(f(X_i)|u, X_i)\}q(u)q(X) df du dX.
 \end{equation}
 %
 However we can apply the variational formulation again, noting that $q(z) = \frac{q(z|f,u,X)q(f,u,X)}{q(f,u,X|z)}$, and integrating \ref{eq:logpy1} wrt the auxiliary variables, to obtain a further lower bound:
@@ -155,10 +155,6 @@ Term $C$ in (\ref{eq:L_aux_ABC}) then becomes:
 \end{align}
 
 
-
-
-
-
-
-
 \end{document}
+
+
