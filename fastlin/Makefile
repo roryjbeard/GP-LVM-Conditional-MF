@@ -3,19 +3,22 @@ CC = gcc
 FF = gfortran
 RM = rm
 CFLAGS  = -g -Wall -fPIC
+FFLAGS  = -march=native -Wall -Wextra -O3 -fPIC -mno-avx
 # MAC OS
-#FFLAGS  = -march=native -mno-avx -Wall -Wextra -O3 -fPIC
-#LIBFLAGS = -dynamiclib
-#LIBS = -framework Accelerate
+MACSHARE = -dynamiclib
+MACLIBS = -framework Accelerate
 # UBUNTU
-FFLAGS  = -march=native -Wall -Wextra -O3 -fPIC
-LIBFLAGS = -shared
-LIBS = -llapack -lblas
+LINSHARE = -shared
+LINLIBS = -llapack -lblas
 
 default: choleskyGradTest
 
-libcholgrad: dpo2ft.o dpofrt.o choleskyGrad.o
-	$(CC) $(LIBFLAGS) -o libcholgrad.so dpo2ft.o dpofrt.o choleskyGrad.o $(LIBS)
+libcholgrad.so: dpo2ft.o dpofrt.o choleskyGrad.o
+	$(CC) $(LINSHARE) -o libcholgrad.so dpo2ft.o dpofrt.o choleskyGrad.o $(LINLIBS)
+
+libcholgrad.dylib: dpo2ft.o dpofrt.o choleskyGrad.o
+	$(CC) $(MACSHARE) -o libcholgrad.dylib dpo2ft.o dpofrt.o choleskyGrad.o $(MACLIBS)
+
 dpo2ft.o: dpo2ft.f
 	$(FF) $(FFLAGS) -c dpo2ft.f
 
@@ -25,7 +28,7 @@ dpofrt.o: dpofrt.f
 choleskyGrad.o: choleskyGrad.c choleskyGrad.h
 	$(CC) $(CFLAGS) -c choleskyGrad.c
 
-choleskyGradTest: libcholgrad choleskyGradTest.c
+choleskyGradTest: libcholgrad.so libcholgrad.dylib choleskyGradTest.c
 	$(CC) $(CFLAGS) choleskyGradTest.c -o choleskyGradTest -L. -lcholgrad 
 
 clean: 
