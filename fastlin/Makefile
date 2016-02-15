@@ -13,9 +13,11 @@ LINLIBS = -llapack -lblas
 
 default: choleskyGradTest
 
-libcholgrad.so: dpo2ft.o dpofrt.o choleskyGrad.o
-	$(CC) $(LINSHARE) -o libcholgrad.so dpo2ft.o dpofrt.o choleskyGrad.o $(LINLIBS)
+# uncomment for mac
+#libcholgrad.so: dpo2ft.o dpofrt.o choleskyGrad.o
+#	$(CC) $(LINSHARE) -o libcholgrad.so dpo2ft.o dpofrt.o choleskyGrad.o $(LINLIBS)
 
+# Uncomment for linux
 libcholgrad.dylib: dpo2ft.o dpofrt.o choleskyGrad.o
 	$(CC) $(MACSHARE) -o libcholgrad.dylib dpo2ft.o dpofrt.o choleskyGrad.o $(MACLIBS)
 
@@ -28,7 +30,8 @@ dpofrt.o: dpofrt.f
 choleskyGrad.o: choleskyGrad.c choleskyGrad.h
 	$(CC) $(CFLAGS) -c choleskyGrad.c
 
-choleskyGradTest: libcholgrad.so libcholgrad.dylib choleskyGradTest.c
+# Change libcholgrad.so to libcholgrad.dylib for linux/max 
+choleskyGradTest: libcholgrad.so choleskyGradTest.c
 	$(CC) $(CFLAGS) choleskyGradTest.c -o choleskyGradTest -L. -lcholgrad 
 
 clean: 
