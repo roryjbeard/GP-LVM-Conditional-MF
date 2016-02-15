@@ -8,7 +8,8 @@ import os
 import theano.tensor as T
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-
+os.environ["LD_LIBRARY_PATH"]   = os.path.dirname(os.path.realpath(__file__)) + '/fastlin/'
+os.environ["DYLD_LIBRARY_PATH"] = os.path.dirname(os.path.realpath(__file__)) + '/fastlin/'
 parser = argparse.ArgumentParser()
 
 args = parser.parse_args()

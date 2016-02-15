@@ -372,7 +372,8 @@ class SGPDV(object):
 
             self.upsilon = th.shared(Q_M_mat, name='upsilon')
 
-            (self.cUpsilon, self.iUpsilon, self.logDetUpsilon) = cholInvLogDet(self.Upsilon, self.Q * self.M, self.jitter)
+            (self.cUpsilon, self.iUpsilon, self.logDetUpsilon) \
+                = cholInvLogDet(self.Upsilon, self.Q * self.M, self.jitter)
 
             self.ru_vars = [self.Upsilon_sqrt, self.upsilon]
 
@@ -450,7 +451,7 @@ class SGPDV(object):
             elif var.name.startswith('W1') or \
                     var.name.startswith('W2') or \
                     var.name.startswith('W3'):
-
+                print 'Randomising ' + var.name
                 # Hidden layer weights are uniformly sampled from a symmetric interval
                 # following [Xavier, 2010]
                 X = var.get_value().shape[0]
@@ -465,12 +466,15 @@ class SGPDV(object):
             elif var.name.startswith('b1') or \
                     var.name.startswith('b2') or \
                     var.name.startswith('b3'):
+                print 'Setting ' + var.name + ' to all 0s'
                 # Offsets not randomised at all
                 var.set_value(np.zeros(var.get_value().shape, dtype=precision))
 
             elif type(var) == T.sharedvar.TensorSharedVariable:
+                print 'Randomising ' + var.name
                 var.set_value(rnd(var.get_value()))
             elif type(var) == T.sharedvar.ScalarSharedVariable:
+                print 'Randomising ' + var.name
                 var.set_value(np.random.randn())
             else:
                 raise RuntimeError('Unknown randomisation type')
@@ -481,7 +485,6 @@ class SGPDV(object):
             var = getattr(self, name)
             if type(var) == T.sharedvar.ScalarSharedVariable or \
                type(var) == T.sharedvar.TensorSharedVariable:
-                print 'Randomising ' + var.name
                 rnd(var)
 
     def setKernelParameters(self,
@@ -556,8 +559,11 @@ class SGPDV(object):
         raise RuntimeError('Calling un-implemented function')
 
     def log_q_f_uX(self):
-        log_q_f_uX_ = -0.5 * self.Q * self.B * np.log(2 * np.pi) - 0.5 * self.Q * self.logDetSigma \
-            - 0.5 * nlinalg.trace(T.dot(self.iSigma, T.dot((self.f - self.mu).T, (self.f - self.mu))))
+        f_minus_mu = self.f - self.mu
+        outer = T.dot(f_minus_mu.T, f_minus_mu)
+        log_q_f_uX_ = - 0.5 * self.Q * self.B * np.log(2 * np.pi) \
+                      - 0.5 * self.Q * self.logDetSigma \
+                      - 0.5 * nlinalg.trace(T.dot(self.iSigma, outer))
         return log_q_f_uX_
 
     def addtionalBoundTerms(self):
