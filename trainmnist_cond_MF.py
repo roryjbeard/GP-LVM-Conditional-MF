@@ -94,25 +94,25 @@ va.train(numberOfEpochs=numberOfEpochs, maxIters=10)
 
 #lowerBounds = va.train_adagrad( n_iter, learningRate=learning_rate )
 #
-print "Testing"
-vatest = va = VA(
-    numberOfInducingPoints, # Number of inducing ponts in sparse GP
-    batchSize,              # Size of mini batch
-    dimX,                   # Dimensionality of the latent co-ordinates
-    dimZ,                   # Dimensionality of the latent variables
-    x_test,                   # [NxP] matrix of observations
-    kernelType=kernelType,
-    encoderType_qX=encoderType_qX,  # 'FreeForm', 'MLP', 'Kernel'.
-    encoderType_rX=encoderType_rX,  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
-    encoderType_ru=encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
-    Xu_optimise=Xu_optimise,
-    numHiddenUnits_encoder=numHiddenUnits_encoder,
-    numHiddentUnits_decoder=numHiddentUnits_decoder,
-    continuous=True
-)
+#print "Testing"
+#vatest = va = VA(
+#    numberOfInducingPoints, # Number of inducing ponts in sparse GP
+#    batchSize,              # Size of mini batch
+#    dimX,                   # Dimensionality of the latent co-ordinates
+#    dimZ,                   # Dimensionality of the latent variables
+#    x_test,                   # [NxP] matrix of observations
+#    kernelType=kernelType,
+#    encoderType_qX=encoderType_qX,  # 'FreeForm', 'MLP', 'Kernel'.
+#    encoderType_rX=encoderType_rX,  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+#    encoderType_ru=encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
+#    Xu_optimise=Xu_optimise,
+#    numHiddenUnits_encoder=numHiddenUnits_encoder,
+#    numHiddentUnits_decoder=numHiddentUnits_decoder,
+#    continuous=True
+#)
 
-va.construct_L_using_r()
-vatest.copyParameters(va)
+#va.construct_L_using_r()
+#vatest.copyParameters(va)
 
-testLogLhood = vatest.getMCLogLikelihood(numTestSamples)
+#testLogLhood = vatest.getMCLogLikelihood(numTestSamples)
 print testLogLhood

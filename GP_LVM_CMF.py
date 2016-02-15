@@ -430,7 +430,7 @@ class SGPDV(object):
         self.gradientVariables.extend(self.rX_vars)
         self.gradientVariables.extend(self.ru_vars)
 
-        # self.profmode = th.ProfileMode(optimizer='fast_run', linker=th.gof.OpWiseCLinker())
+        self.profmode = th.ProfileMode(optimizer='fast_run', linker=th.gof.OpWiseCLinker())
 
     def randomise(self, sig=1, rndQR=False):
 
@@ -702,7 +702,7 @@ class SGPDV(object):
 
         updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
 
-        self.updateFunction = th.function([], None, updates=updates, no_default_updates=True)  # ,  mode=self.profmode)
+        self.updateFunction = th.function([], None, updates=updates, no_default_updates=True,  mode=self.profmode)
 
     def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf):
 
