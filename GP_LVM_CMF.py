@@ -358,7 +358,7 @@ class SGPDV(object):
 
             self.rX_vars = [self.log_omega]
 
-        elif self.encoderType == 'NoEncoding':
+        elif self.encoderType_rX == 'NoEncoding':
             self.rX_vars = []
         else:
             raise RuntimeError('Unrecognised encoding for r(X|z)')
@@ -412,7 +412,7 @@ class SGPDV(object):
             self.ru_vars = [self.W1_ru, self.W2_ru, self.W3_ru, self.b1_ru, self.b2_ru, self.b3_ru]
 
         elif self.encoderType_ru == 'Kernel':
-            raise RuntimeError('Kernel encoding of r(u|z) implemented')
+            raise RuntimeError('Kernel encoding of r(u|z) not implemented')
         elif self.encoderType_ru == 'NoEncoding':
             self.ru_vars = []
         else:
