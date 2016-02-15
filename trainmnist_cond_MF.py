@@ -116,4 +116,4 @@ va.train(numberOfEpochs=numberOfEpochs, maxIters=10)
 #vatest.copyParameters(va)
 
 #testLogLhood = vatest.getMCLogLikelihood(numTestSamples)
-print testLogLhood
+#print testLogLhood

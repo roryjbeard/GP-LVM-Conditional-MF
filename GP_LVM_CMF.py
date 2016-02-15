@@ -143,8 +143,12 @@ class SGPDV(object):
         self.y_miniBatch.name = 'y_miniBatch'
 
         # This is for numerical stability of cholesky
-        self.jitterDefault = np.float32(0.0117)
-        self.jitterGrowthFactor = np.float32(1.1)
+	if th.config.floatX == 'float32'
+	    # Need a lot more jitter for 32 bit computation       
+	    self.jitterDefault = np.float32(0.1)
+	else
+	    self.jitterDefault = np.float32(0.0001)
+	self.jitterGrowthFactor = np.float32(1.1)
         self.jitter = th.shared(np.asarray(self.jitterDefault, dtype=precision), name='jitter')
 
         kfactory = kernelFactory(kernelType)
@@ -431,7 +435,7 @@ class SGPDV(object):
         self.gradientVariables.extend(self.rX_vars)
         self.gradientVariables.extend(self.ru_vars)
 
-        self.profmode = th.ProfileMode(optimizer='fast_run', linker=th.gof.OpWiseCLinker())
+        #self.profmode = th.ProfileMode(optimizer='fast_run', linker=th.gof.OpWiseCLinker())
 
     def randomise(self, sig=1, rndQR=False):
 
@@ -708,7 +712,7 @@ class SGPDV(object):
 
         updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
 
-        self.updateFunction = th.function([], None, updates=updates, no_default_updates=True,  mode=self.profmode)
+        self.updateFunction = th.function([], None, updates=updates, no_default_updates=True)#,  mode=self.profmode)
 
     def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf):
 
@@ -778,8 +782,9 @@ class SGPDV(object):
                 val = func()
                 passed = True
             except np.linalg.LinAlgError:
-                print 'Increasing value of jitter'
-                self.jitter.set_value(self.jitter.get_value() * self.jitterGrowthFactor)
+		self.jitter.set_value(self.jitter.get_value() * self.jitterGrowthFactor)                
+		print 'Increasing value of jitter. Jitter now: ' + str(self.jitter.get_value())
+                
         if reset:
             self.jitter.set_value(self.jitterDefault)
         return val
