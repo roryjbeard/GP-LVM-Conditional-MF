@@ -107,11 +107,13 @@ int APPLY_SPECIFIC(apply_cholesky_grad)(PyArrayObject* input0,
             // If so, decrement the count to that memory
             Py_XDECREF(*output0);
         }
-        // Gradient has same type of thing we're taking gradient of, i.e. input 1
-        PyArray_Descr* output_descr = PyArray_DescrFromObject((PyObject*) input0, NULL);
-        // Copy the F to the right type format for the output: Can use C or F memory styles
-        *output0 = (PyArrayObject*) PyArray_FromAny((PyObject*)F, output_descr, 2, 2, NPY_ARRAY_F_CONTIGUOUS, NULL);
-        if(*output0 == NULL){
+	
+
+        // Get descriptor of output type
+        PyArray_Descr* output_descr =  PyArray_DescrFromType(TYPENUM_OUTPUT_0);
+	// Copy the F to the right type format for the output: Can use C or F memory styles
+        *output0 = (PyArrayObject*) PyArray_FromAny((PyObject*)F, output_descr, 2, 2, NPY_ARRAY_F_CONTIGUOUS|NPY_ARRAY_FORCECAST, NULL);
+        if(*output0 == NULL) {
             rCode = 4;
             PyErr_Format(PyExc_ValueError, "Could not allocate output storage");
         }
