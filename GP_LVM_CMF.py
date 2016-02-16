@@ -143,12 +143,12 @@ class SGPDV(object):
         self.y_miniBatch.name = 'y_miniBatch'
 
         # This is for numerical stability of cholesky
-	if th.config.floatX == 'float32'
-	    # Need a lot more jitter for 32 bit computation       
-	    self.jitterDefault = np.float32(0.1)
-	else
-	    self.jitterDefault = np.float32(0.0001)
-	self.jitterGrowthFactor = np.float32(1.1)
+        if th.config.floatX == 'float32':
+           # Need a lot more jitter for 32 bit computation
+           self.jitterDefault = np.float32(0.1)
+        else:
+            self.jitterDefault = np.float32(0.0001)
+        self.jitterGrowthFactor = np.float32(1.1)
         self.jitter = th.shared(np.asarray(self.jitterDefault, dtype=precision), name='jitter')
 
         kfactory = kernelFactory(kernelType)
@@ -362,7 +362,7 @@ class SGPDV(object):
 
             self.rX_vars = [self.log_omega]
 
-        elif self.encoderType == 'NoEncoding':
+        elif self.encoderType_rX == 'NoEncoding':
             self.rX_vars = []
         else:
             raise RuntimeError('Unrecognised encoding for r(X|z)')
@@ -416,7 +416,7 @@ class SGPDV(object):
             self.ru_vars = [self.W1_ru, self.W2_ru, self.W3_ru, self.b1_ru, self.b2_ru, self.b3_ru]
 
         elif self.encoderType_ru == 'Kernel':
-            raise RuntimeError('Kernel encoding of r(u|z) implemented')
+            raise RuntimeError('Kernel encoding of r(u|z) not implemented')
         elif self.encoderType_ru == 'NoEncoding':
             self.ru_vars = []
         else:
@@ -782,9 +782,9 @@ class SGPDV(object):
                 val = func()
                 passed = True
             except np.linalg.LinAlgError:
-		self.jitter.set_value(self.jitter.get_value() * self.jitterGrowthFactor)                
+		self.jitter.set_value(self.jitter.get_value() * self.jitterGrowthFactor)
 		print 'Increasing value of jitter. Jitter now: ' + str(self.jitter.get_value())
-                
+
         if reset:
             self.jitter.set_value(self.jitterDefault)
         return val
