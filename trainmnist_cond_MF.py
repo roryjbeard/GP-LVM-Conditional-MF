@@ -112,8 +112,8 @@ va.train(numberOfEpochs=numberOfEpochs, maxIters=10)
 #    continuous=True
 #)
 
-#va.construct_L_using_r()
-#vatest.copyParameters(va)
+va.construct_L_using_r()
+vatest.copyParameters(va)
 
-#testLogLhood = vatest.getMCLogLikelihood(numTestSamples)
-#print testLogLhood
+testLogLhood = vatest.getMCLogLikelihood(numTestSamples)
+print testLogLhood

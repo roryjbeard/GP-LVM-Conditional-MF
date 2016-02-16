@@ -143,8 +143,8 @@ class SGPDV(object):
         self.y_miniBatch.name = 'y_miniBatch'
 
         # This is for numerical stability of cholesky
-	if th.config.floatX == 'float32'
-	    # Need a lot more jitter for 32 bit computation       
+	if th.config.floatX == 'float32':
+	    # Need a lot more jitter for 32 bit computation
 	    self.jitterDefault = np.float32(0.1)
 	else
 	    self.jitterDefault = np.float32(0.0001)
@@ -782,9 +782,9 @@ class SGPDV(object):
                 val = func()
                 passed = True
             except np.linalg.LinAlgError:
-		self.jitter.set_value(self.jitter.get_value() * self.jitterGrowthFactor)                
+		self.jitter.set_value(self.jitter.get_value() * self.jitterGrowthFactor)
 		print 'Increasing value of jitter. Jitter now: ' + str(self.jitter.get_value())
-                
+
         if reset:
             self.jitter.set_value(self.jitterDefault)
         return val
