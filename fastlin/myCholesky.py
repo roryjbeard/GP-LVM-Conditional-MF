@@ -151,7 +151,7 @@ class myCholeskyGrad(COp):
 
     def c_lib_dirs(self):
         lib_dir = os.path.dirname(os.path.realpath(__file__))
-        print "************ c_lib_dirs = {} ****************",format(lib_dir)
+        print "************ c_lib_dirs = {} ****************".format(lib_dir)
         return [lib_dir]
 
     def get_op_params(self):
@@ -159,5 +159,10 @@ class myCholeskyGrad(COp):
             UPLO = "'L'"
         else:
             UPLO = "'U'" 
-        return [('UPLO', UPLO)]
+        return [('UPLO', UPLO)]#
+
+    def c_compile_args(self):
+        rpath = "-Wl,-rpath," + os.path.dirname(os.path.realpath(__file__)) + "/cholgrad"
+        print "************ c_compile_args = {} ****************".format(rpath)
+        return [rpath]
 

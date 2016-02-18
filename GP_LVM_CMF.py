@@ -595,15 +595,17 @@ class SGPDV(object):
         if not q_f_Xu_equals_r_f_Xuz:
             raise RuntimeError('Case not implemented')
 
-        self.L_func = th.function([], self.L, no_default_updates=True)
         self.dL = T.grad(self.L, self.gradientVariables)
-        self.dL_func = th.function([], self.dL, no_default_updates=True)
 
     def construct_L_without_r(self):
         self.L = 0  # Implement me!
 
     def construct_L_predictive(self):
         self.L = self.log_p_y_z()
+
+    def construct_L_dL_functions(self):
+        self.L_func = th.function([], self.L, no_default_updates=True)
+        self.dL_func = th.function([], self.dL, no_default_updates=True)
 
     def log_r_uX_z(self):
         # use this function if we don't want to exploit gaussianity
@@ -712,7 +714,8 @@ class SGPDV(object):
 
         updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
 
-        self.updateFunction = th.function([], None, updates=updates, no_default_updates=True)#,  mode=self.profmode)
+        # Get the update function to also return the bound!
+        self.updateFunction = th.function([], self.L, updates=updates, no_default_updates=True, profile=True)#,  mode=self.profmode)
 
     def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf):
 
@@ -734,10 +737,9 @@ class SGPDV(object):
 
                 self.sample()
                 self.iterator.set_value(self.iterator.get_value() + 1)
-                self.jitterProtect(self.updateFunction, reset=False)
+                lbTmp = self.jitterProtect(self.updateFunction, reset=False)
                 # self.constrainKernelParameters()
 
-                lbTmp = self.jitterProtect(self.L_func)
                 lbTmp = lbTmp.flatten()
                 self.lowerBound = lbTmp[0]
 
