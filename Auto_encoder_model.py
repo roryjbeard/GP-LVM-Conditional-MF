@@ -12,7 +12,7 @@ from theano.tensor import nlinalg
 
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
-from utils import log_mean_exp_stable
+from utils import sharedZeroMatrix, sharedZeroVector, log_mean_exp_stable
 
 precision = th.config.floatX
 
@@ -53,18 +53,12 @@ class VA(SGPDV):
         self.HU_decoder = numHiddentUnits_decoder
         self.continuous = continuous
 
-        # Construct appropriately sized matrices to initialise theano shares
-        HU_Q_mat = np.zeros((self.HU_decoder, self.Q), dtype=precision)
-        HU_vec   = np.zeros((self.HU_decoder, 1 ), dtype=precision)
-        P_HU_mat = np.zeros((self.P, self.HU_decoder), dtype=precision)
-        P_vec    = np.zeros((self.P, 1), dtype=precision)
-
-        self.W1 = th.shared(HU_Q_mat, name='W1')
-        self.W2 = th.shared(P_HU_mat, name='W2')
-        self.W3 = th.shared(P_HU_mat, name='W3')
-        self.b1 = th.shared(HU_vec,   name='b1', broadcastable=(False,True))
-        self.b2 = th.shared(P_vec,    name='b2', broadcastable=(False,True))
-        self.b3 = th.shared(P_vec,    name='b3', broadcastable=(False,True))
+        self.W1 = sharedZeroMatrix(self.HU_decoder, self.Q, 'W1')
+        self.W2 = sharedZeroMatrix(self.P, self.HU_decoder, 'W2')
+        self.W3 = sharedZeroMatrix(self.P, self.HU_decoder, 'W3')
+        self.b1 = sharedZeroVector(self.HU_decoder, 'b1', broadcastable=(False,True))
+        self.b2 = sharedZeroVector(self.P, 'b2', broadcastable=(False,True))
+        self.b3 = sharedZeroVector(self.P, 'b3', broadcastable=(False,True))
 
         self.likelihoodVariables = [self.W1, self.W2, self.W3, self.b1, self.b2, self.b3]
         self.gradientVariables.extend(self.likelihoodVariables)
@@ -215,6 +209,8 @@ if __name__ == "__main__":
 
     print 'log_r_uX_z'
     print th.function([], va.log_r_uX_z())()
+
+    va.construct_L_dL_functions()
 
     for i in range(len(va.gradientVariables)):
         f  = lambda x: va.L_test( x, va.gradientVariables[i] )

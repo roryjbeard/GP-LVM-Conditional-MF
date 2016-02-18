@@ -25,16 +25,17 @@ data = x_train
 
 [N,dimX] = data.shape
 
-dimZ = 20
-dimX = 5
+dimZ = 40
+dimX = 3
 HU_decoder = 400
 batchSize = 100
 encoderType_qX='MLP'
 encoderType_rX='MLP'
-encoderType_ru='MLP'
+encoderType_qu='Kernel'
+encoderType_ru='FreeForm'
 Xu_optimise=True
 kernelType='RBF'
-numHiddenUnits_encoder=0
+numHiddenUnits_encoder=400
 numHiddentUnits_decoder=400
 numberOfInducingPoints = 50
 learning_rate = 1e-3
@@ -50,6 +51,7 @@ va = VA(
     x_train,                   # [NxP] matrix of observations
     kernelType=kernelType,
     encoderType_qX=encoderType_qX,  # 'FreeForm', 'MLP', 'Kernel'.
+    encoderType_qu=encoderType_qu,  # 'Kernel'
     encoderType_rX=encoderType_rX,  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
     encoderType_ru=encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
     Xu_optimise=Xu_optimise,

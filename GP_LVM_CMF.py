@@ -10,7 +10,7 @@ import time
 import collections
 
 from optimisers import Adam
-from utils import cholInvLogDet, np_log_mean_exp_stable
+from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, np_log_mean_exp_stable
 
 # precision = np.float64
 precision = th.config.floatX
@@ -23,7 +23,7 @@ class kernelFactory(object):
         self.kernelType = kernelType_
         self.eps        = eps_
 
-    def kernel(self, X1, X2, theta, name_):
+    def kernel(self, X1, X2, theta, name_, dtype=precision):
         if X2 is None:
             _X2 = X1
         else:
@@ -32,6 +32,9 @@ class kernelFactory(object):
             inls = T.exp(theta[0])
             # dist = (((X1 / theta[0])**2).sum(1)) + (((_X2 / theta[0])**2).sum(1)).T - 2*T.dot( X1 / theta[0], _X2.T / theta[0] )
             dist = ((X1 / inls)**2).sum(1)[:, None] + ((_X2 / inls)**2).sum(1)[None, :] - 2 * (X1 / inls).dot((_X2 / inls).T)
+            # Always want kernels to be 64-bit
+            if dtype == 'float64':
+                dist = T.cast(dist, dtype='float64')
             K = T.exp(theta[1] - dist / 2.0)
             if X2 is None:
                 K = K + self.eps * T.eye(X1.shape[0])
@@ -99,31 +102,6 @@ class SGPDV(object):
 
         self.lowerBound = -np.inf  # Lower bound
 
-        # Suitably sized zero matrices
-        B_R_mat = np.zeros((self.B, self.R), dtype=precision)
-        B_Q_mat = np.zeros((self.B, self.Q), dtype=precision)
-        H_P_mat = np.zeros((self.H, self.P), dtype=precision)
-        H_B_mat = np.zeros((self.H, self.B), dtype=precision)
-        M_R_mat = np.zeros((self.M, self.R), dtype=precision)
-        M_H_mat = np.zeros((self.M, self.H), dtype=precision)
-        Q_M_mat = np.zeros((self.Q, self.M), dtype=precision)
-        Q_H_mat = np.zeros((self.Q, self.H), dtype=precision)
-        R_H_mat = np.zeros((self.R, self.H), dtype=precision)
-        R_vec   = np.zeros((self.R, 1), dtype=precision)
-        H_vec   = np.zeros((self.H, 1), dtype=precision)
-        M_vec   = np.zeros((self.M, 1), dtype=precision)
-        Q_vec   = np.zeros((self.Q, 1), dtype=precision)
-        N_R_mat = np.zeros((self.N, self.R), dtype=precision)
-        H_QpP_mat  = np.zeros((self.H, (self.Q + self.P)), dtype=precision)
-        H_vec      = np.zeros((self.H, 1), dtype=precision)
-        QM_QM_mat  = np.zeros((self.Q * self.M, self.Q * self.M), dtype=precision)
-        One_One_mat = np.zeros((1, 1), dtype=precision)
-        if self.encoderType_qX == 'FreeForm':
-            N_N_mat = np.zeros((self.N, self.N), dtype=precision)
-        if self.encoderType_rX == 'FreeForm':
-            NR_NR_mat  = np.zeros((self.N * self.R, self.N * self.R), dtype=precision)
-        # Mini batch indicator varible
-
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
@@ -146,22 +124,17 @@ class SGPDV(object):
         self.y_miniBatch = self.y[self.currentBatch, :]
         self.y_miniBatch.name = 'y_miniBatch'
 
-        # This is for numerical stability of cholesky
-        if th.config.floatX == 'float32':
-           # Need a lot more jitter for 32 bit computation
-           self.jitterDefault = np.float32(0.1)
-        else:
-            self.jitterDefault = np.float32(0.0001)
-        self.jitterGrowthFactor = np.float32(1.1)
-        self.jitter = th.shared(np.asarray(self.jitterDefault, dtype=precision), name='jitter')
+        self.jitterDefault = np.float64(0.0001)
+        self.jitterGrowthFactor = np.float64(1.1)
+        self.jitter = th.shared(np.asarray(self.jitterDefault, dtype='float64'), name='jitter')
 
         kfactory = kernelFactory(kernelType)
 
         # kernel parameters
-        self.log_theta = th.shared(np.zeros(self.numberOfKernelParameters, dtype=precision), name='log_theta')  # parameters of Kuu, Kuf, Kff
-        self.log_gamma = th.shared(np.zeros(self.numberOfKernelParameters, dtype=precision), name='log_gamma')  # parameters of qX
-        self.log_omega = th.shared(np.zeros(self.numberOfKernelParameters, dtype=precision), name='log_omega')  # parameters of qu
-        self.log_sigma = th.shared(np.asarray(0.0, dtype=precision), name='log_sigma')  # standard deviation of q(z|f)
+        self.log_theta = sharedZeroArray(self.numberOfKernelParameters, 'log_theta') # parameters of Kuu, Kuf, Kff
+        self.log_gamma = sharedZeroArray(self.numberOfKernelParameters, 'log_gamma') # parameters of qX
+        self.log_omega = sharedZeroArray(self.numberOfKernelParameters, 'log_omega') # parameters of qu
+        self.log_sigma = th.shared(0.0, name='log_sigma')  # standard deviation of q(z|f)
 
         # Random variables
         self.alpha = srng.normal(size=(self.Q, self.M), avg=0.0, std=1.0, ndim=None)
@@ -186,8 +159,8 @@ class SGPDV(object):
         if encoderType_qX == 'FreeForm':
             # Have a normal variational distribution over location of latent co-ordinates
 
-            self.Phi_full_sqrt = th.shared(N_N_mat, name='Phi_full_sqrt')
-            self.phi_full      = th.shared(N_R_mat, name='phi_full')
+            self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
+            self.phi_full      = sharedZeroMatrix(self.N, self.R, 'phi_full')
 
             Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
             Phi_batch_sqrt.name = 'Phi_batch_sqrt'
@@ -205,12 +178,12 @@ class SGPDV(object):
         elif self.encoderType_qX == 'MLP':
 
             # Auto encode
-            self.W1_qX = th.shared(H_P_mat, name='W1_qX')
-            self.b1_qX = th.shared(H_vec,   name='b1_qX', broadcastable=(False, True))
-            self.W2_qX = th.shared(R_H_mat, name='W2_qX')
-            self.b2_qX = th.shared(R_vec,   name='b2_qX', broadcastable=(False, True))
-            self.W3_qX = th.shared(H_vec.T, name='W3_qX')
-            self.b3_qX = th.shared(One_One_mat, name='b3_qX', broadcastable=(False, True))
+            self.W1_qX = sharedZeroMatrix(self.H, self.P, 'W1_qX')
+            self.W2_qX = sharedZeroMatrix(self.R, self.H, 'W2_qX')
+            self.W3_qX = sharedZeroMatrix(1, self.H, 'W3_qX')
+            self.b1_qX = sharedZeroVector(self.H, 'b1_qX', broadcastable=(False, True))
+            self.b2_qX = sharedZeroVector(self.R, 'b2_qX', broadcastable=(False, True))
+            self.b3_qX = sharedZeroVector(1, 'b3_qX', broadcastable=(False, True))
 
             # [HxB] = softplus( [HxP] . [BxP]^T + repmat([Hx1],[1,B]) )
             h_qX = T.nnet.softplus(T.dot(self.W1_qX, self.y_miniBatch.T) + self.b1_qX)
@@ -224,9 +197,9 @@ class SGPDV(object):
             log_sigma_qX.name = 'log_sigma_qX'
 
             self.phi  = mu_qX.T  # [BxR]
-            self.Phi  = T.diag(T.exp(log_sigma_qX.flatten()))  # [BxB]
-            self.iPhi = T.diag(T.exp(-log_sigma_qX.flatten()))  # [BxB]
-            self.cPhi = T.diag(T.exp(0.5 * log_sigma_qX.flatten()))  # [BxB]
+            self.Phi  = T.diag(T.exp(log_sigma_qX.flatten())) # [BxB]
+            self.iPhi = T.diag(T.exp(-log_sigma_qX.flatten())) # [BxB]
+            self.cPhi = T.diag(T.exp(0.5 * log_sigma_qX.flatten())) # [BxB]
             self.logDetPhi = T.sum(log_sigma_qX)  # scalar
 
             self.phi.name       = 'phi'
@@ -241,7 +214,7 @@ class SGPDV(object):
 
             # Draw the latent coordinates from a GP with data co-ordinates
             self.Phi = kfactory.kernel(self.y_miniBatch, None, self.log_gamma, 'Phi')
-            self.phi = th.shared(B_R_mat, name='phi')
+            self.phi = sharedZeroMatrix(self.B, self.R, 'phi')
             (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, self.jitter)
 
             self.qX_vars = [self.log_gamma]
@@ -255,13 +228,13 @@ class SGPDV(object):
         self.Xf.name  = 'Xf'
 
         # Inducing points co-ordinates
-        self.Xu = th.shared(M_R_mat, name='Xu')
+        self.Xu = sharedZeroMatrix(self.M, self.R, 'Xu')
 
         # Compute parameters of q(u)
         if encoderType_qu == 'Kernel':
             # Have a normal variational distribution over inducing values
 
-            self.kappa = th.shared(Q_M_mat, name='kappa')
+            self.kappa = sharedZeroMatrix(self.Q, self.M, 'kappa')
             self.Kuu = kfactory.kernel(self.Xu, None, self.log_theta, 'Kuu')
             (self.cKuu, self.iKuu, self.logDetKuu) = cholInvLogDet(self.Kuu, self.M, self.jitter)
             self.qu_vars = [self.log_theta, self.kappa, self.Xu]
@@ -269,14 +242,14 @@ class SGPDV(object):
         elif self.encoderType_qu == 'MLP':
             raise RuntimeError('Don''t do this')
             # # Auto encode
-            # self.W1_qu = th.shared(H_B_mat, name='W1_qu')
-            # self.b1_qu = th.shared(H_vec,   name='b1_qu', broadcastable=(False, True))
-            # self.W2_qu = th.shared(P_Q_mat, name='W2_qu')
-            # self.b2_qu = th.shared(H_vec,   name='b2_qu', broadcastable=(False, True))
-            # self.W3_qu = th.shared(M_H_vec, name='W3_qu')
-            # self.b3_qu = th.shared(M_vec,   name='b3_qu', broadcastable=(False, True))
-            # self.W4_qu = th.shared(M_H_vec, name='W4_qu')
-            # self.b4_qu = th.shared(M_vec,   name='b4_qu', broadcastable=(False, True))
+            # self.W1_qu = sharedZeroMatrix(self.H, self.B, 'W1_qu')
+            # self.W2_qu = sharedZeroMatrix(self.P, self.Q, 'W2_qu')
+            # self.W3_qu = sharedZeroMatrix(self.M, self.H, 'W3_qu')
+            # self.W4_qu = sharedZeroMatrix(self.M, self.H, 'W4_qu')
+            # self.b1_qu = sharedZeroVector(self.H, 'b1_qu', broadcastable=(False, True))
+            # self.b2_qu = sharedZeroVector(self.H, 'b2_qu', broadcastable=(False, True))
+            # self.b3_qu = sharedZeroVector(self.M, 'b3_qu', broadcastable=(False, True))
+            # self.b4_qu = sharedZeroVector(self.M, 'b4_qu', broadcastable=(False, True))
 
             # # [HxP] = softplus( [HxB] . [BxP]^T + repmat([Hx1],[1,P]) )
             # h1_qu = T.nnet.softplus(T.dot(self.W1_qu, self.y_miniBatch.T) + self.b1_qu)
@@ -340,8 +313,8 @@ class SGPDV(object):
             self.TauRange.name = 'TauRange'
             TauIdx = (self.TauRange[self.currentBatch, :]).flatten()
 
-            self.Tau_full_sqrt = th.shared(NR_NR_mat, name='Tau_full_sqrt')
-            self.tau_full = th.shared(N_R_mat, name='tau_full')
+            self.Tau_full_sqrt = sharedZeroMatrix(self.N*self.R, self.N*self.R, 'Tau_full_sqrt')
+            self.tau_full = sharedZeroMatrix(self.N, self.R, 'tau_full')
 
             Tau_batch_sqrt = self.Tau_full_sqrt[TauIdx][:, TauIdx]
             Tau_batch_sqrt.name = 'Tau_batch_sqrt'
@@ -358,12 +331,12 @@ class SGPDV(object):
 
         elif self.encoderType_rX == 'MLP':
 
-            self.W1_rX = th.shared(H_QpP_mat, name='W1_rX')
-            self.b1_rX = th.shared(H_vec,     name='b1_rX', broadcastable=(False, True))
-            self.W2_rX = th.shared(R_H_mat,   name='W2_rX')
-            self.b2_rX = th.shared(R_vec,     name='b2_rX', broadcastable=(False, True))
-            self.W3_rX = th.shared(R_H_mat,   name='W3_rX')
-            self.b3_rX = th.shared(R_vec,     name='b3_rX', broadcastable=(False, True))
+            self.W1_rX = sharedZeroMatrix(self.H, self.Q+self.P, 'W1_rX')
+            self.W2_rX = sharedZeroMatrix(self.R, self.H, 'W2_rX')
+            self.W3_rX = sharedZeroMatrix(self.R, self.H, 'W3_rX')
+            self.b1_rX = sharedZeroVector(self.H, 'b1_rX', broadcastable=(False, True))
+            self.b2_rX = sharedZeroVector(self.R, 'b2_rX', broadcastable=(False, True))
+            self.b3_rX = sharedZeroVector(self.R, 'b3_rX', broadcastable=(False, True))
 
             # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
             h_rX = T.nnet.softplus(T.dot(self.W1_rX, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_rX)
@@ -400,7 +373,7 @@ class SGPDV(object):
             self.cTau = slinalg.kron(cTau_r, T.eye(self.R))
             self.iTau = slinalg.kron(iTau_r, T.eye(self.R))
             self.logDetTau = logDetTau_r * self.R
-            self.tau = th.shared(B_R_mat, name='tau')
+            self.tau = sharedZeroMatrix(self.B, self.R, 'tau')
 
             self.tau.name  = 'tau'
             # self.Tau.name  = 'Tau'
@@ -417,12 +390,12 @@ class SGPDV(object):
 
         if self.encoderType_ru == 'FreeForm':
 
-            self.Upsilon_sqrt = th.shared(QM_QM_mat, name='Upsilon_sqrt')
+            self.Upsilon_sqrt = sharedZeroMatrix(self.Q * self.M, self.Q * self.M, 'Upsilon_sqrt')
 
             self.Upsilon = T.dot(self.Upsilon_sqrt, self.Upsilon_sqrt.T)
             self.Upsilon.name = 'Upsilon'
 
-            self.upsilon = th.shared(Q_M_mat, name='upsilon')
+            self.upsilon = sharedZeroMatrix(self.Q, self.M, 'upsilon')
 
             (self.cUpsilon, self.iUpsilon, self.logDetUpsilon) \
                 = cholInvLogDet(self.Upsilon, self.Q * self.M, self.jitter)
@@ -431,28 +404,14 @@ class SGPDV(object):
 
         elif self.encoderType_ru == 'MLP':
 
-            # self.W1_ru = th.shared(H_B_mat, name='W1_ru')
-            # self.b1_ru = th.shared(H_vec,   name='b1_ru', broadcastable=(False, True))
-            # self.W2_ru = th.shared(M_H_mat, name='W2_ru')
-            # self.b2_ru = th.shared(M_vec,   name='b2_ru', broadcastable=(False, True))
-            # self.W3_ru = th.shared(M_H_mat, name='W3_ru')
-            # self.b3_ru = th.shared(M_vec,   name='b3_ru', broadcastable=(False, True))
-
-            # # [HxQ] = softplus( [HxB)] . [QxB]^T + repmat([Hx1], [1,B]) )
-            # h_ru = T.nnet.softplus(T.dot(self.W1_ru, self.z.T) + self.b1_ru)
-            # # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
-            # mu_ru = T.nnet.sigmoid(T.dot(self.W2_ru, h_ru) + self.b2_ru)
-            # # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
-            # log_sigma_ru = 0.5 * (T.dot(self.W3_ru, h_ru) + self.b3_ru)
-
-            self.W1_ru = th.shared(H_QpP_mat, name='W1_ru')
-            self.b1_ru = th.shared(H_vec,     name='b1_ru', broadcastable=(False, True))
-            self.W2_ru = th.shared(B_Q_mat,   name='W2_ru')
-            self.b2_ru = th.shared(H_vec,     name='b2_ru', broadcastable=(False, True))
-            self.W3_ru = th.shared(M_H_mat,   name='W2_ru')
-            self.b3_ru = th.shared(M_vec,     name='b2_ru', broadcastable=(False, True))
-            self.W4_ru = th.shared(M_H_mat,   name='W3_ru')
-            self.b4_ru = th.shared(M_vec,     name='b3_ru', broadcastable=(False, True))
+            self.W1_ru = sharedZeroMatrix(self.H, self.Q+self.P, 'W1_ru')
+            self.W2_ru = sharedZeroMatrix(self.B, self.Q, 'W2_ru')
+            self.W3_ru = sharedZeroMatrix(self.M, self.H, 'W2_ru')
+            self.W4_ru = sharedZeroMatrix(self.M, self.H, 'W3_ru')
+            self.b1_ru = sharedZeroVector(self.H, 'b1_ru', broadcastable=(False, True))
+            self.b2_ru = sharedZeroVector(self.H, 'b2_ru', broadcastable=(False, True))
+            self.b3_ru = sharedZeroVector(self.M, 'b2_ru', broadcastable=(False, True))
+            self.b4_ru = sharedZeroVector(self.M, 'b3_ru', broadcastable=(False, True))
 
             # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
             h1_ru = T.nnet.softplus(T.dot(self.W1_ru, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_ru)
@@ -502,8 +461,6 @@ class SGPDV(object):
         self.gradientVariables.extend(self.rX_vars)
         self.gradientVariables.extend(self.ru_vars)
 
-        #self.profmode = th.ProfileMode(optimizer='fast_run', linker=th.gof.OpWiseCLinker())
-
     def randomise(self, sig=1, rndQR=False):
 
         def rnd(var):
@@ -512,8 +469,6 @@ class SGPDV(object):
             elif var.name == 'y':
                 pass
             elif var.name == 'iterator':
-                pass
-            elif var.name == 'y_miniBatch':
                 pass
             elif var.name == 'jitter':
                 pass
@@ -739,33 +694,34 @@ class SGPDV(object):
         # but it tells theano the results is guaranteed to be scalar
         KL_qr_u_1 = nlinalg.trace((T.dot(upsilon_m_kappa_vec.T,
                                          T.dot(self.iUpsilon, upsilon_m_kappa_vec))))
-        KL_qr_u_1.name = 'KL_qr_u_1'
-        # These are definitely scalar
         KL_qr_u_2 = nlinalg.trace(T.dot(self.iUpsilon, Kuu_kron))
-        KL_qr_u_2.name = 'KL_qr_u_2'
         KL_qr_u_3 = self.logDetUpsilon - self.Q * self.logDetKuu
-        KL_qr_u_2.name = 'KL_qr_u_3'
         KL_qr_u = 0.5 * (KL_qr_u_1 + KL_qr_u_2 + KL_qr_u_3 - self.Q * self.M)
+                
+        KL_qr_u_1.name = 'KL_qr_u_1'
+        KL_qr_u_2.name = 'KL_qr_u_2'
+        KL_qr_u_2.name = 'KL_qr_u_3'
         KL_qr_u.name = 'KL_qr_u'
 
         phi_m_tau = self.phi - self.tau
-        phi_m_tau.name = 'phi_m_tau'
         phi_m_tau_vec = T.reshape(phi_m_tau, [self.B * self.R, 1])
-        phi_m_tau_vec.name = 'phi_m_tau_vec'
-
         # Not that the kron is the other way here compared to Kuu
         Phi_kron = slinalg.kron(self.Phi, T.eye(self.R))
+
+        phi_m_tau.name = 'phi_m_tau'
+        phi_m_tau_vec.name = 'phi_m_tau_vec'
         Phi_kron.name = 'Phi_kron'
 
         # Again, don't actually need a trace here from maths perspective
         KL_qr_X_1 = nlinalg.trace(T.dot(phi_m_tau_vec.T,
                                         T.dot(self.iTau, phi_m_tau_vec)))
-        KL_qr_X_1.name = 'KL_qr_X_1'
         KL_qr_X_2 = nlinalg.trace(T.dot(self.iTau, Phi_kron))
-        KL_qr_X_2.name = 'KL_qr_X_2'
         KL_qr_X_3 = self.logDetTau - self.logDetPhi
-        KL_qr_X_3.name = 'KL_qr_X_3'
         KL_qr_X = 0.5 * (KL_qr_X_1 + KL_qr_X_2 + KL_qr_X_3 - self.N * self.R)
+
+        KL_qr_X_1.name = 'KL_qr_X_1'
+        KL_qr_X_2.name = 'KL_qr_X_2'
+        KL_qr_X_3.name = 'KL_qr_X_3'
         KL_qr_X.name = 'KL_qr_X'
 
         KL = KL_qr_u + KL_qr_X
@@ -785,8 +741,6 @@ class SGPDV(object):
         self.updateFunction = th.function([], self.L, updates=updates, no_default_updates=True, profile=True)#,  mode=self.profmode)
 
     def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf):
-
-        self.lowerBounds = []
 
         startTime    = time.time()
         wallClockOld = startTime
@@ -830,6 +784,24 @@ class SGPDV(object):
 
         return self.lowerBounds
 
+    def init_Xu_from_Xf(self):
+        
+        Xf_min = np.zeros(self.R,)
+        Xf_max = np.zeros(self.R,)
+        Xf_locations = th.function([], self.phi, no_default_updates=True) # [B x R]
+        for b in range(self.numberofBatchesPerEpoch):
+            self.iterator.set_value(b) 
+            Xf_batch = Xf_locations()
+            Xf_min = np.min( (Xf_min, Xf_batch.min(axis=0)), axis=0)
+            Xf_max = np.max( (Xf_min, Xf_batch.max(axis=0)), axis=0)
+            
+        Xf_min.reshape(-1,1)
+        Xf_max.reshape(-1,1)
+        Df = Xf_max - Xf_min
+        Xu = np.random.rand(self.M, self.R) * Df + Xf_min # [M x R]
+        
+        self.Xu.set_value(Xu, borrow=True)
+        
     def sample(self):
 
         self.sample_alpha()
