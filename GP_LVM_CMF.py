@@ -63,6 +63,7 @@ class SGPDV(object):
                  data,                   # [NxP] matrix of observations
                  kernelType='RBF',
                  encoderType_qX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel'.
+                 encoderType_qu='Kernel',    # 'Kernel', 'MLP'
                  encoderType_rX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
                  encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
                  Xu_optimise=False,
@@ -105,10 +106,12 @@ class SGPDV(object):
         M_R_mat = np.zeros((self.M, self.R), dtype=precision)
         M_H_mat = np.zeros((self.M, self.H), dtype=precision)
         Q_M_mat = np.zeros((self.Q, self.M), dtype=precision)
+        Q_H_mat = np.zeros((self.Q, self.H), dtype=precision)
         R_H_mat = np.zeros((self.R, self.H), dtype=precision)
         R_vec   = np.zeros((self.R, 1), dtype=precision)
         H_vec   = np.zeros((self.H, 1), dtype=precision)
         M_vec   = np.zeros((self.M, 1), dtype=precision)
+        Q_vec   = np.zeros((self.Q, 1), dtype=precision)
         N_R_mat = np.zeros((self.N, self.R), dtype=precision)
         H_QpP_mat  = np.zeros((self.H, (self.Q + self.P)), dtype=precision)
         H_vec      = np.zeros((self.H, 1), dtype=precision)
@@ -201,7 +204,6 @@ class SGPDV(object):
         elif self.encoderType_qX == 'MLP':
 
             # Auto encode
-
             self.W1_qX = th.shared(H_P_mat, name='W1_qX')
             self.b1_qX = th.shared(H_vec,   name='b1_qX', broadcastable=(False, True))
             self.W2_qX = th.shared(R_H_mat, name='W2_qX')
@@ -254,16 +256,62 @@ class SGPDV(object):
         # Inducing points co-ordinates
         self.Xu = th.shared(M_R_mat, name='Xu')
 
-        # variational and auxiliary parameters
-        self.kappa = th.shared(Q_M_mat, name='kappa')
+        # Compute parameters of q(u)
+        if encoderType_qu == 'Kernel':
+            # Have a normal variational distribution over inducing values
+
+            self.kappa = th.shared(Q_M_mat, name='kappa')
+            self.Kuu = kfactory.kernel(self.Xu, None, self.log_theta, 'Kuu')
+            (self.cKuu, self.iKuu, self.logDetKuu) = cholInvLogDet(self.Kuu, self.M, self.jitter)
+            self.qu_vars = [self.log_theta, self.kappa, self.Xu]
+
+        elif self.encoderType_qu == 'MLP':
+
+            # # Auto encode
+            # self.W1_qu = th.shared(H_B_mat, name='W1_qu')
+            # self.b1_qu = th.shared(H_vec,   name='b1_qu', broadcastable=(False, True))
+            # self.W2_qu = th.shared(P_Q_mat, name='W2_qu')
+            # self.b2_qu = th.shared(H_vec,   name='b2_qu', broadcastable=(False, True))
+            # self.W3_qu = th.shared(M_H_vec, name='W3_qu')
+            # self.b3_qu = th.shared(M_vec,   name='b3_qu', broadcastable=(False, True))
+            # self.W4_qu = th.shared(M_H_vec, name='W4_qu')
+            # self.b4_qu = th.shared(M_vec,   name='b4_qu', broadcastable=(False, True))
+
+            # # [HxP] = softplus( [HxB] . [BxP]^T + repmat([Hx1],[1,P]) )
+            # h1_qu = T.nnet.softplus(T.dot(self.W1_qu, self.y_miniBatch.T) + self.b1_qu)
+            # # [HxQ] = softplus( [HxP] . [PxQ] + repmat([Hx1],[1,Q]) )
+            # h2_qu = T.nnet.softplus(T.dot(h1_qu, self.W2_qu) + self.b2_qu)
+            # # [MxQ] = sigmoid( [MxH] . [HxQ] + repmat([Mx1],[1,Q]) )
+            # mu_qu = T.nnet.sigmoid(T.dot(self.W3_qu, h2_qu) + self.b3_qu)
+            # # [1xB] = 0.5 * ( [1xH] . [HxB] + repmat([1x1],[1,B]) )
+            # log_sigma_qu = 0.5 * (T.dot(self.W4_qu, h2_qu) + self.b4_qu)
+
+            # h1_qu.name         = 'h1_qu'
+            # h2_qu.name         = 'h2_qu'
+            # mu_qu.name         = 'mu_qu' # kappa equivilent
+            # log_sigma_qu.name  = 'log_sigma_qu' # Kuu equivilent
+
+            # self.kappa  = mu_qu.T # [QxM]
+            # self.Kuu  = T.diag(T.exp(log_sigma_qu.flatten()))  # [BxB]
+            # self.iKuu = T.diag(T.exp(-log_sigma_qu.flatten()))  # [BxB]
+            # self.cKuu = T.diag(T.exp(0.5 * log_sigma_qu.flatten()))  # [BxB]
+            # self.logDetKuu = T.sum(log_sigma_qu)  # scalar
+
+            # self.kappa.name     = 'kappa(MLP)'
+            # self.Kuu.name       = 'Kuu(MLP)'
+            # self.iKuu.name      = 'iKuu(MLP)'
+            # self.cKuu.name      = 'cKuu(MLP)'
+            # self.logDetKuu.name = 'logDetKuu(MLP)'
+
+            # self.qu_vars = [self.log_theta, self.W1_qu, self.W2_qu, self.W3_qu, self.W4_qu, self.b1_qu, self.b2_qu, self.b3_qu, self.b4_qu]
+
+        else:
+            raise RuntimeError('Unrecognised encoding for q(u)')
 
         # Kernels
-        self.Kuu = kfactory.kernel(self.Xu, None,    self.log_theta, 'Kuu')
         self.Kff = kfactory.kernel(self.Xf, None,    self.log_theta, 'Kff')
         self.Kfu = kfactory.kernel(self.Xf, self.Xu, self.log_theta, 'Kfu')
 
-        # self.cKuu = slinalg.cholesky( self.Kuu )
-        (self.cKuu, self.iKuu, self.logDetKuu) = cholInvLogDet(self.Kuu, self.M, self.jitter)
         # Variational distribution
         self.Sigma  = self.Kff - T.dot(self.Kfu, T.dot(self.iKuu, self.Kfu.T))
         self.Sigma.name = 'Sigma'
@@ -283,7 +331,6 @@ class SGPDV(object):
         self.f.name  = 'f'
         self.z.name  = 'z'
 
-        self.qu_vars = [self.log_theta, self.kappa]
         self.qf_vars = [self.log_sigma]
 
         if self.encoderType_rX == 'FreeForm':
@@ -383,23 +430,42 @@ class SGPDV(object):
 
         elif self.encoderType_ru == 'MLP':
 
-            self.W1_ru = th.shared(H_B_mat, name='W1_ru')
-            self.b1_ru = th.shared(H_vec,   name='b1_ru', broadcastable=(False, True))
-            self.W2_ru = th.shared(M_H_mat, name='W2_ru')
-            self.b2_ru = th.shared(M_vec,   name='b2_ru', broadcastable=(False, True))
-            self.W3_ru = th.shared(M_H_mat, name='W3_ru')
-            self.b3_ru = th.shared(M_vec,   name='b3_ru', broadcastable=(False, True))
+            # self.W1_ru = th.shared(H_B_mat, name='W1_ru')
+            # self.b1_ru = th.shared(H_vec,   name='b1_ru', broadcastable=(False, True))
+            # self.W2_ru = th.shared(M_H_mat, name='W2_ru')
+            # self.b2_ru = th.shared(M_vec,   name='b2_ru', broadcastable=(False, True))
+            # self.W3_ru = th.shared(M_H_mat, name='W3_ru')
+            # self.b3_ru = th.shared(M_vec,   name='b3_ru', broadcastable=(False, True))
 
-            # [HxQ] = softplus( [HxB)] . [QxB]^T + repmat([Hx1], [1,B]) )
-            h_ru = T.nnet.softplus(T.dot(self.W1_ru, self.z.T) + self.b1_ru)
-            # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
-            mu_ru = T.nnet.sigmoid(T.dot(self.W2_ru, h_ru) + self.b2_ru)
-            # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
-            log_sigma_ru = 0.5 * (T.dot(self.W3_ru, h_ru) + self.b3_ru)
+            # # [HxQ] = softplus( [HxB)] . [QxB]^T + repmat([Hx1], [1,B]) )
+            # h_ru = T.nnet.softplus(T.dot(self.W1_ru, self.z.T) + self.b1_ru)
+            # # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
+            # mu_ru = T.nnet.sigmoid(T.dot(self.W2_ru, h_ru) + self.b2_ru)
+            # # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
+            # log_sigma_ru = 0.5 * (T.dot(self.W3_ru, h_ru) + self.b3_ru)
 
-            h_ru.name         = 'h_ru'
-            mu_ru.name        = 'mu_ru'
-            log_sigma_ru.name = 'log_sigma_ru'
+            self.W1_ru = th.shared(H_QpP_mat, name='W1_ru')
+            self.b1_ru = th.shared(H_vec,     name='b1_ru', broadcastable=(False, True))
+            self.W2_ru = th.shared(B_Q_mat,   name='W2_ru')
+            self.b2_ru = th.shared(H_vec,     name='b2_ru', broadcastable=(False, True))
+            self.W3_ru = th.shared(M_H_mat,   name='W2_ru')
+            self.b3_ru = th.shared(M_vec,     name='b2_ru', broadcastable=(False, True))
+            self.W4_ru = th.shared(M_H_mat,   name='W3_ru')
+            self.b4_ru = th.shared(M_vec,     name='b3_ru', broadcastable=(False, True))
+
+            # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
+            h1_ru = T.nnet.softplus(T.dot(self.W1_ru, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_ru)
+            # [HxQ] = softplus( [HxB] . [BxQ] + repmat([Hx1], [1,Q]) )
+            h2_ru = T.nnet.softplus(T.dot(h1_ru, self.W2_ru) + self.b2_ru)
+            # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Hx1], [1,Q]) )
+            mu_ru = T.nnet.sigmoid(T.dot(self.W3_ru, h2_ru) + self.b3_ru)
+            # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Hx1], [1,Q]) )
+            log_sigma_ru = 0.5 * (T.dot(self.W4_ru, h2_ru) + self.b4_ru)
+
+            h1_ru.name         = 'h1_ru'
+            h2_ru.name         = 'h2_ru'
+            mu_ru.name         = 'mu_ru'
+            log_sigma_ru.name  = 'log_sigma_ru'
 
             self.upsilon = mu_ru.T
             self.Upsilon = T.diag(T.flatten(T.exp(log_sigma_ru.T)))
@@ -413,7 +479,7 @@ class SGPDV(object):
             self.iUpsilon.name = 'iUpsilon'
             self.logDetUpsilon.name = 'logDetUpsilon'
 
-            self.ru_vars = [self.W1_ru, self.W2_ru, self.W3_ru, self.b1_ru, self.b2_ru, self.b3_ru]
+            self.ru_vars = [self.W1_ru, self.W2_ru, self.W3_ru, self.W4_ru, self.b1_ru, self.b2_ru, self.b3_ru, self.b4_ru]
 
         elif self.encoderType_ru == 'Kernel':
             raise RuntimeError('Kernel encoding of r(u|z) not implemented')
@@ -719,7 +785,7 @@ class SGPDV(object):
 
     def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf):
 
-        lowerBounds = []
+        self.lowerBounds = []
 
         startTime    = time.time()
         wallClockOld = startTime
@@ -751,7 +817,7 @@ class SGPDV(object):
                 print("\n Ep %d It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
                       % (ep, it, wallClock, stepTime, self.lowerBound))
 
-                lowerBounds.append((self.lowerBound, wallClock))
+                self.lowerBounds.append((self.lowerBound, wallClock))
 
                 if ep * self.numberofBatchesPerEpoch + it > maxIters:
                     break
@@ -761,7 +827,7 @@ class SGPDV(object):
             # pbar.update(ep*numberOfIterations+it)
         # pbar.finish()
 
-        return lowerBounds
+        return self.lowerBounds
 
     def sample(self):
 

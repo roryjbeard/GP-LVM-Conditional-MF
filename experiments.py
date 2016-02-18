@@ -1,4 +1,4 @@
-import GP_LVM_CMF
+from Auto_encoder_model import VA
 import utils
 import config
 
@@ -6,6 +6,8 @@ import os
 import cPickle as pkl
 import argparse
 import numpy as np
+
+maxEpochPower = 5
 
 def save_checkpoint(directory_name, i, model, srng):
     '''Saves model and state of random number generator as a pickle file named training_state[i].pkl'''
@@ -41,12 +43,12 @@ def post_experiment(directory_name, dataset, model):
 
     num_samples_for_likelihood = 5000
 
-    marginal_log_likelihood_train =
+    lowerbounds = model.lowerbounds
 
-    marginal_log_likelihood_test =
+    marginal_log_likelihood_test = model.
 
 
-    with open(os.path.join(directory_name, "train_log_likelihood_{}_samples.txt".format(num_samples_for_likelihood)), "w") as f:
+    with open(os.path.join(directory_name, "train_log_likelihood_{}_maxEpPow.txt".format(maxEpochPower)), "w") as f:
         f.write(str(marginal_log_likelihood_train))
 
     with open(os.path.join(directory_name, "test_log_likelihood_{}_samples.txt".format(num_samples_for_likelihood)), "w") as f:
@@ -75,19 +77,18 @@ def load_dataset_from_name(dataset):
 
 def training_experiment(directory_name,
             dataset,
-            n_induce,
-            batch_size,
+            numberOfInducingPoints,
+            batchSize,
             dimX,
             dimZ,
-            kernelType_='RBF',
-            autoenc_qX,
-            autoenc_rX,
-            autoenc_ru,
-            enc_type,
-            z_optimise,
+            kernelType,
+            encoderType_qX,
+            encoderType_rX,
+            encoderType_ru,
+            Xu_optimise,
             phi_optimise,
-            HU_encoder,
-            HU_decoder,
+            numHiddenUnits_encoder,
+            numHiddentUnits_decoder,
             checkpoint=-1):
 
     def checkpoint0(dataset):
@@ -98,27 +99,32 @@ def training_experiment(directory_name,
 
         load_dataset_from_name(dataset)
 
-        va = VA(n_induce,
-        batch_size,
-        dimX,
-        dimZ,
-        x_train,
-        HU_encoder,
-        HU_decoder,
-        kernelType_='RBF',
-        continuous,
-        encode_qX=autoenc_qX,
-        encode_rX=autoenc_rX,
-        encode_ru=autoenc_ru,
-        encode_type=enc_type,
-        z_optimise,
-        phi_optimise)
+        model = VA(
+            numberOfInducingPoints, # Number of inducing ponts in sparse GP
+            batchSize,              # Size of mini batch
+            dimX,                   # Dimensionality of the latent co-ordinates
+            dimZ,                   # Dimensionality of the latent variables
+            x_train,                   # [NxP] matrix of observations
+            kernelType=kernelType,
+            encoderType_qX=encoderType_qX,  # 'FreeForm', 'MLP', 'Kernel'.
+            encoderType_rX=encoderType_rX,  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+            encoderType_ru=encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
+            Xu_optimise=Xu_optimise,
+            numHiddenUnits_encoder=numHiddenUnits_encoder,
+            numHiddentUnits_decoder=numHiddentUnits_decoder,
+            continuous=continuous
+        )
 
-        va.construct_L()
-        va.setHyperparameters(0.01, 5*np.ones((2,)),
+        model.construct_L_using_r()
+
+        model.setKernelParameters(0.01, 5*np.ones((2,)),
             1e-100, 0.5,
             [1e-10,1e-10], [10,10] )
-        model = va.randomise()
+
+        model.randomise()
+
+        model.constructUpdateFunction()
+        model = model.randomise()
 
         srng = utils.srng()
 
@@ -126,7 +132,7 @@ def training_experiment(directory_name,
 
     def checkpoint1to8(i, model, srng):
         learning_rate = 1e-4*round(10.**(1-(i-1)/7.), 1)
-        model.train_adagrad( numberOfIterations=None, numberOfEpochs=3**(i-1), learningRate=learning_rate )
+        model.train(numberOfEpochs=3**(i-1), learningRate=learning_rate )
 
         return model, srng
 
@@ -142,10 +148,10 @@ def training_experiment(directory_name,
         save_checkpoint(directory_name, 0, model, srng)
         loaded_checkpoint = 0
 
-    for i in range(loaded_checkpoint+1, 9):
+    for i in range(loaded_checkpoint+1, maxEpochPower+1):
         model, optimizer, srng = checkpoint1to8(i, dataset, model, srng)
         save_checkpoint(directory_name, i, model, srng)
-    loaded_checkpoint = 8
+    loaded_checkpoint = maxEpochPower
 
     post_experiment(directory_name, dataset, model)
 
@@ -207,18 +213,33 @@ if __name__ == '__main__':
 
     training_experiment(directory_name,
                 dataset=args.dataset,
-                n_induce=args.induce,
-                batch_size=args.batchsize,
+                numberOfInducingPoints=args.induce,
+                batchSize=args.batchsize,
                 dimX=args.dimX,
                 dimZ=args.dimZ,
-                kernelType_='RBF',
-                encode_qX=args.autoenc_qX,
-                encode_rX=args.autoenc_rX,
-                encode_ru=args.autoenc_ru,
-                enc_type=args.autoenc_type,
+                kernelType='RBF',
+                encoderType_qX=args.autoenc_qX,
+                encoderType_rX=args.autoenc_rX,
+                encoderType_ru=args.autoenc_ru,
                 z_optimise,
                 phi_optimise,
                 HU_encoder,
                 HU_decoder=args.hunits,
                 checkpoint=args.checkpoint):
+
+    (directory_name,
+            dataset,
+            numberOfInducingPoints,
+            batchSize,
+            dimX,
+            dimZ,
+            kernelType,
+            encoderType_qX,
+            encoderType_rX,
+            encoderType_ru,
+            Xu_optimise,
+            phi_optimise,
+            numHiddenUnits_encoder,
+            numHiddentUnits_decoder,
+            checkpoint=-1):
 

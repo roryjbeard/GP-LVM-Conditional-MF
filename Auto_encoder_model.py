@@ -26,6 +26,7 @@ class VA(SGPDV):
             data,                   # [NxP] matrix of observations
             kernelType='RBF',
             encoderType_qX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel'.
+            encoderType_qu='Kernel',    # 'Kernel', 'MLP'
             encoderType_rX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
             encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
             Xu_optimise=False,
@@ -42,6 +43,7 @@ class VA(SGPDV):
             data,                   # [NxP] matrix of observations
             kernelType,
             encoderType_qX,
+            encoderType_qu,
             encoderType_rX,
             encoderType_ru,
             Xu_optimise,
