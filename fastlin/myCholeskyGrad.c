@@ -61,7 +61,7 @@ int APPLY_SPECIFIC(apply_cholesky_grad)(PyArrayObject* input0,
         PyArray_Descr* npy_float64_descr = PyArray_DescrFromType(NPY_FLOAT64);
 
         L = (PyArrayObject*) PyArray_FromAny((PyObject*)input1, npy_float64_descr, 2, 2, NPY_ARRAY_F_CONTIGUOUS, NULL);
-        F = (PyArrayObject*) PyArray_FromAny((PyObject*)input2, npy_float64_descr, 2, 2, NPY_ARRAY_F_CONTIGUOUS, NULL);
+        F = (PyArrayObject*) PyArray_FromAny((PyObject*)input2, npy_float64_descr, 2, 2, NPY_ARRAY_F_CONTIGUOUS|NPY_ARRAY_ENSURECOPY, NULL);
  
         if(L == NULL || F == NULL) {
             rCode = 2;
@@ -98,7 +98,7 @@ int APPLY_SPECIFIC(apply_cholesky_grad)(PyArrayObject* input0,
             PyErr_Format(PyExc_ValueError, "cholgrad library returned error code %d\n", info);
         }
         // We don't need the reference to L anymore
-        Py_XDECREF(L);
+        //Py_XDECREF(L); // Don't think we need this
     }
 
     if(!rCode) {
@@ -111,14 +111,15 @@ int APPLY_SPECIFIC(apply_cholesky_grad)(PyArrayObject* input0,
 
         // Get descriptor of output type
         PyArray_Descr* output_descr =  PyArray_DescrFromType(TYPENUM_OUTPUT_0);
-	// Copy the F to the right type format for the output: Can use C or F memory styles
+	    // Copy the F to the right type format for the output: Can use C or F memory styles
         *output0 = (PyArrayObject*) PyArray_FromAny((PyObject*)F, output_descr, 2, 2, NPY_ARRAY_F_CONTIGUOUS|NPY_ARRAY_FORCECAST, NULL);
         if(*output0 == NULL) {
             rCode = 4;
             PyErr_Format(PyExc_ValueError, "Could not allocate output storage");
         }
         // Don't need the reference to F anymore
-        Py_XDECREF(F);
+        //Py_XDECREF(F); // Don't think we need this
+        Py_XDECREF(output_descr);
     }
 
     return rCode;
