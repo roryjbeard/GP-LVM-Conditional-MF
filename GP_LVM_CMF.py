@@ -105,10 +105,12 @@ class SGPDV(object):
         M_R_mat = np.zeros((self.M, self.R), dtype=precision)
         M_H_mat = np.zeros((self.M, self.H), dtype=precision)
         Q_M_mat = np.zeros((self.Q, self.M), dtype=precision)
+        Q_H_mat = np.zeros((self.Q, self.H), dtype=precision)
         R_H_mat = np.zeros((self.R, self.H), dtype=precision)
         R_vec   = np.zeros((self.R, 1), dtype=precision)
         H_vec   = np.zeros((self.H, 1), dtype=precision)
         M_vec   = np.zeros((self.M, 1), dtype=precision)
+        Q_vec   = np.zeros((self.Q, 1), dtype=precision)
         N_R_mat = np.zeros((self.N, self.R), dtype=precision)
         H_QpP_mat  = np.zeros((self.H, (self.Q + self.P)), dtype=precision)
         H_vec      = np.zeros((self.H, 1), dtype=precision)
@@ -254,6 +256,82 @@ class SGPDV(object):
         # Inducing points co-ordinates
         self.Xu = th.shared(M_R_mat, name='Xu')
 
+        ################ MAJOR EDIT ###########################################
+
+        # Compute parameters of q(u)
+        if encoderType_qu == 'FreeForm':
+            # Have a normal variational distribution over inducing values
+
+            self.kappa = th.shared(Q_M_mat, name='kappa')
+
+            # Kernels
+            self.Kuu = kfactory.kernel(self.Xu, None,    self.log_theta, 'Kuu')
+            self.Kff = kfactory.kernel(self.Xf, None,    self.log_theta, 'Kff')
+            self.Kfu = kfactory.kernel(self.Xf, self.Xu, self.log_theta, 'Kfu')
+
+            # self.cKuu = slinalg.cholesky( self.Kuu )
+            (self.cKuu, self.iKuu, self.logDetKuu) = cholInvLogDet(self.Kuu, self.M, self.jitter)
+
+            self.qu_vars = []
+
+        elif self.encoderType_qu == 'MLP':
+
+            # Auto encode
+
+            self.W1_qu = th.shared(H_B_mat, name='W1_qu')
+            self.b1_qu = th.shared(H_vec,   name='b1_qu', broadcastable=(False, True))
+            self.W2_qu = th.shared(P_Q_mat, name='W2_qu')
+            self.b2_qu = th.shared(H_vec,   name='b2_qu', broadcastable=(False, True))
+            self.W3_qu = th.shared(M_H_vec, name='W3_qu')
+            self.b3_qu = th.shared(M_vec,   name='b3_qu', broadcastable=(False, True))
+            self.W4_qu = th.shared(M_H_vec, name='W4_qu')
+            self.b4_qu = th.shared(M_vec,   name='b4_qu', broadcastable=(False, True))
+
+            # [HxP] = softplus( [HxB] . [BxP]^T + repmat([Hx1],[1,P]) )
+            h1_qu = T.nnet.softplus(T.dot(self.W1_qu, self.y_miniBatch.T) + self.b1_qu)
+            # [HxQ] = softplus( [HxP] . [PxQ] + repmat([Hx1],[1,Q]) )
+            h2_qu = T.nnet.softplus(T.dot(h1_qu, self.W2_qu) + self.b2_qu)
+            # [MxQ] = sigmoid( [MxH] . [HxQ] + repmat([Mx1],[1,Q]) )
+            mu_qu = T.nnet.sigmoid(T.dot(self.W3_qu, h2_qu) + self.b3_qu)
+            # [1xB] = 0.5 * ( [1xH] . [HxB] + repmat([1x1],[1,B]) )
+            log_sigma_qu = 0.5 * (T.dot(self.W4_qu, h2_qu) + self.b4_qu)
+
+            h1_qu.name         = 'h1_qu'
+            h2_qu.name         = 'h2_qu'
+            mu_qu.name         = 'mu_qu'
+            log_sigma_qu.name  = 'log_sigma_qu'
+
+            ************* GOT UP TO HERE **************************************
+
+            self.phi  = mu_qX.T  # [BxR]
+            self.Phi  = T.diag(T.exp(log_sigma_qX.flatten()))  # [BxB]
+            self.iPhi = T.diag(T.exp(-log_sigma_qX.flatten()))  # [BxB]
+            self.cPhi = T.diag(T.exp(0.5 * log_sigma_qX.flatten()))  # [BxB]
+            self.logDetPhi = T.sum(log_sigma_qX)  # scalar
+
+            self.phi.name       = 'phi'
+            self.Phi.name       = 'Phi'
+            self.iPhi.name      = 'iPhi'
+            self.cPhi.name      = 'cPhi'
+            self.logDetPhi.name = 'logDetPhi'
+
+            self.qX_vars = [self.W1_qX, self.W2_qX, self.W3_qX, self.b1_qX, self.b2_qX, self.b3_qX]
+
+        elif self.encoderType_qX == 'Kernel':
+
+            # Draw the latent coordinates from a GP with data co-ordinates
+            self.Phi = kfactory.kernel(self.y_miniBatch, None, self.log_gamma, 'Phi')
+            self.phi = th.shared(B_R_mat, name='phi')
+            (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, self.jitter)
+
+            self.qX_vars = [self.log_gamma]
+
+        else:
+            raise RuntimeError('Unrecognised encoding for q(X)')
+
+
+        #######################################################################
+
         # variational and auxiliary parameters
         self.kappa = th.shared(Q_M_mat, name='kappa')
 
@@ -383,23 +461,42 @@ class SGPDV(object):
 
         elif self.encoderType_ru == 'MLP':
 
-            self.W1_ru = th.shared(H_B_mat, name='W1_ru')
-            self.b1_ru = th.shared(H_vec,   name='b1_ru', broadcastable=(False, True))
-            self.W2_ru = th.shared(M_H_mat, name='W2_ru')
-            self.b2_ru = th.shared(M_vec,   name='b2_ru', broadcastable=(False, True))
-            self.W3_ru = th.shared(M_H_mat, name='W3_ru')
-            self.b3_ru = th.shared(M_vec,   name='b3_ru', broadcastable=(False, True))
+            # self.W1_ru = th.shared(H_B_mat, name='W1_ru')
+            # self.b1_ru = th.shared(H_vec,   name='b1_ru', broadcastable=(False, True))
+            # self.W2_ru = th.shared(M_H_mat, name='W2_ru')
+            # self.b2_ru = th.shared(M_vec,   name='b2_ru', broadcastable=(False, True))
+            # self.W3_ru = th.shared(M_H_mat, name='W3_ru')
+            # self.b3_ru = th.shared(M_vec,   name='b3_ru', broadcastable=(False, True))
 
-            # [HxQ] = softplus( [HxB)] . [QxB]^T + repmat([Hx1], [1,B]) )
-            h_ru = T.nnet.softplus(T.dot(self.W1_ru, self.z.T) + self.b1_ru)
-            # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
-            mu_ru = T.nnet.sigmoid(T.dot(self.W2_ru, h_ru) + self.b2_ru)
-            # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
-            log_sigma_ru = 0.5 * (T.dot(self.W3_ru, h_ru) + self.b3_ru)
+            # # [HxQ] = softplus( [HxB)] . [QxB]^T + repmat([Hx1], [1,B]) )
+            # h_ru = T.nnet.softplus(T.dot(self.W1_ru, self.z.T) + self.b1_ru)
+            # # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
+            # mu_ru = T.nnet.sigmoid(T.dot(self.W2_ru, h_ru) + self.b2_ru)
+            # # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Mx1], [1,B]) )
+            # log_sigma_ru = 0.5 * (T.dot(self.W3_ru, h_ru) + self.b3_ru)
 
-            h_ru.name         = 'h_ru'
-            mu_ru.name        = 'mu_ru'
-            log_sigma_ru.name = 'log_sigma_ru'
+            self.W1_ru = th.shared(H_QpP_mat, name='W1_ru')
+            self.b1_ru = th.shared(H_vec,     name='b1_ru', broadcastable=(False, True))
+            self.W2_ru = th.shared(B_Q_mat,   name='W2_ru')
+            self.b2_ru = th.shared(H_vec,     name='b2_ru', broadcastable=(False, True))
+            self.W3_ru = th.shared(M_H_mat,   name='W2_ru')
+            self.b3_ru = th.shared(M_vec,     name='b2_ru', broadcastable=(False, True))
+            self.W4_ru = th.shared(M_H_mat,   name='W3_ru')
+            self.b4_ru = th.shared(M_vec,     name='b3_ru', broadcastable=(False, True))
+
+            # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
+            h1_ru = T.nnet.softplus(T.dot(self.W1_ru, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_ru)
+            # [HxQ] = softplus( [HxB] . [BxQ] + repmat([Hx1], [1,Q]) )
+            h2_ru = T.nnet.softplus(T.dot(h1_ru, self.W2_ru) + self.b2_ru)
+            # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Hx1], [1,Q]) )
+            mu_ru = T.nnet.sigmoid(T.dot(self.W3_ru, h2_ru) + self.b3_ru)
+            # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Hx1], [1,Q]) )
+            log_sigma_ru = 0.5 * (T.dot(self.W4_ru, h2_ru) + self.b4_ru)
+
+            h1_ru.name         = 'h1_ru'
+            h2_ru.name         = 'h2_ru'
+            mu_ru.name         = 'mu_ru'
+            log_sigma_ru.name  = 'log_sigma_ru'
 
             self.upsilon = mu_ru.T
             self.Upsilon = T.diag(T.flatten(T.exp(log_sigma_ru.T)))
@@ -716,7 +813,7 @@ class SGPDV(object):
 
     def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf):
 
-        lowerBounds = []
+        self.lowerBounds = []
 
         startTime    = time.time()
         wallClockOld = startTime
@@ -749,7 +846,7 @@ class SGPDV(object):
                 print("\n Ep %d It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
                       % (ep, it, wallClock, stepTime, self.lowerBound))
 
-                lowerBounds.append((self.lowerBound, wallClock))
+                self.lowerBounds.append((self.lowerBound, wallClock))
 
                 if ep * self.numberofBatchesPerEpoch + it > maxIters:
                     break
@@ -759,7 +856,7 @@ class SGPDV(object):
             # pbar.update(ep*numberOfIterations+it)
         # pbar.finish()
 
-        return lowerBounds
+        return self.lowerBounds
 
     def sample(self):
 
