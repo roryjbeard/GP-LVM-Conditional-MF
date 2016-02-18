@@ -4,6 +4,7 @@ from theano import tensor as T
 from theano.tensor import slinalg, nlinalg
 from fastlin.myCholesky import myCholesky
 
+precision = th.config.floatX
 
 def t_repeat(x, num_repeats, axis):
     '''Repeats x along an axis num_repeats times. Axis has to be 0 or 1, x has to be a matrix.'''
@@ -34,7 +35,7 @@ def invLogDet( C ):
     
 def jitterChol(A, dim, jitter):
 
-    A_jitter = A + jitter * T.eye(dim, dtype='float32')
+    A_jitter = A + jitter * T.eye(dim, dtype=precision)
 
     # cA = slinalg.cholesky(A_jitter)
     # D, V = T.nlinalg.Eigh()(A_jitter)

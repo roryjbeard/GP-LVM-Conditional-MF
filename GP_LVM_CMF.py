@@ -101,6 +101,7 @@ class SGPDV(object):
 
         # Suitably sized zero matrices
         B_R_mat = np.zeros((self.B, self.R), dtype=precision)
+        B_Q_mat = np.zeros((self.B, self.Q), dtype=precision)
         H_P_mat = np.zeros((self.H, self.P), dtype=precision)
         H_B_mat = np.zeros((self.H, self.B), dtype=precision)
         M_R_mat = np.zeros((self.M, self.R), dtype=precision)
@@ -266,7 +267,7 @@ class SGPDV(object):
             self.qu_vars = [self.log_theta, self.kappa, self.Xu]
 
         elif self.encoderType_qu == 'MLP':
-
+            raise RuntimeError('Don''t do this')
             # # Auto encode
             # self.W1_qu = th.shared(H_B_mat, name='W1_qu')
             # self.b1_qu = th.shared(H_vec,   name='b1_qu', broadcastable=(False, True))
