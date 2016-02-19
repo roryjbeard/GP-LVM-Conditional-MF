@@ -167,10 +167,10 @@ class SGPDV(object):
             if encoderType_qX == 'FreeForm1':
 
                 self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
-                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]                
+                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
                 self.Phi = T.dot(Phi_batch_sqrt, Phi_batch_sqrt.T)
 
-                Phi_batch_sqrt.name = 'Phi_batch_sqrt'                
+                Phi_batch_sqrt.name = 'Phi_batch_sqrt'
                 self.Phi.name = 'Phi'
 
                 (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, self.jitter)
@@ -178,7 +178,7 @@ class SGPDV(object):
                 self.qX_vars = [self.Phi_full_sqrt, self.phi_full]
 
             else:
-                
+
                 self.Phi_full_diag = sharedZeroArray(self.N, 'Phi_full_diag')
 
                 Phi_batch_diag = self.Phi_full_diag[self.currentBatch]
@@ -325,25 +325,25 @@ class SGPDV(object):
             TauIdx = (self.TauRange[self.currentBatch, :]).flatten()
 
             if self.encoderType_rX == 'FreeForm1':
-                
+
                 self.Tau_full_sqrt = sharedZeroMatrix(self.N * self.R, self.N * self.R, 'Tau_full_sqrt')
                 Tau_batch_sqrt = self.Tau_full_sqrt[TauIdx][:, TauIdx]
                 self.Tau = T.dot(Tau_batch_sqrt, Tau_batch_sqrt.T)
 
                 Tau_batch_sqrt.name = 'Tau_batch_sqrt'
                 self.Tau.name = 'Tau'
-                
+
                 (self.cTau, self.iTau, self.logDetTau) = cholInvLogDet(self.Tau, self.B * self.R, self.jitter)
 
-                self.rX_vars = [self.Tau_full_sqrt, self.tau_full]                
-                                
+                self.rX_vars = [self.Tau_full_sqrt, self.tau_full]
+
             elif self.encoderType_rX == 'FreeForm2':
-                
+
                 self.Tau_full_diag = sharedZeroArray(self.N * self.R, 'Tau_full_diag')
                 Tau_batch_diag = self.Tau_full_diag[TauIdx]
-                
+
                 Tau_batch_diag.name = 'Tau_batch_diag'
-                
+
                 (self.Tau, self.cTau, self.iTau, self.logDetTau)  \
                      = diagCholInvLogDet_fromDiag(Tau_batch_diag, 'Tau')
 
@@ -371,7 +371,7 @@ class SGPDV(object):
 
             self.tau  = mu_rX.T
             (self.Tau, self.cTau, self.iTau, self.logDetTau) \
-                = diagCholInvLogDet_fromLogDiag(log_sigma_rX)
+                = diagCholInvLogDet_fromLogDiag(log_sigma_rX, 'Tau')
 
             self.rX_vars = [self.W1_rX, self.W2_rX, self.W3_rX, self.b1_rX, self.b2_rX, self.b3_rX]
 
@@ -493,7 +493,8 @@ class SGPDV(object):
                 pass
             elif var.name.startswith('W1') or \
                     var.name.startswith('W2') or \
-                    var.name.startswith('W3'):
+                    var.name.startswith('W3') or \
+                    var.name.startswith('W4'):
                 print 'Randomising ' + var.name
                 # Hidden layer weights are uniformly sampled from a symmetric interval
                 # following [Xavier, 2010]
@@ -709,18 +710,18 @@ class SGPDV(object):
 
         # We don't actually need a trace here (mathematically),
         # but it tells theano the results is guaranteed to be scalar
-        #KL_qr_u_1 = nlinalg.trace((T.dot(upsilon_m_kappa_vec.T,
-        #                                 T.dot(self.iUpsilon, upsilon_m_kappa_vec))))
-        #KL_qr_u_2 = nlinalg.trace(T.dot(self.iUpsilon, Kuu_kron))
-        #KL_qr_u_3 = self.logDetUpsilon - self.Q * self.logDetKuu
-        #KL_qr_u = 0.5 * (KL_qr_u_1 + KL_qr_u_2 + KL_qr_u_3 - self.Q * self.M)
-                
-        #KL_qr_u_1.name = 'KL_qr_u_1'
-        #KL_qr_u_2.name = 'KL_qr_u_2'
-        #KL_qr_u_2.name = 'KL_qr_u_3'
-        #KL_qr_u.name = 'KL_qr_u'
+        KL_qr_u_1 = nlinalg.trace((T.dot(upsilon_m_kappa_vec.T,
+                                        T.dot(self.iUpsilon, upsilon_m_kappa_vec))))
+        KL_qr_u_2 = nlinalg.trace(T.dot(self.iUpsilon, Kuu_kron))
+        KL_qr_u_3 = self.logDetUpsilon - self.Q * self.logDetKuu
+        KL_qr_u = 0.5 * (KL_qr_u_1 + KL_qr_u_2 + KL_qr_u_3 - self.Q * self.M)
 
-        KL_qr_u = T.sum(self.Upsilon_diag) + T.sum(self.upsilon) + T.sum(Kuu_kron) + T.sum(upsilon_m_kappa_vec)
+        KL_qr_u_1.name = 'KL_qr_u_1'
+        KL_qr_u_2.name = 'KL_qr_u_2'
+        KL_qr_u_2.name = 'KL_qr_u_3'
+        KL_qr_u.name = 'KL_qr_u'
+
+        # KL_qr_u_DEBUG = T.sum(self.Upsilon_diag) + T.sum(self.upsilon) + T.sum(Kuu_kron) + T.sum(upsilon_m_kappa_vec)
 
         phi_m_tau = self.phi - self.tau
         phi_m_tau_vec = T.reshape(phi_m_tau, [self.B * self.R, 1])
@@ -803,23 +804,23 @@ class SGPDV(object):
         return self.lowerBounds
 
     def init_Xu_from_Xf(self):
-        
+
         Xf_min = np.zeros(self.R,)
         Xf_max = np.zeros(self.R,)
         Xf_locations = th.function([], self.phi, no_default_updates=True) # [B x R]
         for b in range(self.numberofBatchesPerEpoch):
-            self.iterator.set_value(b) 
+            self.iterator.set_value(b)
             Xf_batch = Xf_locations()
             Xf_min = np.min( (Xf_min, Xf_batch.min(axis=0)), axis=0)
             Xf_max = np.max( (Xf_min, Xf_batch.max(axis=0)), axis=0)
-            
+
         Xf_min.reshape(-1,1)
         Xf_max.reshape(-1,1)
         Df = Xf_max - Xf_min
         Xu = np.random.rand(self.M, self.R) * Df + Xf_min # [M x R]
-        
+
         self.Xu.set_value(Xu, borrow=True)
-        
+
     def sample(self):
 
         self.sample_alpha()
