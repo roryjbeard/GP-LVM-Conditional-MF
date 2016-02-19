@@ -340,7 +340,7 @@ class SGPDV(object):
             elif self.encoderType_rX == 'FreeForm2':
 
                 self.Tau_full_diag = sharedZeroArray(self.N * self.R, 'Tau_full_diag')
-                Tau_batch_diag = self.Tau_full_diag[TauIdx]
+                Tau_batch_diag = T.exp(self.Tau_full_diag[TauIdx])
 
                 Tau_batch_diag.name = 'Tau_batch_diag'
 
@@ -516,7 +516,10 @@ class SGPDV(object):
 
             elif type(var) == T.sharedvar.TensorSharedVariable:
                 print 'Randomising ' + var.name
-                var.set_value(rnd(var.get_value()))
+                tmp =rnd(var.get_value())
+                if var.name.endswith('diag'):
+                    tmp = np.exp(tmp)
+                var.set_value(tmp)
             elif type(var) == T.sharedvar.ScalarSharedVariable:
                 print 'Randomising ' + var.name
                 var.set_value(np.random.randn())

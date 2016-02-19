@@ -13,6 +13,7 @@ from theano.tensor import nlinalg
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
 from utils import sharedZeroMatrix, sharedZeroVector, log_mean_exp_stable
+from theano.compile.nanguardmode import NanGuardMode
 
 precision = th.config.floatX
 
