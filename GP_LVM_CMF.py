@@ -103,7 +103,7 @@ class SGPDV(object):
 
         self.lowerBound = -np.inf  # Lower bound
 
-        self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
+        self.numberofBatchesPerEpoch = int(np.ceil(self.N / float(self.B)))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
         self.batchStream = srng.permutation(n=self.N)
@@ -778,9 +778,8 @@ class SGPDV(object):
             self.epochSample()
 
             for it in range(self.numberofBatchesPerEpoch):
-
+                self.iterator.set_value(it)
                 self.sample()
-                self.iterator.set_value(self.iterator.get_value() + 1)
                 lbTmp = self.jitterProtect(self.updateFunction, reset=False)
                 # self.constrainKernelParameters()
 
