@@ -25,10 +25,10 @@ class VA(SGPDV):
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
             kernelType='RBF',
-            encoderType_qX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel'.
+            encoderType_qX='FreeForm2',  # 'FreeForm1', 'FreeForm2','MLP', 'Kernel'.
             encoderType_qu='Kernel',    # 'Kernel', 'MLP'
-            encoderType_rX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
-            encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
+            encoderType_rX='FreeForm2',  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel', 'NoEncoding'.
+            encoderType_ru='FreeForm2',  # 'FreeForm', 'MLP', 'NoEncoding'
             Xu_optimise=False,
             numHiddenUnits_encoder=0,
             numHiddentUnits_decoder=10,
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     np.random.seed(1)
 
     #nnumberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits
-    va = VA( 3, 20, 2, 2, np.random.rand(40,3), encoderType_qX='FreeForm', encoderType_rX='FreeForm', encoderType_ru='FreeForm')
+    va = VA( 3, 20, 2, 2, np.random.rand(40,3), encoderType_qX='FreeForm2', encoderType_rX='FreeForm2', encoderType_ru='FreeForm')
 
     log_p_y_z_eqn = va.log_p_y_z()
     log_p_y_z_var = [va.Xu]

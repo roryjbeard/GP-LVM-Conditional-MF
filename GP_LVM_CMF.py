@@ -10,7 +10,8 @@ import time
 import collections
 
 from optimisers import Adam
-from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, np_log_mean_exp_stable
+from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, \
+     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag
 
 # precision = np.float64
 precision = th.config.floatX
@@ -65,10 +66,10 @@ class SGPDV(object):
                  dimZ,                   # Dimensionality of the latent variables
                  data,                   # [NxP] matrix of observations
                  kernelType='RBF',
-                 encoderType_qX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel'.
+                 encoderType_qX='FreeForm2',  # 'FreeForm1', 'FreeForm2' 'MLP', 'Kernel'.
                  encoderType_qu='Kernel',    # 'Kernel', 'MLP'
-                 encoderType_rX='FreeForm',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
-                 encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
+                 encoderType_rX='FreeForm2',  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel', 'NoEncoding'.
+                 encoderType_ru='FreeForm2',  # 'FreeForm1', 'FreeForm2', 'MLP', 'NoEncoding'
                  Xu_optimise=False,
                  numberOfEncoderHiddenUnits=0
                  ):
@@ -112,10 +113,10 @@ class SGPDV(object):
         self.batchStream.name = 'batchStream'
         self.padStream.name = 'padStream'
 
-        self.iterator     = th.shared(0)
+        self.iterator = th.shared(0)
         self.iterator.name = 'iterator'
 
-        self.allBatches   = T.reshape(T.concatenate((self.batchStream, self.padStream)), [self.numberofBatchesPerEpoch, self.B])
+        self.allBatches = T.reshape(T.concatenate((self.batchStream, self.padStream)), [self.numberofBatchesPerEpoch, self.B])
         self.currentBatch = T.flatten(self.allBatches[self.iterator, :])
 
         self.allBatches.name = 'allBatches'
@@ -156,24 +157,37 @@ class SGPDV(object):
         self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
 
         # Compute parameters of q(X)
-        if encoderType_qX == 'FreeForm':
+        if encoderType_qX == 'FreeForm1' or encoderType_qX == 'FreeForm2':
             # Have a normal variational distribution over location of latent co-ordinates
 
-            self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
-            self.phi_full      = sharedZeroMatrix(self.N, self.R, 'phi_full')
-
-            Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
-            Phi_batch_sqrt.name = 'Phi_batch_sqrt'
-
-            self.Phi = T.dot(Phi_batch_sqrt, Phi_batch_sqrt.T)
+            self.phi_full = sharedZeroMatrix(self.N, self.R, 'phi_full')
             self.phi = self.phi_full[self.currentBatch, :]
-
-            self.Phi.name = 'Phi'
             self.phi.name = 'phi'
 
-            (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, self.jitter)
+            if encoderType_qX == 'FreeForm1':
 
-            self.qX_vars = [self.Phi_full_sqrt, self.phi_full]
+                self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
+                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]                
+                self.Phi = T.dot(Phi_batch_sqrt, Phi_batch_sqrt.T)
+
+                Phi_batch_sqrt.name = 'Phi_batch_sqrt'                
+                self.Phi.name = 'Phi'
+
+                (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, self.jitter)
+
+                self.qX_vars = [self.Phi_full_sqrt, self.phi_full]
+
+            else:
+                
+                self.Phi_full_diag = sharedZeroArray(self.N, 'Phi_full_diag')
+
+                Phi_batch_diag = self.Phi_full_diag[self.currentBatch]
+                Phi_batch_diag.name = 'Phi_batch_diag'
+
+                (self.Phi, self.iPhi, self.cPhi, self.logDetPhi) \
+                    = diagCholInvLogDet_fromDiag(Phi_batch_diag, 'Phi')
+
+                self.qX_vars = [self.Phi_full_diag, self.phi_full]
 
         elif self.encoderType_qX == 'MLP':
 
@@ -197,16 +211,8 @@ class SGPDV(object):
             log_sigma_qX.name = 'log_sigma_qX'
 
             self.phi  = mu_qX.T  # [BxR]
-            self.Phi  = T.diag(T.exp(log_sigma_qX.flatten())) # [BxB]
-            self.iPhi = T.diag(T.exp(-log_sigma_qX.flatten())) # [BxB]
-            self.cPhi = T.diag(T.exp(0.5 * log_sigma_qX.flatten())) # [BxB]
-            self.logDetPhi = T.sum(log_sigma_qX)  # scalar
-
-            self.phi.name       = 'phi'
-            self.Phi.name       = 'Phi'
-            self.iPhi.name      = 'iPhi'
-            self.cPhi.name      = 'cPhi'
-            self.logDetPhi.name = 'logDetPhi'
+            (self.Phi,self.cPhi,self.iPhi,self.logDetPhi) \
+                = diagCholInvLogDet_fromLogDiag(log_sigma_qX, 'Phi')
 
             self.qX_vars = [self.W1_qX, self.W2_qX, self.W3_qX, self.b1_qX, self.b2_qX, self.b3_qX]
 
@@ -220,7 +226,7 @@ class SGPDV(object):
             self.qX_vars = [self.log_gamma]
 
         else:
-            raise RuntimeError('Unrecognised encoding for q(X)')
+            raise RuntimeError('Unrecognised encoding for q(X): ' + self.encoderType_qX)
 
         # Calculate latent co-ordinates Xf
         # [BxR]  = [BxR] + [BxB] . [BxR]
@@ -307,27 +313,41 @@ class SGPDV(object):
 
         self.qf_vars = [self.log_sigma]
 
-        if self.encoderType_rX == 'FreeForm':
+        if self.encoderType_rX == 'FreeForm1' or self.encoderType_rX == 'FreeForm2':
+
+            self.tau_full = sharedZeroMatrix(self.N, self.R, 'tau_full')
+            self.tau = self.tau_full[self.currentBatch, :]
+
+            self.tau.name = 'tau'
 
             self.TauRange = th.shared(np.reshape(range(0, self.N * self.R), [self.N, self.R]))
             self.TauRange.name = 'TauRange'
             TauIdx = (self.TauRange[self.currentBatch, :]).flatten()
 
-            self.Tau_full_sqrt = sharedZeroMatrix(self.N*self.R, self.N*self.R, 'Tau_full_sqrt')
-            self.tau_full = sharedZeroMatrix(self.N, self.R, 'tau_full')
+            if self.encoderType_rX == 'FreeForm1':
+                
+                self.Tau_full_sqrt = sharedZeroMatrix(self.N * self.R, self.N * self.R, 'Tau_full_sqrt')
+                Tau_batch_sqrt = self.Tau_full_sqrt[TauIdx][:, TauIdx]
+                self.Tau = T.dot(Tau_batch_sqrt, Tau_batch_sqrt.T)
 
-            Tau_batch_sqrt = self.Tau_full_sqrt[TauIdx][:, TauIdx]
-            Tau_batch_sqrt.name = 'Tau_batch_sqrt'
+                Tau_batch_sqrt.name = 'Tau_batch_sqrt'
+                self.Tau.name = 'Tau'
+                
+                (self.cTau, self.iTau, self.logDetTau) = cholInvLogDet(self.Tau, self.B * self.R, self.jitter)
 
-            self.Tau = T.dot(Tau_batch_sqrt, Tau_batch_sqrt.T)
-            self.tau = self.tau_full[self.currentBatch, :]
+                self.rX_vars = [self.Tau_full_sqrt, self.tau_full]                
+                                
+            elif self.encoderType_rX == 'FreeForm2':
+                
+                self.Tau_full_diag = sharedZeroArray(self.N * self.R, 'Tau_full_diag')
+                Tau_batch_diag = self.Tau_full_diag[TauIdx]
+                
+                Tau_batch_diag.name = 'Tau_batch_diag'
+                
+                (self.Tau, self.cTau, self.iTau, self.logDetTau)  \
+                     = diagCholInvLogDet_fromDiag(Tau_batch_diag, 'Tau')
 
-            self.Tau.name = 'Tau'
-            self.tau.name = 'tau'
-
-            (self.cTau, self.iTau, self.logDetTau) = cholInvLogDet(self.Tau, self.B * self.R, self.jitter)
-
-            self.rX_vars = [self.Tau_full_sqrt, self.tau_full]
+                self.rX_vars = [self.Tau_full_diag, self.tau_full]
 
         elif self.encoderType_rX == 'MLP':
 
@@ -350,16 +370,8 @@ class SGPDV(object):
             log_sigma_rX.name = 'log_sigma_rX'
 
             self.tau  = mu_rX.T
-            # self.Tau  = T.diag(T.flatten(T.exp(log_sigma_rX)))
-            self.cTau = T.diag(T.flatten(T.exp(0.5 * log_sigma_rX.T)))
-            self.iTau = T.diag(T.flatten(T.exp(-log_sigma_rX.T)))
-            self.logDetTau = T.sum(log_sigma_rX.T)
-
-            self.tau.name  = 'tau'
-            # self.Tau.name  = 'Tau'
-            self.cTau.name = 'cTau'
-            self.iTau.name = 'iTau'
-            self.logDetTau.name = 'logDetTau'
+            (self.Tau, self.cTau, self.iTau, self.logDetTau) \
+                = diagCholInvLogDet_fromLogDiag(log_sigma_rX)
 
             self.rX_vars = [self.W1_rX, self.W2_rX, self.W3_rX, self.b1_rX, self.b2_rX, self.b3_rX]
 
@@ -388,7 +400,7 @@ class SGPDV(object):
         else:
             raise RuntimeError('Unrecognised encoding for r(X|z)')
 
-        if self.encoderType_ru == 'FreeForm':
+        if self.encoderType_ru == 'FreeForm1':
 
             self.Upsilon_sqrt = sharedZeroMatrix(self.Q * self.M, self.Q * self.M, 'Upsilon_sqrt')
 
@@ -401,6 +413,17 @@ class SGPDV(object):
                 = cholInvLogDet(self.Upsilon, self.Q * self.M, self.jitter)
 
             self.ru_vars = [self.Upsilon_sqrt, self.upsilon]
+
+        elif self.encoderType_ru == 'FreeForm2':
+
+            self.Upsilon_diag = sharedZeroArray(self.Q * self.M, 'Upsilon_diag')
+
+            self.upsilon = sharedZeroMatrix(self.Q, self.M, 'upsilon')
+
+            (self.Upsilon, self.cUpsilon, self.iUpsilon, self.logDetUpsilon) \
+                = diagCholInvLogDet_fromDiag(self.Upsilon_diag, 'Upsilon' )
+
+            self.ru_vars = [self.Upsilon_diag, self.upsilon]
 
         elif self.encoderType_ru == 'MLP':
 
@@ -428,16 +451,8 @@ class SGPDV(object):
             log_sigma_ru.name  = 'log_sigma_ru'
 
             self.upsilon = mu_ru.T
-            self.Upsilon = T.diag(T.flatten(T.exp(log_sigma_ru.T)))
-            self.cUpsilon = T.diag(T.flatten(T.exp(0.5 * log_sigma_ru.T)))
-            self.iUpsilon = T.diag(T.flatten(T.exp(-log_sigma_ru.T)))
-            self.logDetUpsilon = T.sum(log_sigma_ru)
-
-            self.upsilon.name  = 'upsilon'
-            self.Upsilon.name  = 'Upsilon'
-            self.cUpsilon.name = 'cUpsilon'
-            self.iUpsilon.name = 'iUpsilon'
-            self.logDetUpsilon.name = 'logDetUpsilon'
+            (self.Upsilon, self.cUpsilon, self.iUpsilon, self.logDetUpsilon) \
+                = diagCholInvLogDet_fromLogDiag(log_sigma_ru, 'Upsilon')
 
             self.ru_vars = [self.W1_ru, self.W2_ru, self.W3_ru, self.W4_ru, self.b1_ru, self.b2_ru, self.b3_ru, self.b4_ru]
 
@@ -460,6 +475,8 @@ class SGPDV(object):
         self.gradientVariables.extend(self.qX_vars)
         self.gradientVariables.extend(self.rX_vars)
         self.gradientVariables.extend(self.ru_vars)
+
+        self.lowerBounds = []
 
     def randomise(self, sig=1, rndQR=False):
 
@@ -692,16 +709,18 @@ class SGPDV(object):
 
         # We don't actually need a trace here (mathematically),
         # but it tells theano the results is guaranteed to be scalar
-        KL_qr_u_1 = nlinalg.trace((T.dot(upsilon_m_kappa_vec.T,
-                                         T.dot(self.iUpsilon, upsilon_m_kappa_vec))))
-        KL_qr_u_2 = nlinalg.trace(T.dot(self.iUpsilon, Kuu_kron))
-        KL_qr_u_3 = self.logDetUpsilon - self.Q * self.logDetKuu
-        KL_qr_u = 0.5 * (KL_qr_u_1 + KL_qr_u_2 + KL_qr_u_3 - self.Q * self.M)
+        #KL_qr_u_1 = nlinalg.trace((T.dot(upsilon_m_kappa_vec.T,
+        #                                 T.dot(self.iUpsilon, upsilon_m_kappa_vec))))
+        #KL_qr_u_2 = nlinalg.trace(T.dot(self.iUpsilon, Kuu_kron))
+        #KL_qr_u_3 = self.logDetUpsilon - self.Q * self.logDetKuu
+        #KL_qr_u = 0.5 * (KL_qr_u_1 + KL_qr_u_2 + KL_qr_u_3 - self.Q * self.M)
                 
-        KL_qr_u_1.name = 'KL_qr_u_1'
-        KL_qr_u_2.name = 'KL_qr_u_2'
-        KL_qr_u_2.name = 'KL_qr_u_3'
-        KL_qr_u.name = 'KL_qr_u'
+        #KL_qr_u_1.name = 'KL_qr_u_1'
+        #KL_qr_u_2.name = 'KL_qr_u_2'
+        #KL_qr_u_2.name = 'KL_qr_u_3'
+        #KL_qr_u.name = 'KL_qr_u'
+
+        KL_qr_u = T.sum(self.Upsilon_diag) + T.sum(self.upsilon) + T.sum(Kuu_kron) + T.sum(upsilon_m_kappa_vec)
 
         phi_m_tau = self.phi - self.tau
         phi_m_tau_vec = T.reshape(phi_m_tau, [self.B * self.R, 1])
@@ -724,12 +743,12 @@ class SGPDV(object):
         KL_qr_X_3.name = 'KL_qr_X_3'
         KL_qr_X.name = 'KL_qr_X'
 
-        KL = KL_qr_u + KL_qr_X
+        KL =  KL_qr_X + KL_qr_u
         KL.name = 'KL_qr'
 
         return KL
 
-    def constructUpdateFunction(self, learning_rate=0.001, beta_1=0.99, beta_2=0.999):
+    def constructUpdateFunction(self, learning_rate=0.001, beta_1=0.99, beta_2=0.999, profile=False):
 
         gradColl = collections.OrderedDict([(param, T.grad(self.L, param)) for param in self.gradientVariables])
 
@@ -738,7 +757,7 @@ class SGPDV(object):
         updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
 
         # Get the update function to also return the bound!
-        self.updateFunction = th.function([], self.L, updates=updates, no_default_updates=True, profile=True)#,  mode=self.profmode)
+        self.updateFunction = th.function([], self.L, updates=updates, no_default_updates=True, profile=profile)
 
     def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf):
 
@@ -859,9 +878,13 @@ class SGPDV(object):
                 pass
             elif name == 'Phi_full_sqrt':
                 pass
+            elif name == 'Phi_full_diag':
+                pass
             elif name == 'phi_full':
                 pass
             elif name == 'Tau_full_sqrt':
+                pass
+            elif name == 'Tau_full_diag':
                 pass
             elif name == 'tau_full':
                 pass

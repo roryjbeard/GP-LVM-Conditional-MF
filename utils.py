@@ -1,7 +1,7 @@
 import numpy as np
 import theano as th
 from theano import tensor as T
-from theano.tensor import slinalg, nlinalg
+from theano.tensor import nlinalg
 from fastlin.myCholesky import myCholesky
 
 def t_repeat(x, num_repeats, axis):
@@ -33,13 +33,7 @@ def invLogDet( C ):
     
 def jitterChol(A, dim, jitter):
 
-    A_jitter = A + jitter * T.eye(dim, dtype=precision)
-
-    # cA = slinalg.cholesky(A_jitter)
-    # D, V = T.nlinalg.Eigh()(A_jitter)
-    # D.name = 'd' + A.name    
-    # V.name = 'v' + A.name
-    # cA =  T.dot(V, T.diag(D))
+    A_jitter = A + jitter * T.eye(dim)
     
     cA = myCholesky()(A_jitter)
     cA.name = 'c' + A.name
@@ -49,12 +43,6 @@ def jitterChol(A, dim, jitter):
 def cholInvLogDet(A, dim, jitter, fast=False):
 
     A_jitter = A + jitter * T.eye(dim)
-
-    # D, V = T.nlinalg.Eigh()(A_jitter)
-    # D.name = 'd' + A.name    
-    # V.name = 'v' + A.name
-    # cA =  T.dot(V, T.diag(T.sqrt(D)))
-    
     cA = myCholesky()(A_jitter)
     cA.name = 'c' + A.name 
 
@@ -68,7 +56,35 @@ def cholInvLogDet(A, dim, jitter, fast=False):
 
     return(cA, iA, logDetA)
     
+def diagCholInvLogDet_fromLogDiag(logdiag, name):
+
+    diag = T.diag(T.exp(logdiag.flatten()))
+    inv  = T.diag(T.exp(-logdiag.flatten()))
+    chol = T.diag(T.exp(0.5 * logdiag.flatten()))
+    logDet = T.sum(logdiag)  # scalar
+
+    diag.name = name
+    chol.name = 'c' + name
+    inv.name = 'i' + name
+    logDet.name = 'logDet' + name
     
+    return(diag,chol,inv,logDet)
+    
+def diagCholInvLogDet_fromDiag(diag_vec, name):
+    
+    diag_mat = T.diag(diag_vec.flatten())
+    inv  = T.diag(1.0/diag_vec.flatten())
+    chol = T.diag(T.sqrt(diag_vec.flatten()))
+    logDet = T.sum(T.log(diag_vec.flatten())) # scalar
+
+    diag_mat.name = name
+    chol.name = 'c' + name
+    inv.name = 'i' + name
+    logDet.name = 'logDet' + name
+
+    return(diag_mat,chol,inv,logDet)
+
+
 def log_mean_exp_stable(x, axis):
     m = T.max(x, axis=axis, keepdims=True)
     return m + T.log(T.mean(T.exp(x - m), axis=axis, keepdims=True))

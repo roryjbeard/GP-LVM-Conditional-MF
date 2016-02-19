@@ -27,17 +27,16 @@ data = x_train
 
 dimZ = 40
 dimX = 3
-HU_decoder = 400
 batchSize = 100
-encoderType_qX='MLP'
-encoderType_rX='MLP'
+encoderType_qX='FreeForm2'
+encoderType_rX='FreeForm2'
 encoderType_qu='Kernel'
-encoderType_ru='FreeForm'
+encoderType_ru='FreeForm2'
 Xu_optimise=True
 kernelType='RBF'
-numHiddenUnits_encoder=400
-numHiddentUnits_decoder=400
-numberOfInducingPoints = 50
+numHiddenUnits_encoder=200
+numHiddentUnits_decoder=200
+numberOfInducingPoints =50
 learning_rate = 1e-3
 numTestSamples = 100
 
@@ -50,9 +49,9 @@ va = VA(
     dimZ,                   # Dimensionality of the latent variables
     x_train,                   # [NxP] matrix of observations
     kernelType=kernelType,
-    encoderType_qX=encoderType_qX,  # 'FreeForm', 'MLP', 'Kernel'.
+    encoderType_qX=encoderType_qX,  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel'.
     encoderType_qu=encoderType_qu,  # 'Kernel'
-    encoderType_rX=encoderType_rX,  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+    encoderType_rX=encoderType_rX,  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel', 'NoEncoding'.
     encoderType_ru=encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
     Xu_optimise=Xu_optimise,
     numHiddenUnits_encoder=numHiddenUnits_encoder,
@@ -67,6 +66,8 @@ va.setKernelParameters(0.01, 5*np.ones((2,)),
     [1e-10,1e-10], [10,10] )
 
 va.randomise()
+
+va.init_Xu_from_Xf()
 
 va.constructUpdateFunction()
 
