@@ -185,7 +185,7 @@ class SGPDV(object):
                 Phi_batch_logdiag.name = 'Phi_batch_logdiag'
 
                 (self.Phi, self.iPhi, self.cPhi, self.logDetPhi) \
-                    = diagCholInvLogDet_fromLogDiag(Phi_batch_diag, 'Phi')
+                    = diagCholInvLogDet_fromLogDiag(Phi_batch_logdiag, 'Phi')
 
                 self.qX_vars = [self.Phi_full_logdiag, self.phi_full]
 
