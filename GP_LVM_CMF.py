@@ -371,7 +371,7 @@ class SGPDV(object):
 
             self.tau  = mu_rX.T
             (self.Tau, self.cTau, self.iTau, self.logDetTau) \
-                = diagCholInvLogDet_fromLogDiag(log_sigma_rX)
+                = diagCholInvLogDet_fromLogDiag(log_sigma_rX, 'Tau')
 
             self.rX_vars = [self.W1_rX, self.W2_rX, self.W3_rX, self.b1_rX, self.b2_rX, self.b3_rX]
 
