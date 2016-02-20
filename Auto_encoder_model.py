@@ -109,8 +109,8 @@ class VA(SGPDV):
     def KL_qp(self):
 
         if self.continuous:
-            iKuu_Kuf_Kfu_iKuu = T.dot(self.iKuu, T.dot(self.Kfu.T, T.dot(self.Kfu, self.iKuu)))
-            kappa_outer = T.dot(self.kappa.T, self.kappa)
+            iKuu_Kuf_Kfu_iKuu = T.dot(self.iKuu, T.dot(self.Kfu.T, T.dot(self.Kfu, self.iKuu)))   
+            kappa_outer = T.dot(self.kappa.T, self.kappa)   
             KL = -0.5*self.B*self.Q*(1 + T.exp(self.log_sigma)**2 - 2*self.log_sigma) \
                  +0.5*nlinalg.trace(T.dot(iKuu_Kuf_Kfu_iKuu, kappa_outer)) \
                  +0.5*self.Q*(nlinalg.trace(self.Kff))
