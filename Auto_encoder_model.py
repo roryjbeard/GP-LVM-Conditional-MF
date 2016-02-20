@@ -13,7 +13,6 @@ from theano.tensor import nlinalg
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
 from utils import sharedZeroMatrix, sharedZeroVector, log_mean_exp_stable
-from theano.compile.nanguardmode import NanGuardMode
 
 precision = th.config.floatX
 
@@ -29,7 +28,7 @@ class VA(SGPDV):
             encoderType_qX='FreeForm2',  # 'FreeForm1', 'FreeForm2','MLP', 'Kernel'.
             encoderType_qu='Kernel',    # 'Kernel', 'MLP'
             encoderType_rX='FreeForm2',  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel', 'NoEncoding'.
-            encoderType_ru='FreeForm2',  # 'FreeForm', 'MLP', 'NoEncoding'
+            encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
             Xu_optimise=False,
             numHiddenUnits_encoder=0,
             numHiddentUnits_decoder=10,
@@ -110,10 +109,11 @@ class VA(SGPDV):
     def KL_qp(self):
 
         if self.continuous:
-            Kuf_Kfu_iKuu = T.dot(self.Kfu.T, T.dot(self.Kfu, self.iKuu))
+            iKuu_Kuf_Kfu_iKuu = T.dot(self.iKuu, T.dot(self.Kfu.T, T.dot(self.Kfu, self.iKuu)))
+            kappa_outer = T.dot(self.kappa.T, self.kappa)
             KL = -0.5*self.B*self.Q*(1 + T.exp(self.log_sigma)**2 - 2*self.log_sigma) \
-                 +0.5*nlinalg.trace(T.dot( self.iKuu, T.dot( Kuf_Kfu_iKuu, (T.dot(self.kappa.T, self.kappa) + self.iKuu) ) )) \
-                 +0.5*self.Q*( nlinalg.trace(self.Kff) - nlinalg.trace(Kuf_Kfu_iKuu) )
+                 +0.5*nlinalg.trace(T.dot(iKuu_Kuf_Kfu_iKuu, kappa_outer)) \
+                 +0.5*self.Q*(nlinalg.trace(self.Kff))
         else:
             raise RuntimeError("Case not implemented")
 
