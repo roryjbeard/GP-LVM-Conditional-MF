@@ -517,7 +517,10 @@ class SGPDV(object):
 
             elif type(var) == T.sharedvar.TensorSharedVariable:
                 print 'Randomising ' + var.name
-                var.set_value(rnd(var.get_value()))
+                if var.name.endswith('logdiag'):
+                    var.set_value(var.get_value() + 1.)
+                else:
+                    var.set_value(rnd(var.get_value()))
             elif type(var) == T.sharedvar.ScalarSharedVariable:
                 print 'Randomising ' + var.name
                 var.set_value(np.random.randn())
@@ -804,6 +807,9 @@ class SGPDV(object):
         # pbar.finish()
 
         return self.lowerBounds
+
+    def init_Xf_PCA(self):
+
 
     def init_Xu_from_Xf(self):
 
