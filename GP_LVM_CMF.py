@@ -345,7 +345,7 @@ class SGPDV(object):
                 Tau_batch_logdiag.name = 'Tau_batch_logdiag'
 
                 (self.Tau, self.cTau, self.iTau, self.logDetTau)  \
-                     = diagCholInvLogDet_fromDiag(Tau_batch_logdiag, 'Tau')
+                     = diagCholInvLogDet_fromLogDiag(Tau_batch_logdiag, 'Tau')
 
                 self.rX_vars = [self.Tau_full_logdiag, self.tau_full]
 
@@ -637,6 +637,8 @@ class SGPDV(object):
             raise RuntimeError('Case not implemented')
 
         self.dL = T.grad(self.L, self.gradientVariables)
+        for i in range(len(self.dL)):
+            self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
 
     def construct_L_without_r(self):
         self.L = 0  # Implement me!
@@ -924,8 +926,8 @@ class SGPDV(object):
         members = [attr for attr in dir(self)]
         for name in members:
             var = getattr(self, name)
-            if type(var) == T.sharedvar.ScalarSharedVariable or \
-               type(var) == T.sharedvar.TensorSharedVariable:
+            if not type(var) == th.compile.function_module.Function \
+                and hasattr(var, 'name'):
                 print var.name
                 var_fun = th.function([], var, no_default_updates=True)
                 print self.jitterProtect(var_fun)
