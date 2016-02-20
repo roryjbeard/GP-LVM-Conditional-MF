@@ -421,7 +421,7 @@ class SGPDV(object):
             self.upsilon = sharedZeroMatrix(self.Q, self.M, 'upsilon')
 
             (self.Upsilon, self.cUpsilon, self.iUpsilon, self.logDetUpsilon) \
-                = diagCholInvLogDet_fromLogDiag(self.Upsilon_diag, 'Upsilon' )
+                = diagCholInvLogDet_fromLogDiag(self.Upsilon_logdiag, 'Upsilon' )
 
             self.ru_vars = [self.Upsilon_logdiag, self.upsilon]
 
