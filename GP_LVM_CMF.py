@@ -181,7 +181,7 @@ class SGPDV(object):
 
                 self.Phi_full_logdiag = sharedZeroArray(self.N, 'Phi_full_logdiag')
 
-                Phi_batch_logdiag = self.Phi_full_diag[self.currentBatch]
+                Phi_batch_logdiag = self.Phi_full_logdiag[self.currentBatch]
                 Phi_batch_logdiag.name = 'Phi_batch_logdiag'
 
                 (self.Phi, self.iPhi, self.cPhi, self.logDetPhi) \
