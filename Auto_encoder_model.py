@@ -4,7 +4,7 @@ Created on Thu Feb  4 20:44:40 2016
 
 @author: clloyd
 """
-
+ 
 import numpy as np
 import theano as th
 import theano.tensor as T
@@ -73,7 +73,7 @@ class VA(SGPDV):
 
         if not self.continuous:
             # Optimal initial values for tanh transform are 1/4
-            # those for thes sigmoid transform
+            # those for thes sigmoid transformgi
             self.W1.set_value(self.W1.get_value()/4.0)
             self.W2.set_value(self.W2.get_value()/4.0)
             self.W3.set_value(self.W3.get_value()/4.0)

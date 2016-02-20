@@ -69,16 +69,19 @@ va.randomise()
 
 va.init_Xu_from_Xf()
 
+
+va.printMemberTypes()
+va.printSharedVariables()
+va.printTheanoVariables()
+
+
 va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
 numberOfEpochs = 1
 
-#va.printMemberTypes()
 
-va.printMemberTypes(memberType=T.sharedvar.TensorSharedVariable)
-va.printMemberTypes(T.sharedvar.ScalarSharedVariable)
 
 va.train(numberOfEpochs=numberOfEpochs, maxIters=20)
 
