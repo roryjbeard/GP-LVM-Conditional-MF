@@ -342,7 +342,7 @@ class SGPDV(object):
                 self.Tau_full_logdiag = sharedZeroArray(self.N * self.R, 'Tau_full_logdiag')
                 Tau_batch_logdiag = self.Tau_full_logdiag[TauIdx]
 
-                Tau_batch_diag.name = 'Tau_batch_logdiag'
+                Tau_batch_logdiag.name = 'Tau_batch_logdiag'
 
                 (self.Tau, self.cTau, self.iTau, self.logDetTau)  \
                      = diagCholInvLogDet_fromDiag(Tau_batch_logdiag, 'Tau')
