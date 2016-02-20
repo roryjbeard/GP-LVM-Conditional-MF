@@ -493,7 +493,8 @@ class SGPDV(object):
                 pass
             elif var.name.startswith('W1') or \
                     var.name.startswith('W2') or \
-                    var.name.startswith('W3'):
+                    var.name.startswith('W3') or \
+                    var.name.startswith('W4'):
                 print 'Randomising ' + var.name
                 # Hidden layer weights are uniformly sampled from a symmetric interval
                 # following [Xavier, 2010]
@@ -508,7 +509,8 @@ class SGPDV(object):
 
             elif var.name.startswith('b1') or \
                     var.name.startswith('b2') or \
-                    var.name.startswith('b3'):
+                    var.name.startswith('b3') or \
+                    var.name.startswith('b4'):
                 print 'Setting ' + var.name + ' to all 0s'
                 # Offsets not randomised at all
                 var.set_value(np.zeros(var.get_value().shape, dtype=precision))
