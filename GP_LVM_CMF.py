@@ -103,7 +103,7 @@ class SGPDV(object):
 
         self.lowerBound = -np.inf  # Lower bound
 
-        self.numberofBatchesPerEpoch = int(np.ceil(self.N / float(self.B)))
+        self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
         self.batchStream = srng.permutation(n=self.N)
@@ -167,10 +167,10 @@ class SGPDV(object):
             if encoderType_qX == 'FreeForm1':
 
                 self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
-                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
+                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]                
                 self.Phi = T.dot(Phi_batch_sqrt, Phi_batch_sqrt.T)
 
-                Phi_batch_sqrt.name = 'Phi_batch_sqrt'
+                Phi_batch_sqrt.name = 'Phi_batch_sqrt'                
                 self.Phi.name = 'Phi'
 
                 (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, self.jitter)
@@ -178,16 +178,16 @@ class SGPDV(object):
                 self.qX_vars = [self.Phi_full_sqrt, self.phi_full]
 
             else:
-
-                self.Phi_full_diag = sharedZeroArray(self.N, 'Phi_full_diag')
+                
+                self.Phi_full_logdiag = sharedZeroArray(self.N, 'Phi_full_logdiag')
 
                 Phi_batch_diag = self.Phi_full_diag[self.currentBatch]
-                Phi_batch_diag.name = 'Phi_batch_diag'
+                Phi_batch_diag.name = 'Phi_batch_logdiag'
 
                 (self.Phi, self.iPhi, self.cPhi, self.logDetPhi) \
-                    = diagCholInvLogDet_fromDiag(Phi_batch_diag, 'Phi')
+                    = diagCholInvLogDet_fromLogDiag(Phi_batch_diag, 'Phi')
 
-                self.qX_vars = [self.Phi_full_diag, self.phi_full]
+                self.qX_vars = [self.Phi_full_logdiag, self.phi_full]
 
         elif self.encoderType_qX == 'MLP':
 
@@ -325,29 +325,29 @@ class SGPDV(object):
             TauIdx = (self.TauRange[self.currentBatch, :]).flatten()
 
             if self.encoderType_rX == 'FreeForm1':
-
+                
                 self.Tau_full_sqrt = sharedZeroMatrix(self.N * self.R, self.N * self.R, 'Tau_full_sqrt')
                 Tau_batch_sqrt = self.Tau_full_sqrt[TauIdx][:, TauIdx]
                 self.Tau = T.dot(Tau_batch_sqrt, Tau_batch_sqrt.T)
 
                 Tau_batch_sqrt.name = 'Tau_batch_sqrt'
                 self.Tau.name = 'Tau'
-
+                
                 (self.cTau, self.iTau, self.logDetTau) = cholInvLogDet(self.Tau, self.B * self.R, self.jitter)
 
-                self.rX_vars = [self.Tau_full_sqrt, self.tau_full]
-
+                self.rX_vars = [self.Tau_full_sqrt, self.tau_full]                
+                                
             elif self.encoderType_rX == 'FreeForm2':
-
-                self.Tau_full_diag = sharedZeroArray(self.N * self.R, 'Tau_full_diag')
-                Tau_batch_diag = T.exp(self.Tau_full_diag[TauIdx])
-
-                Tau_batch_diag.name = 'Tau_batch_diag'
-
+                
+                self.Tau_full_logdiag = sharedZeroArray(self.N * self.R, 'Tau_full_logdiag')
+                Tau_batch_logdiag = self.Tau_full_logdiag[TauIdx]
+                
+                Tau_batch_diag.name = 'Tau_batch_logdiag'
+                
                 (self.Tau, self.cTau, self.iTau, self.logDetTau)  \
-                     = diagCholInvLogDet_fromDiag(Tau_batch_diag, 'Tau')
+                     = diagCholInvLogDet_fromDiag(Tau_batch_logdiag, 'Tau')
 
-                self.rX_vars = [self.Tau_full_diag, self.tau_full]
+                self.rX_vars = [self.Tau_full_logdiag, self.tau_full]
 
         elif self.encoderType_rX == 'MLP':
 
@@ -371,7 +371,7 @@ class SGPDV(object):
 
             self.tau  = mu_rX.T
             (self.Tau, self.cTau, self.iTau, self.logDetTau) \
-                = diagCholInvLogDet_fromLogDiag(log_sigma_rX, 'Tau')
+                = diagCholInvLogDet_fromLogDiag(log_sigma_rX)
 
             self.rX_vars = [self.W1_rX, self.W2_rX, self.W3_rX, self.b1_rX, self.b2_rX, self.b3_rX]
 
@@ -416,14 +416,14 @@ class SGPDV(object):
 
         elif self.encoderType_ru == 'FreeForm2':
 
-            self.Upsilon_diag = sharedZeroArray(self.Q * self.M, 'Upsilon_diag')
+            self.Upsilon_logdiag = sharedZeroArray(self.Q * self.M, 'Upsilon_logdiag')
 
             self.upsilon = sharedZeroMatrix(self.Q, self.M, 'upsilon')
 
             (self.Upsilon, self.cUpsilon, self.iUpsilon, self.logDetUpsilon) \
-                = diagCholInvLogDet_fromDiag(self.Upsilon_diag, 'Upsilon' )
+                = diagCholInvLogDet_fromLogDiag(self.Upsilon_diag, 'Upsilon' )
 
-            self.ru_vars = [self.Upsilon_diag, self.upsilon]
+            self.ru_vars = [self.Upsilon_logdiag, self.upsilon]
 
         elif self.encoderType_ru == 'MLP':
 
@@ -493,8 +493,7 @@ class SGPDV(object):
                 pass
             elif var.name.startswith('W1') or \
                     var.name.startswith('W2') or \
-                    var.name.startswith('W3') or \
-                    var.name.startswith('W4'):
+                    var.name.startswith('W3'):
                 print 'Randomising ' + var.name
                 # Hidden layer weights are uniformly sampled from a symmetric interval
                 # following [Xavier, 2010]
@@ -516,10 +515,7 @@ class SGPDV(object):
 
             elif type(var) == T.sharedvar.TensorSharedVariable:
                 print 'Randomising ' + var.name
-                tmp =rnd(var.get_value())
-                if var.name.endswith('diag'):
-                    tmp = np.exp(tmp)
-                var.set_value(tmp)
+                var.set_value(rnd(var.get_value()))
             elif type(var) == T.sharedvar.ScalarSharedVariable:
                 print 'Randomising ' + var.name
                 var.set_value(np.random.randn())
@@ -714,17 +710,15 @@ class SGPDV(object):
         # We don't actually need a trace here (mathematically),
         # but it tells theano the results is guaranteed to be scalar
         KL_qr_u_1 = nlinalg.trace((T.dot(upsilon_m_kappa_vec.T,
-                                        T.dot(self.iUpsilon, upsilon_m_kappa_vec))))
+                                         T.dot(self.iUpsilon, upsilon_m_kappa_vec))))
         KL_qr_u_2 = nlinalg.trace(T.dot(self.iUpsilon, Kuu_kron))
         KL_qr_u_3 = self.logDetUpsilon - self.Q * self.logDetKuu
         KL_qr_u = 0.5 * (KL_qr_u_1 + KL_qr_u_2 + KL_qr_u_3 - self.Q * self.M)
-
+                
         KL_qr_u_1.name = 'KL_qr_u_1'
         KL_qr_u_2.name = 'KL_qr_u_2'
         KL_qr_u_2.name = 'KL_qr_u_3'
         KL_qr_u.name = 'KL_qr_u'
-
-        # KL_qr_u_DEBUG = T.sum(self.Upsilon_diag) + T.sum(self.upsilon) + T.sum(Kuu_kron) + T.sum(upsilon_m_kappa_vec)
 
         phi_m_tau = self.phi - self.tau
         phi_m_tau_vec = T.reshape(phi_m_tau, [self.B * self.R, 1])
@@ -778,8 +772,9 @@ class SGPDV(object):
             self.epochSample()
 
             for it in range(self.numberofBatchesPerEpoch):
-                self.iterator.set_value(it)
+
                 self.sample()
+                self.iterator.set_value(self.iterator.get_value() + 1)
                 lbTmp = self.jitterProtect(self.updateFunction, reset=False)
                 # self.constrainKernelParameters()
 
@@ -807,23 +802,23 @@ class SGPDV(object):
         return self.lowerBounds
 
     def init_Xu_from_Xf(self):
-
+        
         Xf_min = np.zeros(self.R,)
         Xf_max = np.zeros(self.R,)
         Xf_locations = th.function([], self.phi, no_default_updates=True) # [B x R]
         for b in range(self.numberofBatchesPerEpoch):
-            self.iterator.set_value(b)
+            self.iterator.set_value(b) 
             Xf_batch = Xf_locations()
             Xf_min = np.min( (Xf_min, Xf_batch.min(axis=0)), axis=0)
             Xf_max = np.max( (Xf_min, Xf_batch.max(axis=0)), axis=0)
-
+            
         Xf_min.reshape(-1,1)
         Xf_max.reshape(-1,1)
         Df = Xf_max - Xf_min
         Xu = np.random.rand(self.M, self.R) * Df + Xf_min # [M x R]
-
+        
         self.Xu.set_value(Xu, borrow=True)
-
+        
     def sample(self):
 
         self.sample_alpha()
@@ -881,13 +876,13 @@ class SGPDV(object):
                 pass
             elif name == 'Phi_full_sqrt':
                 pass
-            elif name == 'Phi_full_diag':
+            elif name == 'Phi_full_logdiag':
                 pass
             elif name == 'phi_full':
                 pass
             elif name == 'Tau_full_sqrt':
                 pass
-            elif name == 'Tau_full_diag':
+            elif name == 'Tau_full_logdiag':
                 pass
             elif name == 'tau_full':
                 pass
