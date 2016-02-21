@@ -89,7 +89,7 @@ class SGPDV(object):
         self.encoderType_qX = encoderType_qX
         self.encoderType_rX = encoderType_rX
         self.encoderType_ru = encoderType_ru
-        self.encoderType_qu = encoderType_qu        
+        self.encoderType_qu = encoderType_qu
         self.Xu_optimise = Xu_optimise
 
         self.y = th.shared(data)
@@ -168,9 +168,9 @@ class SGPDV(object):
             if encoderType_qX == 'FreeForm1':
 
                 self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
-                
+
                 Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
-                
+
                 self.Phi = Tdot(Phi_batch_sqrt, Phi_batch_sqrt.T, 'Phi')
 
                 Phi_batch_sqrt.name = 'Phi_batch_sqrt'
@@ -277,7 +277,7 @@ class SGPDV(object):
             self.kappa = mu_qu.T # [QxM]
             (self.Kappa, self.cKappa, self.iKappa, self.logDetKappa) \
                 = diagCholInvLogDet_fromLogDiag(log_sigma_qu, 'Kappa') # [MxM]
-            
+
             self.qu_vars = [self.W1_qu, self.W2_qu, self.W3_qu, self.W4_qu, self.b1_qu, self.b2_qu, self.b3_qu, self.b4_qu]
 
         else:
@@ -685,7 +685,7 @@ class SGPDV(object):
         xOuter = Tdot(X_m_phi, X_m_phi.T, 'xOuter')
         # [MxM] = [RxM]^T . [RxM]
         u_m_kappa = Tminus(self.u - self.kappa)
-        # [?] 
+        # [?]
         uOuter = Tdot(u_m_kappa.T, u_m_kappa, 'uOuter')
 
         log_q_X = -0.5 * self.B * self.R * log2pi - 0.5 * self.R * self.logDetPhi \
@@ -778,7 +778,7 @@ class SGPDV(object):
             for it in range(self.numberofBatchesPerEpoch):
 
                 self.sample()
-                self.iterator.set_value(self.iterator.get_value() + 1)
+                self.iterator.set_value(it)
                 lbTmp = self.jitterProtect(self.updateFunction, reset=False)
                 # self.constrainKernelParameters()
 
