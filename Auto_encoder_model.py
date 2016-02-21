@@ -12,7 +12,7 @@ from theano.tensor import nlinalg
 
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
-from utils import sharedZeroMatrix, sharedZeroVector, log_mean_exp_stable
+from utils import log_mean_exp_stable, Tdot
 
 precision = th.config.floatX
 
@@ -25,10 +25,10 @@ class VA(SGPDV):
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
             kernelType='RBF',
-            encoderType_qX='FreeForm2',  # 'FreeForm1', 'FreeForm2','MLP', 'Kernel'.
-            encoderType_qu='Kernel',    # 'Kernel', 'MLP'
-            encoderType_rX='FreeForm2',  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel', 'NoEncoding'.
-            encoderType_ru='FreeForm',  # 'FreeForm', 'MLP', 'NoEncoding'
+            encoderType_qX='FreeForm2',  # 'FreeForm', 'MLP', 'Kernel'.
+            encoderType_qu='FreeForm',
+            encoderType_rX='FreeForm2',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
+            encoderType_ru='FreeForm2',  # 'FreeForm', 'MLP', 'NoEncoding'
             Xu_optimise=False,
             numHiddenUnits_encoder=0,
             numHiddentUnits_decoder=10,
@@ -41,24 +41,30 @@ class VA(SGPDV):
             dimX,                   # Dimensionality of the latent co-ordinates
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
-            kernelType,
-            encoderType_qX,
-            encoderType_qu,
-            encoderType_rX,
-            encoderType_ru,
-            Xu_optimise,
-            numHiddenUnits_encoder
+            kernelType=kernelType,
+            encoderType_qX=encoderType_qX,
+            encoderType_qu=encoderType_qu,
+            encoderType_rX=encoderType_rX,
+            encoderType_ru=encoderType_ru,
+            Xu_optimise=Xu_optimise,
+            numberOfEncoderHiddenUnits=numHiddenUnits_encoder
         )
 
         self.HU_decoder = numHiddentUnits_decoder
         self.continuous = continuous
 
-        self.W1 = sharedZeroMatrix(self.HU_decoder, self.Q, 'W1')
-        self.W2 = sharedZeroMatrix(self.P, self.HU_decoder, 'W2')
-        self.W3 = sharedZeroMatrix(self.P, self.HU_decoder, 'W3')
-        self.b1 = sharedZeroVector(self.HU_decoder, 'b1', broadcastable=(False,True))
-        self.b2 = sharedZeroVector(self.P, 'b2', broadcastable=(False,True))
-        self.b3 = sharedZeroVector(self.P, 'b3', broadcastable=(False,True))
+        # Construct appropriately sized matrices to initialise theano shares
+        HU_Q_mat = np.zeros((self.HU_decoder, self.Q), dtype=precision)
+        HU_vec   = np.zeros((self.HU_decoder, 1 ), dtype=precision)
+        P_HU_mat = np.zeros((self.P, self.HU_decoder), dtype=precision)
+        P_vec    = np.zeros((self.P, 1), dtype=precision)
+
+        self.W1 = th.shared(HU_Q_mat, name='W1')
+        self.W2 = th.shared(P_HU_mat, name='W2')
+        self.W3 = th.shared(P_HU_mat, name='W3')
+        self.b1 = th.shared(HU_vec,   name='b1', broadcastable=(False,True))
+        self.b2 = th.shared(P_vec,    name='b2', broadcastable=(False,True))
+        self.b3 = th.shared(P_vec,    name='b3', broadcastable=(False,True))
 
         self.likelihoodVariables = [self.W1, self.W2, self.W3, self.b1, self.b2, self.b3]
         self.gradientVariables.extend(self.likelihoodVariables)
@@ -109,11 +115,16 @@ class VA(SGPDV):
     def KL_qp(self):
 
         if self.continuous:
-            iKuu_Kuf_Kfu_iKuu = T.dot(self.iKuu, T.dot(self.Kfu.T, T.dot(self.Kfu, self.iKuu)))   
-            kappa_outer = T.dot(self.kappa.T, self.kappa)   
+            Kfu_iKuu = Tdot(self.Kfu, self.iKuu)
+            Kfu_iKuu_Kuf = Tdot(Kfu_iKuu, self.Kfu.T)
+            iKuu_Kuf_Kfu_iKuu = T.dot(Kfu_iKuu.T, Kfu_iKuu)
+            Kfu_iKuu_Kappa_iKuu_Kuf = Tdot(T.dot(Kfu_iKuu, self.Kappa), Kfu_iKuu.T)
+            kappa_outer = Tdot(self.kappa.T, self.kappa, 'kappa_outer')  
+
             KL = -0.5*self.B*self.Q*(1 + T.exp(self.log_sigma)**2 - 2*self.log_sigma) \
-                 +0.5*nlinalg.trace(T.dot(iKuu_Kuf_Kfu_iKuu, kappa_outer)) \
-                 +0.5*self.Q*(nlinalg.trace(self.Kff))
+                 +0.5*nlinalg.trace(Tdot(iKuu_Kuf_Kfu_iKuu, kappa_outer)) \
+                 +0.5*self.Q*(nlinalg.trace(self.Kff) - nlinalg.trace(Kfu_iKuu_Kuf) + nlinalg.trace(Kfu_iKuu_Kappa_iKuu_Kuf))
+            KL.name = 'KL_qp'
         else:
             raise RuntimeError("Case not implemented")
 
@@ -144,7 +155,7 @@ if __name__ == "__main__":
     np.random.seed(1)
 
     #nnumberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits
-    va = VA( 3, 20, 2, 2, np.random.rand(40,3), encoderType_qX='FreeForm2', encoderType_rX='FreeForm2', encoderType_ru='FreeForm')
+    va = VA( 3, 20, 2, 2, np.random.rand(40,3), encoderType_qX='FreeForm', encoderType_rX='FreeForm', encoderType_ru='FreeForm')
 
     log_p_y_z_eqn = va.log_p_y_z()
     log_p_y_z_var = [va.Xu]
@@ -210,8 +221,6 @@ if __name__ == "__main__":
 
     print 'log_r_uX_z'
     print th.function([], va.log_r_uX_z())()
-
-    va.construct_L_dL_functions()
 
     for i in range(len(va.gradientVariables)):
         f  = lambda x: va.L_test( x, va.gradientVariables[i] )

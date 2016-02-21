@@ -808,9 +808,6 @@ class SGPDV(object):
 
         return self.lowerBounds
 
-    def init_Xf_PCA(self):
-
-
     def init_Xu_from_Xf(self):
 
         Xf_min = np.zeros(self.R,)
