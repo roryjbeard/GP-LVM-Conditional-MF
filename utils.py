@@ -114,5 +114,30 @@ def shared_ones_like(shared_var):
     return th.shared(np.ones(shared_var.get_value(borrow=True).shape).astype(shared_var.dtype),
                          broadcastable=shared_var.broadcastable)
 
+def Tname(A, B, op, name=None):
+    if not name == None:
+        pass
+    elif not A.name == None and not B.name == None:
+        name = A.name + op + B.name
+    elif not A.name == None:
+        name = A.name + op + '?'
+    elif not B.name == None:
+        name = '?' + 'op' + B.name
+    else:
+        name = None
+    return name
 
+def Tdot(A, B, name=None):
+    C = T.dot(A,B)
+    C.name = Tname(A, B, '.', name)
+    return C
 
+def Tminus(A, B, name=None):
+    C = A - B
+    C.name = Tname(A, B, '-', name)
+    return C
+
+def Tplus(A, B, name=None):
+    C = A + B
+    C.name = Tname(A, B, '+', name)
+    return C

@@ -11,7 +11,7 @@ import collections
 
 from optimisers import Adam
 from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, \
-     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag
+     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag, Tdot, Tminus, Tplus
 
 # precision = np.float64
 precision = th.config.floatX
@@ -31,7 +31,7 @@ class kernelFactory(object):
             _X2 = X2
         if self.kernelType == 'RBF':
             inls = T.exp(theta[0])
-            # dist = (((X1 / theta[0])**2).sum(1)) + (((_X2 / theta[0])**2).sum(1)).T - 2*T.dot( X1 / theta[0], _X2.T / theta[0] )
+            # dist = (((X1 / theta[0])**2).sum(1)) + (((_X2 / theta[0])**2).sum(1)).T - 2*Tdot( X1 / theta[0], _X2.T / theta[0] )
             dist = ((X1 / inls)**2).sum(1)[:, None] + ((_X2 / inls)**2).sum(1)[None, :] - 2 * (X1 / inls).dot((_X2 / inls).T)
             # Always want kernels to be 64-bit
             if dtype == 'float64':
@@ -67,7 +67,7 @@ class SGPDV(object):
                  data,                   # [NxP] matrix of observations
                  kernelType='RBF',
                  encoderType_qX='FreeForm2',  # 'FreeForm1', 'FreeForm2' 'MLP', 'Kernel'.
-                 encoderType_qu='Kernel',    # 'Kernel', 'MLP'
+                 encoderType_qu='FreeForm',   # 'FreeForm', 'MLP'
                  encoderType_rX='FreeForm2',  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel', 'NoEncoding'.
                  encoderType_ru='FreeForm2',  # 'FreeForm1', 'FreeForm2', 'MLP', 'NoEncoding'
                  Xu_optimise=False,
@@ -89,6 +89,7 @@ class SGPDV(object):
         self.encoderType_qX = encoderType_qX
         self.encoderType_rX = encoderType_rX
         self.encoderType_ru = encoderType_ru
+        self.encoderType_qu = encoderType_qu        
         self.Xu_optimise = Xu_optimise
 
         self.y = th.shared(data)
@@ -157,7 +158,7 @@ class SGPDV(object):
         self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
 
         # Compute parameters of q(X)
-        if encoderType_qX == 'FreeForm1' or encoderType_qX == 'FreeForm2':
+        if self.encoderType_qX == 'FreeForm1' or self.encoderType_qX == 'FreeForm2':
             # Have a normal variational distribution over location of latent co-ordinates
 
             self.phi_full = sharedZeroMatrix(self.N, self.R, 'phi_full')
@@ -167,13 +168,14 @@ class SGPDV(object):
             if encoderType_qX == 'FreeForm1':
 
                 self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
+                
                 Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
-                self.Phi = T.dot(Phi_batch_sqrt, Phi_batch_sqrt.T)
+                
+                self.Phi = Tdot(Phi_batch_sqrt, Phi_batch_sqrt.T, 'Phi')
 
                 Phi_batch_sqrt.name = 'Phi_batch_sqrt'
-                self.Phi.name = 'Phi'
 
-                (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, self.jitter)
+                (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, 0)
 
                 self.qX_vars = [self.Phi_full_sqrt, self.phi_full]
 
@@ -184,7 +186,7 @@ class SGPDV(object):
                 Phi_batch_logdiag = self.Phi_full_logdiag[self.currentBatch]
                 Phi_batch_logdiag.name = 'Phi_batch_logdiag'
 
-                (self.Phi, self.iPhi, self.cPhi, self.logDetPhi) \
+                (self.Phi, self.cPhi, self.iPhi, self.logDetPhi) \
                     = diagCholInvLogDet_fromLogDiag(Phi_batch_logdiag, 'Phi')
 
                 self.qX_vars = [self.Phi_full_logdiag, self.phi_full]
@@ -200,11 +202,11 @@ class SGPDV(object):
             self.b3_qX = sharedZeroVector(1, 'b3_qX', broadcastable=(False, True))
 
             # [HxB] = softplus( [HxP] . [BxP]^T + repmat([Hx1],[1,B]) )
-            h_qX = T.nnet.softplus(T.dot(self.W1_qX, self.y_miniBatch.T) + self.b1_qX)
+            h_qX = T.nnet.softplus(Tdot(self.W1_qX, self.y_miniBatch.T) + self.b1_qX)
             # [RxB] = sigmoid( [RxH] . [HxB] + repmat([Rx1],[1,B]) )
-            mu_qX = T.nnet.sigmoid(T.dot(self.W2_qX, h_qX) + self.b2_qX)
+            mu_qX = T.nnet.sigmoid(Tdot(self.W2_qX, h_qX) + self.b2_qX)
             # [1xB] = 0.5 * ( [1xH] . [HxB] + repmat([1x1],[1,B]) )
-            log_sigma_qX = 0.5 * (T.dot(self.W3_qX, h_qX) + self.b3_qX)
+            log_sigma_qX = 0.5 * (Tdot(self.W3_qX, h_qX) + self.b3_qX)
 
             h_qX.name         = 'h_qX'
             mu_qX.name        = 'mu_qX'
@@ -230,79 +232,74 @@ class SGPDV(object):
 
         # Calculate latent co-ordinates Xf
         # [BxR]  = [BxR] + [BxB] . [BxR]
-        self.Xf = self.phi + T.dot(self.cPhi, self.beta)
+        self.Xf = self.phi + Tdot(self.cPhi, self.beta)
         self.Xf.name  = 'Xf'
 
         # Inducing points co-ordinates
         self.Xu = sharedZeroMatrix(self.M, self.R, 'Xu')
 
         # Compute parameters of q(u)
-        if encoderType_qu == 'Kernel':
+        if self.encoderType_qu == 'FreeForm':
             # Have a normal variational distribution over inducing values
 
             self.kappa = sharedZeroMatrix(self.Q, self.M, 'kappa')
-            self.Kuu = kfactory.kernel(self.Xu, None, self.log_theta, 'Kuu')
-            (self.cKuu, self.iKuu, self.logDetKuu) = cholInvLogDet(self.Kuu, self.M, self.jitter)
-            self.qu_vars = [self.log_theta, self.kappa, self.Xu]
+            self.Kappa_sqrt = sharedZeroMatrix(self.M, self.M, 'Kappa_sqrt')
+            self.Kappa = Tdot(self.Kappa_sqrt, self.Kappa_sqrt.T, 'Kappa')
+            (self.cKappa, self.iKappa, self.logDetKappa) \
+                    = cholInvLogDet(self.Kappa, self.M, 0)
+            self.qu_vars = [self.Kappa_sqrt, self.kappa]
 
         elif self.encoderType_qu == 'MLP':
-            raise RuntimeError('Don''t do this')
-            # # Auto encode
-            # self.W1_qu = sharedZeroMatrix(self.H, self.B, 'W1_qu')
-            # self.W2_qu = sharedZeroMatrix(self.P, self.Q, 'W2_qu')
-            # self.W3_qu = sharedZeroMatrix(self.M, self.H, 'W3_qu')
-            # self.W4_qu = sharedZeroMatrix(self.M, self.H, 'W4_qu')
-            # self.b1_qu = sharedZeroVector(self.H, 'b1_qu', broadcastable=(False, True))
-            # self.b2_qu = sharedZeroVector(self.H, 'b2_qu', broadcastable=(False, True))
-            # self.b3_qu = sharedZeroVector(self.M, 'b3_qu', broadcastable=(False, True))
-            # self.b4_qu = sharedZeroVector(self.M, 'b4_qu', broadcastable=(False, True))
+            # Auto encode
+            self.W1_qu = sharedZeroMatrix(self.H, self.B, 'W1_qu')
+            self.W2_qu = sharedZeroMatrix(self.P, self.Q, 'W2_qu')
+            self.W3_qu = sharedZeroMatrix(self.M, self.H, 'W3_qu')
+            self.W4_qu = sharedZeroMatrix(self.M, self.H, 'W4_qu')
+            self.b1_qu = sharedZeroVector(self.H, 'b1_qu', broadcastable=(False, True))
+            self.b2_qu = sharedZeroVector(self.H, 'b2_qu', broadcastable=(False, True))
+            self.b3_qu = sharedZeroVector(self.M, 'b3_qu', broadcastable=(False, True))
+            self.b4_qu = sharedZeroVector(self.M, 'b4_qu', broadcastable=(False, True))
 
-            # # [HxP] = softplus( [HxB] . [BxP]^T + repmat([Hx1],[1,P]) )
-            # h1_qu = T.nnet.softplus(T.dot(self.W1_qu, self.y_miniBatch.T) + self.b1_qu)
-            # # [HxQ] = softplus( [HxP] . [PxQ] + repmat([Hx1],[1,Q]) )
-            # h2_qu = T.nnet.softplus(T.dot(h1_qu, self.W2_qu) + self.b2_qu)
-            # # [MxQ] = sigmoid( [MxH] . [HxQ] + repmat([Mx1],[1,Q]) )
-            # mu_qu = T.nnet.sigmoid(T.dot(self.W3_qu, h2_qu) + self.b3_qu)
-            # # [1xB] = 0.5 * ( [1xH] . [HxB] + repmat([1x1],[1,B]) )
-            # log_sigma_qu = 0.5 * (T.dot(self.W4_qu, h2_qu) + self.b4_qu)
+            # [HxP] = softplus( [HxB] . [BxP]^T + repmat([Hx1],[1,P]) )
+            h1_qu = T.nnet.softplus(Tdot(self.W1_qu, self.y_miniBatch.T) + self.b1_qu)
+            # [HxQ] = softplus( [HxP] . [PxQ] + repmat([Hx1],[1,Q]) )
+            h2_qu = T.nnet.softplus(Tdot(h1_qu, self.W2_qu) + self.b2_qu)
+            # [MxQ] = sigmoid( [MxH] . [HxQ] + repmat([Mx1],[1,Q]) )
+            mu_qu = T.nnet.sigmoid(Tdot(self.W3_qu, h2_qu) + self.b3_qu)
+            # [1xM] = 0.5 * ( [1xH] . [HxM] + repmat([1x1],[1,B]) )
+            log_sigma_qu = 0.5 * (Tdot(self.W4_qu, h2_qu) + self.b4_qu)
 
-            # h1_qu.name         = 'h1_qu'
-            # h2_qu.name         = 'h2_qu'
-            # mu_qu.name         = 'mu_qu' # kappa equivilent
-            # log_sigma_qu.name  = 'log_sigma_qu' # Kuu equivilent
+            h1_qu.name         = 'h1_qu'
+            h2_qu.name         = 'h2_qu'
+            mu_qu.name         = 'mu_qu' # kappa equivilent
+            log_sigma_qu.name  = 'log_sigma_qu' # Kappa equivilent
 
-            # self.kappa  = mu_qu.T # [QxM]
-            # self.Kuu  = T.diag(T.exp(log_sigma_qu.flatten()))  # [BxB]
-            # self.iKuu = T.diag(T.exp(-log_sigma_qu.flatten()))  # [BxB]
-            # self.cKuu = T.diag(T.exp(0.5 * log_sigma_qu.flatten()))  # [BxB]
-            # self.logDetKuu = T.sum(log_sigma_qu)  # scalar
-
-            # self.kappa.name     = 'kappa(MLP)'
-            # self.Kuu.name       = 'Kuu(MLP)'
-            # self.iKuu.name      = 'iKuu(MLP)'
-            # self.cKuu.name      = 'cKuu(MLP)'
-            # self.logDetKuu.name = 'logDetKuu(MLP)'
-
-            # self.qu_vars = [self.log_theta, self.W1_qu, self.W2_qu, self.W3_qu, self.W4_qu, self.b1_qu, self.b2_qu, self.b3_qu, self.b4_qu]
+            self.kappa = mu_qu.T # [QxM]
+            (self.Kappa, self.cKappa, self.iKappa, self.logDetKappa) \
+                = diagCholInvLogDet_fromLogDiag(log_sigma_qu, 'Kappa') # [MxM]
+            
+            self.qu_vars = [self.W1_qu, self.W2_qu, self.W3_qu, self.W4_qu, self.b1_qu, self.b2_qu, self.b3_qu, self.b4_qu]
 
         else:
-            raise RuntimeError('Unrecognised encoding for q(u)')
+            raise RuntimeError('Unrecognised encoding for q(u): ' + self.encoderType_qu)
 
         # Kernels
         self.Kff = kfactory.kernel(self.Xf, None,    self.log_theta, 'Kff')
         self.Kfu = kfactory.kernel(self.Xf, self.Xu, self.log_theta, 'Kfu')
+        self.Kuu = kfactory.kernel(self.Xu, None,    self.log_theta, 'Kuu')
+        (self.cKuu, self.iKuu, self.logDetKuu) = cholInvLogDet(self.Kuu, self.M, self.jitter)
 
         # Variational distribution
-        self.Sigma  = self.Kff - T.dot(self.Kfu, T.dot(self.iKuu, self.Kfu.T))
+        self.Sigma  = self.Kff - Tdot(Tdot(self.Kfu, self.iKuu), self.Kfu.T)
         self.Sigma.name = 'Sigma'
         (self.cSigma, self.iSigma, self.logDetSigma) = cholInvLogDet(self.Sigma, self.B, self.jitter)
 
-        # Sample u_q from q(u_q) = N(u_q; kappa_q, Kuu )  [QxM]
-        self.u  = self.kappa + (T.dot(self.cKuu, self.alpha.T)).T
+        # Sample u_q from q(u_q) = N(u_q; kappa_q, Kappa )  [QxM]
+        self.u  = self.kappa + (Tdot(self.cKappa, self.alpha.T)).T
         # compute mean of f [QxB]
-        self.mu = T.dot(self.Kfu, T.dot(self.iKuu, self.u.T)).T
+        self.mu = Tdot(self.Kfu, Tdot(self.iKuu, self.u.T)).T
         # Sample f from q(f|u,X) = N( mu_q, Sigma ) [QxB]
-        self.f  = self.mu + (T.dot(self.cSigma, self.xi.T)).T
+        self.f  = self.mu + (Tdot(self.cSigma, self.xi.T)).T
         # Sample z from q(z|f) = N(z,f,I*sigma^2) [QxB]
         self.z  = self.f + T.exp(self.log_sigma) * self.eta
 
@@ -311,7 +308,7 @@ class SGPDV(object):
         self.f.name  = 'f'
         self.z.name  = 'z'
 
-        self.qf_vars = [self.log_sigma]
+        self.qf_vars = [self.log_sigma, self.log_theta]
 
         if self.encoderType_rX == 'FreeForm1' or self.encoderType_rX == 'FreeForm2':
 
@@ -328,12 +325,12 @@ class SGPDV(object):
 
                 self.Tau_full_sqrt = sharedZeroMatrix(self.N * self.R, self.N * self.R, 'Tau_full_sqrt')
                 Tau_batch_sqrt = self.Tau_full_sqrt[TauIdx][:, TauIdx]
-                self.Tau = T.dot(Tau_batch_sqrt, Tau_batch_sqrt.T)
+                self.Tau = Tdot(Tau_batch_sqrt, Tau_batch_sqrt.T)
 
                 Tau_batch_sqrt.name = 'Tau_batch_sqrt'
                 self.Tau.name = 'Tau'
 
-                (self.cTau, self.iTau, self.logDetTau) = cholInvLogDet(self.Tau, self.B * self.R, self.jitter)
+                (self.cTau, self.iTau, self.logDetTau) = cholInvLogDet(self.Tau, self.B * self.R, 0)
 
                 self.rX_vars = [self.Tau_full_sqrt, self.tau_full]
 
@@ -359,11 +356,11 @@ class SGPDV(object):
             self.b3_rX = sharedZeroVector(self.R, 'b3_rX', broadcastable=(False, True))
 
             # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
-            h_rX = T.nnet.softplus(T.dot(self.W1_rX, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_rX)
+            h_rX = T.nnet.softplus(Tdot(self.W1_rX, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_rX)
             # [RxB] = softplus( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
-            mu_rX = T.nnet.sigmoid(T.dot(self.W2_rX, h_rX) + self.b2_rX)
+            mu_rX = T.nnet.sigmoid(Tdot(self.W2_rX, h_rX) + self.b2_rX)
             # [RxB] = 0.5*( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
-            log_sigma_rX = 0.5 * (T.dot(self.W3_rX, h_rX) + self.b3_rX)
+            log_sigma_rX = 0.5 * (Tdot(self.W3_rX, h_rX) + self.b3_rX)
 
             h_rX.name         = 'h_rX'
             mu_rX.name        = 'mu_rX'
@@ -404,13 +401,12 @@ class SGPDV(object):
 
             self.Upsilon_sqrt = sharedZeroMatrix(self.Q * self.M, self.Q * self.M, 'Upsilon_sqrt')
 
-            self.Upsilon = T.dot(self.Upsilon_sqrt, self.Upsilon_sqrt.T)
-            self.Upsilon.name = 'Upsilon'
+            self.Upsilon = Tdot(self.Upsilon_sqrt, self.Upsilon_sqrt.T, 'Upsilon')
 
             self.upsilon = sharedZeroMatrix(self.Q, self.M, 'upsilon')
 
             (self.cUpsilon, self.iUpsilon, self.logDetUpsilon) \
-                = cholInvLogDet(self.Upsilon, self.Q * self.M, self.jitter)
+                = cholInvLogDet(self.Upsilon, self.Q * self.M, 0)
 
             self.ru_vars = [self.Upsilon_sqrt, self.upsilon]
 
@@ -437,13 +433,13 @@ class SGPDV(object):
             self.b4_ru = sharedZeroVector(self.M, 'b3_ru', broadcastable=(False, True))
 
             # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
-            h1_ru = T.nnet.softplus(T.dot(self.W1_ru, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_ru)
+            h1_ru = T.nnet.softplus(Tdot(self.W1_ru, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_ru)
             # [HxQ] = softplus( [HxB] . [BxQ] + repmat([Hx1], [1,Q]) )
-            h2_ru = T.nnet.softplus(T.dot(h1_ru, self.W2_ru) + self.b2_ru)
+            h2_ru = T.nnet.softplus(Tdot(h1_ru, self.W2_ru) + self.b2_ru)
             # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Hx1], [1,Q]) )
-            mu_ru = T.nnet.sigmoid(T.dot(self.W3_ru, h2_ru) + self.b3_ru)
+            mu_ru = T.nnet.sigmoid(Tdot(self.W3_ru, h2_ru) + self.b3_ru)
             # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Hx1], [1,Q]) )
-            log_sigma_ru = 0.5 * (T.dot(self.W4_ru, h2_ru) + self.b4_ru)
+            log_sigma_ru = 0.5 * (Tdot(self.W4_ru, h2_ru) + self.b4_ru)
 
             h1_ru.name         = 'h1_ru'
             h2_ru.name         = 'h2_ru'
@@ -519,6 +515,9 @@ class SGPDV(object):
                 print 'Randomising ' + var.name
                 if var.name.endswith('logdiag'):
                     var.set_value(var.get_value() + 1.)
+                elif var.name.endswith('sqrt'):
+                    n = var.get_value().shape[0]
+                    var.set_value(np.eye(n))
                 else:
                     var.set_value(rnd(var.get_value()))
             elif type(var) == T.sharedvar.ScalarSharedVariable:
@@ -607,11 +606,12 @@ class SGPDV(object):
         raise RuntimeError('Calling un-implemented function')
 
     def log_q_f_uX(self):
-        f_minus_mu = self.f - self.mu
-        outer = T.dot(f_minus_mu.T, f_minus_mu)
+        f_minus_mu = Tminus(self.f, self.mu)
+        fouter = Tdot(f_minus_mu.T, f_minus_mu, 'fouter')
         log_q_f_uX_ = - 0.5 * self.Q * self.B * np.log(2 * np.pi) \
                       - 0.5 * self.Q * self.logDetSigma \
-                      - 0.5 * nlinalg.trace(T.dot(self.iSigma, outer))
+                      - 0.5 * nlinalg.trace(Tdot(self.iSigma, fouter))
+        log_q_f_uX_.name = 'log_q_f_uX'
         return log_q_f_uX_
 
     def addtionalBoundTerms(self):
@@ -656,21 +656,20 @@ class SGPDV(object):
     def log_r_uX_z(self):
         # use this function if we don't want to exploit gaussianity
 
-        X_m_tau = self.Xf - self.tau
-        X_m_tau.name = 'X_m_tau'
-
+        X_m_tau = Tminus(self.Xf, self.tau)
         X_m_tau_vec = T.reshape(X_m_tau, [self.B * self.R, 1])
         X_m_tau_vec.name = 'X_m_tau_vec'
 
-        u_m_upsilon = T.reshape(self.u - self.upsilon, [self.Q * self.M, 1])
-        u_m_upsilon.name = 'u_m_upsilon'
+        u_m_upsilion = Tminus(self.u - self.upsilon)
+        u_m_upsilon_vec = T.reshape(u_m_upsilion, [self.Q * self.M, 1])
+        u_m_upsilon_vec.name = 'u_m_upsilon_vec'
 
         log_ru_z = -0.5 * self.Q * self.M * log2pi - 0.5 * self.logDetUpsilon \
-            - 0.5 * nlinalg.trace(T.dot(u_m_upsilon.T, T.dot(self.iUpsilon, u_m_upsilon)))
+            - 0.5 * nlinalg.trace(Tdot(u_m_upsilon_vec.T, Tdot(self.iUpsilon, u_m_upsilon_vec)))
         log_ru_z.name = 'log_ru_z'
 
         log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
-            - 0.5 * nlinalg.trace(T.dot(X_m_tau_vec.T, T.dot(self.iTau, X_m_tau_vec)))
+            - 0.5 * nlinalg.trace(Tdot(X_m_tau_vec.T, Tdot(self.iTau, X_m_tau_vec)))
         log_rX_z.name = 'log_rX_z'
 
         log_r = log_ru_z + log_rX_z
@@ -681,21 +680,20 @@ class SGPDV(object):
     def log_q_uX(self):
 
         # [BxR]
-        X_m_phi = self.Xf - self.phi
-        X_m_phi.name = 'X_m_phi'
+        X_m_phi = Tminus(self.Xf - self.phi)
         # [BxB] = [BxR] . [BxR]^T
-        xOuter = T.dot(X_m_phi, X_m_phi.T)
-        xOuter.name = 'xOuter'
+        xOuter = Tdot(X_m_phi, X_m_phi.T, 'xOuter')
         # [MxM] = [RxM]^T . [RxM]
-        uOuter = T.dot((self.u - self.kappa).T, (self.u - self.kappa))
-        uOuter.name = 'uOuter'
+        u_m_kappa = Tminus(self.u - self.kappa)
+        # [?] 
+        uOuter = Tdot(u_m_kappa.T, u_m_kappa, 'uOuter')
 
         log_q_X = -0.5 * self.B * self.R * log2pi - 0.5 * self.R * self.logDetPhi \
-                  - 0.5 * nlinalg.trace(T.dot(self.iPhi, xOuter))
+                  - 0.5 * nlinalg.trace(Tdot(self.iPhi, xOuter))
         log_q_X.name = 'log_q_X'
 
-        log_q_u = -0.5 * self.Q * self.M * log2pi - 0.5 * self.Q * self.logDetKuu \
-                  - 0.5 * nlinalg.trace(T.dot(self.iKuu, uOuter))
+        log_q_u = -0.5 * self.Q * self.M * log2pi - 0.5 * self.Q * self.logDetKappa \
+                  - 0.5 * nlinalg.trace(Tdot(self.iKappa, uOuter))
         log_q_u.name = 'log_q_u'
 
         log_q = log_q_u + log_q_X
@@ -705,21 +703,20 @@ class SGPDV(object):
 
     def KL_qr(self):
 
-        upsilon_m_kappa = self.upsilon - self.kappa
-        upsilon_m_kappa.name = 'upsilon_m_kappa'
+        upsilon_m_kappa = Tminus(self.upsilon, self.kappa)
 
         upsilon_m_kappa_vec = T.reshape(upsilon_m_kappa, [self.Q * self.M, 1])
         upsilon_m_kappa_vec.name = 'upsilon_m_kappa_vec'
 
-        Kuu_kron = slinalg.kron(T.eye(self.Q), self.Kuu)
-        Kuu_kron.name = 'Kuu_kron'
+        Kappa_kron = slinalg.kron(T.eye(self.Q), self.Kappa)
+        Kappa_kron.name = 'Kappa_kron'
 
         # We don't actually need a trace here (mathematically),
         # but it tells theano the results is guaranteed to be scalar
-        KL_qr_u_1 = nlinalg.trace((T.dot(upsilon_m_kappa_vec.T,
-                                         T.dot(self.iUpsilon, upsilon_m_kappa_vec))))
-        KL_qr_u_2 = nlinalg.trace(T.dot(self.iUpsilon, Kuu_kron))
-        KL_qr_u_3 = self.logDetUpsilon - self.Q * self.logDetKuu
+        KL_qr_u_1 = nlinalg.trace((Tdot(upsilon_m_kappa_vec.T,
+                                         Tdot(self.iUpsilon, upsilon_m_kappa_vec))))
+        KL_qr_u_2 = nlinalg.trace(Tdot(self.iUpsilon, Kappa_kron))
+        KL_qr_u_3 = self.logDetUpsilon - self.Q * self.logDetKappa
         KL_qr_u = 0.5 * (KL_qr_u_1 + KL_qr_u_2 + KL_qr_u_3 - self.Q * self.M)
 
         KL_qr_u_1.name = 'KL_qr_u_1'
@@ -729,7 +726,7 @@ class SGPDV(object):
 
         phi_m_tau = self.phi - self.tau
         phi_m_tau_vec = T.reshape(phi_m_tau, [self.B * self.R, 1])
-        # Not that the kron is the other way here compared to Kuu
+        # Not that the kron is the other way here compared to Kappa
         Phi_kron = slinalg.kron(self.Phi, T.eye(self.R))
 
         phi_m_tau.name = 'phi_m_tau'
@@ -737,9 +734,9 @@ class SGPDV(object):
         Phi_kron.name = 'Phi_kron'
 
         # Again, don't actually need a trace here from maths perspective
-        KL_qr_X_1 = nlinalg.trace(T.dot(phi_m_tau_vec.T,
-                                        T.dot(self.iTau, phi_m_tau_vec)))
-        KL_qr_X_2 = nlinalg.trace(T.dot(self.iTau, Phi_kron))
+        KL_qr_X_1 = nlinalg.trace(Tdot(phi_m_tau_vec.T,
+                                        Tdot(self.iTau, phi_m_tau_vec)))
+        KL_qr_X_2 = nlinalg.trace(Tdot(self.iTau, Phi_kron))
         KL_qr_X_3 = self.logDetTau - self.logDetPhi
         KL_qr_X = 0.5 * (KL_qr_X_1 + KL_qr_X_2 + KL_qr_X_3 - self.N * self.R)
 
