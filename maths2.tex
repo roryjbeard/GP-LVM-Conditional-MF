@@ -118,10 +118,10 @@ q(X_z) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \tau_r, \Tau)
 %
 \begin{align}
 &\Ex_{q(\ub,X_z)}\left[\KL\left(q(\zb|\ub,X_z)||p(\zb)\right)\right] \notag \\
-&= \Ex_{q(\ub,X_z)}\left[\sum_{q=1}^Q \left(\tr(\Lb) + \zb_q^\top\zb - B -  \log\det\Lb \right)\right] \\
-&= \Ex_{q(\ub,X_z)}\left[\sum_{q=1}^Q \left(\tr(\Lb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Lb \right)\right] \\
-&=\Ex_{q(X_z)}\left[\sum_{q=1}^Q \left(\tr(\Lb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Lb \right)\right] \\
-&=\Ex_{q(X_z)}\left[Q\tr(\Lb) + \sum_{q=1}^Q\;\tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + Q\;\tr(\Ab^\top\Ab\Kappa) - QB -  Q\;\log\det\Lb \right]
+&= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Lb) + \zb_q^\top\zb - B -  \log\det\Lb \right)\right] \\
+&= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Lb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Lb \right)\right] \\
+&=\Ex_{q(X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Lb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Lb \right)\right] \\
+&=\Ex_{q(X_z)}\left[\frac{Q}{2}\tr(\Lb) + \frac{1}{2}\sum_{q=1}^Q\;\tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + \frac{Q}{2}\;\tr(\Ab^\top\Ab\Kappa) - \frac{QB}{2} -  \frac{Q}{2}\;\log\det\Lb \right]
 \end{align}
 %
 The entropy of $q(\ub)$ is:
@@ -135,7 +135,7 @@ The entropy of $q(X_z)$ is:
 %
 \begin{align}
 -\Ex_{q(X_z)}\left[\log q(\ub)\right] &= \sum_{r=1}^R H[q(\xb_r)] \\
-&= \frac{RB}{2}(1+\log(2\pi))) + \frac{R}{2}\log\det(\Kappa)
+&= \frac{RB}{2}(1+\log(2\pi))) + \frac{R}{2}\log\det(\Tau)
 \end{align}
 %
 We decompose $r$ as $r(\ub,X_z|\zb) = r(\ub|\zb,X_z)r(X_z|\zb)$. 
@@ -147,11 +147,11 @@ We decompose $r$ as $r(\ub,X_z|\zb) = r(\ub|\zb,X_z)r(X_z|\zb)$.
 We set $r(\ub|\zb,X_z) = q(\ub|\zb,X_z)$ which we can compute exactly.
 %
 \begin{align}
-q(\ub|\zb,X_z) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \mu_{u|z}^{(q)}, \Sigma_{u|z}) \\
+q(\ub|\zb,X_z) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \upsilon_q, \Upsilon) \\
 %\Lb^{-1} &= [\Kzz^{-1}-\Kzz^{-1}\Kzu\{ \Kuz\Kzz^{-1}\Kzu-\Kuu\}^{-1}\Kuz\Kzz^{-1} ] \\
-\Sigma_{u|z} &= (\Kappa^{-1} + \Ab^\top\Lb^{-1}\Ab)^{-1} \\
+\Upsilon &= (\Kappa^{-1} + \Ab^\top\Lb^{-1}\Ab)^{-1} \\
 %&= \Kappa^{-1} - \Kappa^{-1} \Ab^\top (\Lb+ \Ab\Kappa^{-1}\Ab^\top)^{-1}\Ab\Kappa^{-1}\\
-\mu_{u|z}^{(q)} &= (\Kappa^{-1} + \Ab^\top\Lb^{-1}\Ab)^{-1}[\Ab^\top \Lb^{-1}\zb_q + \Kappa^{-1}\kappa]
+\upsilon_q &= (\Kappa^{-1} + \Ab^\top\Lb^{-1}\Ab)^{-1}[\Ab^\top \Lb^{-1}\zb_q + \Kappa^{-1}\kappa]
 \end{align}
 %
 Therefore:
@@ -159,7 +159,7 @@ Therefore:
 \begin{align}
 \Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub|X_z,\zb)\right] &= \Ex_{q(\zb,X_z)}\left[ \Ex_{q(\ub|\zb,X_z)} \left\{\log q(\ub|\zb,X_z) \right\} \right] \\
 &= \Ex_{q(\zb,X_z)}\left[-H(q(\ub|\zb,X_z)) \right] \\
-&= \Ex_{q(X_z)}\left[-\frac{MQ}{2}(1+\log(2\pi))) -\frac{Q}{2}\log\det(\Sigma_{u|z}) \right]
+&= \Ex_{q(X_z)}\left[-\frac{MQ}{2}(1+\log(2\pi))) -\frac{Q}{2}\log\det(\Upsilon) \right]
 \end{align}
 %
 
