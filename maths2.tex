@@ -1,0 +1,170 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[top=20mm, bottom=20mm, left=30mm, right=30mm]{geometry}
+\usepackage{soul}
+\usepackage{bbm}
+%Gummi|061|=)
+\usepackage{setspace}
+\usepackage[usenames, dvipsnames]{color}
+
+\newcommand{\chris}[1]{\textcolor{ForestGreen}{#1}}
+\newcommand{\Tau}{\mathcal{T}}
+\newcommand{\Kappa}{\mathcal{K}}
+\newcommand{\xb}{\mathbf{x}}
+\newcommand{\ub}{\mathbf{u}}
+\newcommand{\zb}{\mathbf{z}}
+\newcommand{\Lb}{\mathbf{L}}
+\newcommand{\Ab}{\mathbf{A}}
+\newcommand{\yb}{\mathbf{y}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\Lo}{\mathcal{L}_1}
+\newcommand{\Laux}{\mathcal{L}_{\mathrm{aux}}}
+\newcommand{\Kzz}{\mathbf{K}_{zz}}
+\newcommand{\Kuu}{\mathbf{K}_{uu}}
+\newcommand{\Kuz}{\mathbf{K}_{uz}}
+\newcommand{\Kzu}{\mathbf{K}_{zu}}
+\newcommand{\Ex}{\mathbb{E}}
+\newcommand{\KL}{\mathrm{KL}}
+\newcommand{\No}{\mathcal{N}}
+\newcommand{\chol}{\mathrm{chol}}
+\newcommand{\tr}{\mathrm{tr}}
+\doublespacing
+
+\setlength{\parindent}{0pt}
+
+\title{\textbf{Derivations and Equations}}
+\date{}
+\begin{document}
+
+\maketitle
+
+
+\section{Deriving the bound} % (fold)
+\label{sec:derive_bound}
+The standard variational formulation is
+%
+\begin{align}
+    \log p(\yb) &= \int q(\zb)\log\frac{p(\yb|\zb)p(\zb)}{q(\zb)}\frac{q(\zb)}{p(\zb|\yb)} \dd\zb\notag\\
+    &= \underbrace{\mathbb{E}_{q(\zb)}\big[ \log p(\yb|\zb)p(\zb) - \log q(\zb) \big]}_{\Lo} + \KL\big[ q(\zb)\Vert p(\zb|\yb) \big]\label{eq:logpy1}
+\end{align}
+
+We want $\zb = z(X_z)$ to come from a Guassian process. We also want to condition that GP on some $\ub=u(X_u)$ who's distribution, $q(\ub)$, we control.
+
+We want $u$ and $z$ to come from the same zero mean gaussian process
+%
+\begin{equation}
+    [z(X_z),u(X_u)]^\top \sim \mathcal{GP}(0,[K(X_z,X_z^\prime),K(X_z,X_u^\prime);K(X_u,X_z^\prime),K(X_u,X_u^\prime)])
+\end{equation}
+%
+where $K(X_z,X_z^\prime) = \Kzz$, $K(X_z,X_u^\prime) = \Kzu$, $ K(X_u,X_z^\prime) = \Kuz$, $K(X_u,X_u^\prime) = \Kuu$.
+
+Therefore $\zb|\ub,X_z,X_u \sim \mathcal{N}(\Kzu\Kuu^{-1}\ub, \Kzz - \Kzu\Kuu^{-1}\Kuz)$
+
+We also want to treat the input locations $X_z$ as random variables with distribution $q(X_z)$ who's parameters we control.
+%
+\begin{align}
+q(\zb) &= \int_{\ub,X_z} q(\zb|\ub,X_z)q(\ub)q(X_z) \dd\ub \dd X_z \label{eq:qz1} \\
+&= \frac{q(\zb|\ub,X_z)q(\ub)q(X_z)}{q(\ub,X_z|\zb)} \label{eq:qz2}
+\end{align}
+%
+Note that the integral
+%
+\begin{equation}
+\int_{\ub} q(\zb|\ub,X_z)q(\ub)q(X_z) \dd\ub
+\end{equation}
+%
+is tractable but the integral
+\begin{equation}
+\int_{X_z} q(\zb|\ub,X_z)q(\ub)q(X_z) \dd X_z
+\end{equation}
+%
+is not.
+%
+Re-writing $\Lo$ replacing the $q(\zb)$ in the expectation with Equation \ref{eq:qz1} and in the logarithm with Equation \ref{eq:qz2} gives.
+%
+\begin{align}
+\Lo &= \Ex_{q(\zb,\ub,X_z)}[\log p(\yb|\zb)p(\zb)] - \Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\zb|\ub,X_z)q(\ub)q(X_z)}{q(\ub,X_z|\zb)}\right]
+\end{align}
+%
+This contains a term $q(\ub,X_z|\zb)$, that we cannot obtain so introduce $r(\ub,X_z|\zb)$ that will allow us to lower bound again
+%
+\begin{align}
+\Lo &= \Ex_{q(\zb,\ub,X_z)}[\log p(\yb|\zb)p(\zb)] - \Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\zb|\ub,X_z)q(\ub)q(X_z)}{q(\ub,X_z|\zb)}\frac{r(\ub,X_z|\zb)}{r(\ub,X_z|\zb)}\right] \\
+&= \Ex_{q(\zb,\ub,X_z)}[\log p(\yb|\zb)] - \Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\zb|\ub,X_z)}{p(\zb)}\right] \notag \\
+&-\Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\ub)q(X_z)}{r(\ub,X_z|\zb)}\right] + \Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\ub,X_z|\zb)}{r(\ub,X_z|\zb)}\right] \\
+&= \Ex_{q(\zb,\ub,X_z)}[\log p(\yb|\zb)] - \Ex_{q(\ub,X_z)}\left[\Ex_{q(\zb|\ub,X_z)}\left\{\log\frac{q(\zb|\ub,X_z)}{p(\zb)}\right\}\right] \notag \\
+&-\Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\ub)q(X_z)}{r(\ub,X_z|\zb)}\right] + \Ex_{q(\zb)}\left[\Ex_{q(\ub,X_z|\zb)}\left\{\log\frac{q(\ub,X_z|\zb)}{r(\ub,X_z|\zb)}\right\}\right] \\
+&= \Ex_{q(\zb,\ub,X_z)}[\log p(\yb|\zb)] - \Ex_{q(\ub,X_z)}\left[\KL\left(q(\zb|\ub,X_z)||p(\zb)\right)\right] \notag \\
+&-\Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\ub)q(X_z)}{r(\ub,X_z|\zb)}\right] + \Ex_{q(\zb)}\left[\KL\left(q(\ub,X_z|\zb)||r(\ub,X_z|\zb)\right)\right]
+\end{align}
+%
+Noticing the final KL divergence term is always positive we can drop this term to obtain a lower bound $\Laux:$
+%
+\begin{align}
+\Lo &\ge \Ex_{q(\zb)}[\log p(\yb|\zb)] - \Ex_{q(\ub,X_z)}\left[\KL\left(q(\zb|\ub,X_z)||p(\zb)\right)\right] \notag \\
+&-\Ex_{q(\ub)}\left[\log q(\ub)\right] - \Ex_{q(X_z)}\left[\log q(X_z)\right] + \Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub,X_z|\zb)\right] \\
+&\triangleq \Laux
+\end{align}
+%
+
+\begin{align}
+p(\zb) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \vec{0}, \mathbb{I}_B) \\
+q(\ub) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \kappa_q, \Kappa) \\
+q(\zb|\ub,X_z) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \underbrace{\Kzu\Kuu^{-1}}_{\Ab}\ub_q, \underbrace{\Kzz-\Kzu\Kuu^{-1}\Kuz}_{\Lb}) \\
+q(X_z) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \tau_r, \Tau)
+\end{align}
+%
+\begin{align}
+&\Ex_{q(\ub,X_z)}\left[\KL\left(q(\zb|\ub,X_z)||p(\zb)\right)\right] \notag \\
+&= \Ex_{q(\ub,X_z)}\left[\sum_{q=1}^Q \tr(\Lb) + \zb_q^\top\zb - B -  \log\det\Lb \right] \\
+&= \Ex_{q(\ub,X_z)}\left[\sum_{q=1}^Q \tr(\Lb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Lb \right] \\
+&=\Ex_{q(X_z)}\left[\sum_{q=1}^Q \tr(\Lb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Lb \right] \\
+&=\Ex_{q(X_z)}\left[\sum_{q=1}^Q \tr(\Lb) + \tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + \tr(\Ab^\top\Ab\Kappa) - B -  \log\det\Lb \right]
+\end{align}
+%
+The entropy of $q(\ub)$ is:
+%
+\begin{align}
+-\Ex_{q(\ub)}\left[\log q(\ub)\right] &= \sum_{q=1}^Q H[q(\ub_q)] \\
+&= \frac{MQ}{2}(1+\log(2\pi))) + \frac{Q}{2}\log\det(\Kappa)
+\end{align}
+%
+The entropy of $q(X_z)$ is:
+%
+\begin{align}
+-\Ex_{q(X_z)}\left[\log q(\ub)\right] &= \sum_{r=1}^R H[q(\xb_r)] \\
+&= \frac{RB}{2}(1+\log(2\pi))) + \frac{R}{2}\log\det(\Kappa)
+\end{align}
+%
+We decompose $r$ as $r(\ub,X_z|\zb) = r(\ub|\zb,X_z)r(X_z|\zb)$. 
+%
+\begin{align}
+\Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub,X_z|\zb)\right] &= \Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub|X_z,\zb)\right] + \Ex_{q(\zb,X_z)}\left[\log r(X_z|\zb)\right] 
+\end{align}
+%
+We set $r(\ub|\zb,X_z) = q(\ub|\zb,X_z)$ which we can compute exactly.
+%
+\begin{align}
+q(\ub|\zb,X_z) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \mu_{u|z}^{(q)}, \Sigma_{u|z}) \\
+%\Lb^{-1} &= [\Kzz^{-1}-\Kzz^{-1}\Kzu\{ \Kuz\Kzz^{-1}\Kzu-\Kuu\}^{-1}\Kuz\Kzz^{-1} ] \\
+\Sigma_{u|z} &= (\Kappa^{-1} + \Ab^\top\Lb^{-1}\Ab)^{-1} \\
+%&= \Kappa^{-1} - \Kappa^{-1} \Ab^\top (\Lb+ \Ab\Kappa^{-1}\Ab^\top)^{-1}\Ab\Kappa^{-1}\\
+\mu_{u|z}^{(q)} &= (\Kappa^{-1} + \Ab^\top\Lb^{-1}\Ab)^{-1}[\Ab^\top \Lb^{-1}\zb_q + \Kappa^{-1}\kappa]
+\end{align}
+%
+Therefore:
+%
+\begin{align}
+\Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub|X_z,\zb)\right] &= \Ex_{q(\zb,X_z)}\left[ \Ex_{q(\ub|\zb,X_z)} \left\{\log q(\ub|\zb,X_z) \right\} \right] \\
+&= \Ex_{q(\zb,X_z)}\left[-H(q(\ub|\zb,X_z)) \right] \\
+&= \Ex_{q(X_z)}\left[-\frac{MQ}{2}(1+\log(2\pi))) -\frac{Q}{2}\log\det(\Sigma_{u|z}) \right]
+\end{align}
+%
+
+
+
+\end{document}
+
+
