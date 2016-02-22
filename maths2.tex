@@ -1,0 +1,99 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[top=20mm, bottom=20mm, left=30mm, right=30mm]{geometry}
+\usepackage{soul}
+\usepackage{bbm}
+%Gummi|061|=)
+\usepackage{setspace}
+\usepackage[usenames, dvipsnames]{color}
+
+\newcommand{\chris}[1]{\textcolor{ForestGreen}{#1}}
+\newcommand{\Tau}{\mathcal{T}}
+\newcommand{\ub}{\mathbf{u}}
+\newcommand{\zb}{\mathbf{z}}
+\newcommand{\yb}{\mathbf{y}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\Lo}{\mathcal{L}_1}
+\newcommand{\Kzz}{\mathbf{K}_{zz}}
+\newcommand{\Kuu}{\mathbf{K}_{uu}}
+\newcommand{\Kuz}{\mathbf{K}_{uz}}
+\newcommand{\Kzu}{\mathbf{K}_{zu}}
+\newcommand{\Ex}{\mathbb{E}}
+\newcommand{\No}{\mathcal{N}}
+\newcommand{\chol}{\mathrm{chol}}
+\doublespacing
+
+\setlength{\parindent}{0pt}
+
+\title{\textbf{Derivations and Equations}}
+\date{}
+\begin{document}
+
+\maketitle
+
+
+\section{Deriving the bound} % (fold)
+\label{sec:derive_bound}
+The standard variational formulation is
+%
+\begin{align}
+    \log p(\yb) &= \int q(\zb)\log\frac{p(\yb|\zb)p(\zb)}{q(\zb)}\frac{q(\zb)}{p(\zb|\yb)} \dd\zb\notag\\
+    &= \underbrace{\mathbb{E}_{q(\zb)}\big[ \log p(\yb|\zb)p(\zb) - \log q(\zb) \big]}_{\Lo} + \text{KL}\big[ q(\zb)\Vert p(\zb|\yb) \big]\label{eq:logpy1}
+\end{align}
+
+We want $\zb = z(X_z)$ to come from a Guassian process. We also want to condition that GP on some $\ub=u(X_u)$ who's distribution, $q(\ub)$, we control.
+
+We want $u$ and $z$ to come from the same zero mean gaussian process
+%
+\begin{equation}
+    [z(X_z),u(X_u)]^\top \sim \mathcal{GP}(0,[K(X_z,X_z^\prime),K(X_z,X_u^\prime);K(X_u,X_z^\prime),K(X_u,X_u^\prime)])
+\end{equation}
+%
+where $K(X_z,X_z^\prime) = \Kzz$, $K(X_z,X_u^\prime) = \Kzu$, $ K(X_u,X_z^\prime) = \Kuz$, $K(X_u,X_u^\prime) = \Kuu$.
+
+Therefore $\zb|\ub,X_z,X_u \sim \mathcal{N}(\Kzu\Kuu^{-1}\ub, \Kzz - \Kzu\Kuu^{-1}\Kuz)$
+
+We also want to treat the input locations $X_z$ as random variables with distribution $q(X_z)$ who's parameters we control.
+%
+\begin{align}
+q(\zb) &= \int_{\ub,X_z} q(\zb|\ub,X_z)q(\ub)q(X_z) \dd\ub \dd X_z \label{eq:qz1} \\
+&= \frac{q(\zb|\ub,X_z)q(\ub)q(X_z)}{q(\ub,X_z|\zb)} \label{eq:qz2}
+\end{align}
+%
+where
+\begin{align}
+q(\ub,X_z|\zb) &= \frac{q(\zb|\ub,X_z)q(\ub)q(X_z)}{q(\zb)}
+\end{align}
+%
+Note that the integral
+%
+\begin{equation}
+\int_{\ub} q(\zb|\ub,X_z)q(\ub)q(X_z) \dd\ub
+\end{equation}
+%
+is tractable but the integral
+\begin{equation}
+\int_{X_z} q(\zb|\ub,X_z)q(\ub)q(X_z) \dd X_z
+\end{equation}
+%
+is not.
+%
+Re-writing $\Lo$ replacing the $q(z)$ in the expectation with Equation \ref{eq:qz1} and in the logarithm with Equation \ref{eq:qz2} gives.
+%
+\begin{align}
+\Lo &= \Ex_{q(\zb,\ub,X_z)}[\log p(\yb|\zb)p(\zb)] - \Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\zb|\ub,X_z)q(\ub)q(X_z)}{q(\ub,X_z|\zb)}\right]
+\end{align}
+%
+This contains a term $q(\ub,X_z|\zb)$, that we cannot obtain so introduce $r$ that will allow us to lower bound again
+%
+\begin{align}
+\Lo &= \Ex_{q(\zb,\ub,X_z)}[\log p(\yb|\zb)p(\zb)] - \Ex_{q(\zb,\ub,X_z)}\left[\log\frac{q(\zb|\ub,X_z)q(\ub)q(X_z)}{q(\ub,X_z|\zb)}\frac{r(\ub,X_z|\zb)}{r(\ub,X_z|\zb)}\right]
+\end{align}
+
+
+
+\end{document}
+
+
