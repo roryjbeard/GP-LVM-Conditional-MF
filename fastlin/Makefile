@@ -17,6 +17,11 @@ default: choleskyGradTest
 libcholgrad.so: dpo2ft.o dpofrt.o choleskyGrad.o
 	$(CC) $(LINSHARE) -o libcholgrad.so dpo2ft.o dpofrt.o choleskyGrad.o $(LINLIBS)
 
+# Static library for linux (mac doesn't do static libraries)
+#libcholgrad.a: dpo2ft.o dpofrt.o choleskyGrad.o
+#	ar rcs tmp.a choleskyGrad.o dpo2ft.o dpofrt.o choleskyGrad.o
+#	libtool --mode=link cc -static -o lib.la libabc.la libxyz.la
+
 # Uncomment for mac
 #libcholgrad.dylib: dpo2ft.o dpofrt.o choleskyGrad.o
 #	$(CC) $(MACSHARE) -o libcholgrad.dylib dpo2ft.o dpofrt.o choleskyGrad.o $(MACLIBS)

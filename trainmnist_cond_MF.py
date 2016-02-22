@@ -82,9 +82,9 @@ va.randomise()
 va.init_Xu_from_Xf()
 
 
-va.printMemberTypes()
-va.printSharedVariables()
-va.printTheanoVariables()
+#va.printMemberTypes()
+#va.printSharedVariables()
+#va.printTheanoVariables()
 
 
 va.constructUpdateFunction()
