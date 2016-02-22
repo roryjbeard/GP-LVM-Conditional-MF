@@ -88,7 +88,6 @@ class SGPDV(object):
         self.encoderType_qX = encoderType_qX
         self.encoderType_rX = encoderType_rX
         self.encoderType_ru = encoderType_ru
-    
         self.Xu_optimise = Xu_optimise
 
         self.y = th.shared(data)
@@ -167,8 +166,8 @@ class SGPDV(object):
             if encoderType_qX == 'FreeForm1':
 
                 self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
-                
-                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
+
+                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]                
                 Phi_batch_sqrt.name = 'Phi_batch_sqrt'
                 
                 self.Phi = Tdot(Phi_batch_sqrt, Phi_batch_sqrt.T, 'Phi')
@@ -580,7 +579,7 @@ class SGPDV(object):
         xOuter = Tdot(X_m_phi, X_m_phi.T, 'xOuter')
         # [MxM] = [RxM]^T . [RxM]
         u_m_kappa = Tminus(self.u - self.kappa)
-        # [?] 
+        # [?]
         uOuter = Tdot(u_m_kappa.T, u_m_kappa, 'uOuter')
 
         log_q_X = -0.5 * self.B * self.R * log2pi - 0.5 * self.R * self.logDetPhi \

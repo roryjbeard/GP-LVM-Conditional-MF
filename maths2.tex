@@ -118,10 +118,10 @@ q(X_z) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \tau_r, \Tau)
 %
 \begin{align}
 &\Ex_{q(\ub,X_z)}\left[\KL\left(q(\zb|\ub,X_z)||p(\zb)\right)\right] \notag \\
-&= \Ex_{q(\ub,X_z)}\left[\sum_{q=1}^Q \tr(\Lb) + \zb_q^\top\zb - B -  \log\det\Lb \right] \\
-&= \Ex_{q(\ub,X_z)}\left[\sum_{q=1}^Q \tr(\Lb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Lb \right] \\
-&=\Ex_{q(X_z)}\left[\sum_{q=1}^Q \tr(\Lb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Lb \right] \\
-&=\Ex_{q(X_z)}\left[\sum_{q=1}^Q \tr(\Lb) + \tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + \tr(\Ab^\top\Ab\Kappa) - B -  \log\det\Lb \right]
+&= \Ex_{q(\ub,X_z)}\left[\sum_{q=1}^Q \left(\tr(\Lb) + \zb_q^\top\zb - B -  \log\det\Lb \right)\right] \\
+&= \Ex_{q(\ub,X_z)}\left[\sum_{q=1}^Q \left(\tr(\Lb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Lb \right)\right] \\
+&=\Ex_{q(X_z)}\left[\sum_{q=1}^Q \left(\tr(\Lb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Lb \right)\right] \\
+&=\Ex_{q(X_z)}\left[Q\tr(\Lb) + \sum_{q=1}^Q\;\tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + Q\;\tr(\Ab^\top\Ab\Kappa) - QB -  Q\;\log\det\Lb \right]
 \end{align}
 %
 The entropy of $q(\ub)$ is:
@@ -162,7 +162,6 @@ Therefore:
 &= \Ex_{q(X_z)}\left[-\frac{MQ}{2}(1+\log(2\pi))) -\frac{Q}{2}\log\det(\Sigma_{u|z}) \right]
 \end{align}
 %
-
 
 
 \end{document}
