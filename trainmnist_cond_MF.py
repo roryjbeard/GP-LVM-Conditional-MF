@@ -6,7 +6,7 @@ import argparse
 import gzip, cPickle
 import os
 import theano.tensor as T
-from sklearn.decomposition import PCA
+# from sklearn.decomposition import PCA
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 os.environ["LD_LIBRARY_PATH"]   = os.path.dirname(os.path.realpath(__file__)) + '/fastlin/'
@@ -23,6 +23,7 @@ f = gzip.open('mnist.pkl.gz', 'rb')
 (x_train, t_train), (x_valid, t_valid), (x_test, t_test)  = cPickle.load(f)
 f.close()
 
+
 [N,dimX] = x_train.shape
 
 print 'Loading PCA initialisation of Xf with dimX components if it exists'
@@ -37,6 +38,7 @@ except:
     filename = 'PCA_init_Xf_{}_components'.format(dimX)
     with open(filename, 'wb') as ff:
         cPickle.dump(Xf, ff)
+
 
 data = x_train
 

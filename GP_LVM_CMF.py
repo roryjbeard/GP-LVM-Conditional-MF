@@ -779,7 +779,7 @@ class SGPDV(object):
             for it in range(self.numberofBatchesPerEpoch):
 
                 self.sample()
-                self.iterator.set_value(self.iterator.get_value() + 1)
+                self.iterator.set_value(it)
                 lbTmp = self.jitterProtect(self.updateFunction, reset=False)
                 # self.constrainKernelParameters()
 
