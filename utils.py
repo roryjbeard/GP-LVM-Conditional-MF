@@ -1,7 +1,7 @@
 import numpy as np
 import theano as th
 from theano import tensor as T
-from theano.tensor import nlinalg
+from theano.tensor import nlinalg, slinalg
 from fastlin.myCholesky import myCholesky
 
 def t_repeat(x, num_repeats, axis):
@@ -94,13 +94,13 @@ def np_log_mean_exp_stable(x, axis=0):
     return m + np.log(np.mean(np.exp(x - m), axis=axis, keepdims=True))
 
 def sharedZeroMatrix(M, N, name, dtype=th.config.floatX):
-    return th.shared(np.zeros((M, N)).astype(dtype), name=name)
+    return th.shared(np.asfortranarray(np.zeros((M, N)), dtype), name=name)
 
 def sharedZeroVector(M, name, dtype=th.config.floatX, broadcastable=[]):
     if len(broadcastable) == 0:
-        return th.shared(np.zeros((M, 1)).astype(dtype), name=name)
+        return th.shared(np.asfortranarray(np.zeros((M, 1)), dtype), name=name)
     else:
-        return th.shared(np.zeros((M, 1)).astype(dtype), name=name, broadcastable=broadcastable)
+        return th.shared(np.asfortranarray(np.zeros((M, 1)), dtype), name=name, broadcastable=broadcastable)
 
 def sharedZeroArray(M, name, dtype=th.config.floatX):
     return th.shared(np.zeros((M,)).astype(dtype), name=name)
@@ -114,30 +114,68 @@ def shared_ones_like(shared_var):
     return th.shared(np.ones(shared_var.get_value(borrow=True).shape).astype(shared_var.dtype),
                          broadcastable=shared_var.broadcastable)
 
+def getname(D):
+    if type(D) == int or type(D) == float:
+        Dname = str(D)
+    elif hasattr(D,'name'):
+        Dname = Dname
+    else:
+        RuntimeError('Could not get name')
+    return Dname
+
 def Tname(A, B, op, name=None):
+    
+    Aname = getname(A)
+    Bname = getname(B)
+
     if not name == None:
         pass
-    elif not A.name == None and not B.name == None:
-        name = A.name + op + B.name
-    elif not A.name == None:
-        name = A.name + op + '?'
-    elif not B.name == None:
-        name = '?' + 'op' + B.name
+    elif not Aname == None and not Bname == None:
+        name = Aname + op + Bname
+    elif not Aname == None:
+        name = Aname + op + '?'
+    elif not Bname == None:
+        name = '?' + 'op' + Bname
     else:
         name = None
     return name
 
-def Tdot(A, B, name=None):
+def dot(A, B, name=None):
     C = T.dot(A,B)
     C.name = Tname(A, B, '.', name)
     return C
 
-def Tminus(A, B, name=None):
+def minus(A, B, name=None):
     C = A - B
     C.name = Tname(A, B, '-', name)
     return C
 
-def Tplus(A, B, name=None):
+def plus(A, B, name=None):
     C = A + B
     C.name = Tname(A, B, '+', name)
     return C
+
+def mul(A, B, name=None):
+    C = A * B
+    C.name = Tname(A, B, '*', name)
+    return C
+
+def softplus(A, name=None):
+    return T_function(A, T.net.softplus, 'softplus', name)
+
+def sigmoid(A, name=None):
+    return T_function(A, T.net.sigmoid, 'sigmoid', name)
+
+def trace(A, name=None):
+    return T_function(A, nlinalg.trace, 'trace', name)
+
+def tanh(A, name=None):
+    return T_function(A, T.tanh, 'tanh', name)
+
+def T_function(A, func, funcname, name):
+    B = func(A)
+    Aname = getname(A)
+    B.name = funcname + '(' + Aname + ')' 
+    return B
+
+

@@ -12,7 +12,7 @@ from theano.tensor import nlinalg
 
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
-from utils import log_mean_exp_stable, Tdot
+from utils import log_mean_exp_stable, Tdot, nlinalg_trace
 
 precision = th.config.floatX
 
@@ -25,10 +25,8 @@ class VA(SGPDV):
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
             kernelType='RBF',
-            encoderType_qX='FreeForm2',  # 'FreeForm', 'MLP', 'Kernel'.
-            encoderType_qu='FreeForm',
-            encoderType_rX='FreeForm2',  # 'FreeForm', 'MLP', 'Kernel', 'NoEncoding'.
-            encoderType_ru='FreeForm2',  # 'FreeForm', 'MLP', 'NoEncoding'
+            encoderType_qX='FreeForm2',  # MLP', 'Kernel'.
+            encoderType_rX='FreeForm2',  # MLP', 'Kernel'.
             Xu_optimise=False,
             numHiddenUnits_encoder=0,
             numHiddentUnits_decoder=10,
@@ -43,9 +41,7 @@ class VA(SGPDV):
             data,                   # [NxP] matrix of observations
             kernelType=kernelType,
             encoderType_qX=encoderType_qX,
-            encoderType_qu=encoderType_qu,
             encoderType_rX=encoderType_rX,
-            encoderType_ru=encoderType_ru,
             Xu_optimise=Xu_optimise,
             numberOfEncoderHiddenUnits=numHiddenUnits_encoder
         )
@@ -89,7 +85,7 @@ class VA(SGPDV):
         if self.continuous:
 
             h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z) + self.b1)
-            mu_decoder = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)
+            mu_decoder = T.dot(self.W2, h_decoder) + self.b2
             log_sigma_decoder = 0.5*(T.dot(self.W3, h_decoder) + self.b3)
             log_pyz    = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
                                 - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
@@ -99,8 +95,8 @@ class VA(SGPDV):
             h_decoder.name         = 'h_decoder'
             log_pyz.name           = 'log_p_y_z'
         else:
-            h_decoder = T.tanh(T.dot(self.W1, self.z) + self.b1)
-            y_hat     = T.nnet.sigmoid(T.dot(self.W2, h_decoder) + self.b2)
+            h_decoder = tanh(T.dot(self.W1, self.z.T) + self.b1)
+            y_hat     = sigmoid(T.dot(self.W2, h_decoder) + self.b2)
             log_pyz   = -T.nnet.binary_crossentropy(y_hat, self.y_miniBatch).sum()
             h_decoder.name = 'h_decoder'
             y_hat.name     = 'y_hat'
@@ -115,15 +111,10 @@ class VA(SGPDV):
     def KL_qp(self):
 
         if self.continuous:
-            Kfu_iKuu = Tdot(self.Kfu, self.iKuu)
-            Kfu_iKuu_Kuf = Tdot(Kfu_iKuu, self.Kfu.T)
-            iKuu_Kuf_Kfu_iKuu = T.dot(Kfu_iKuu.T, Kfu_iKuu)
-            Kfu_iKuu_Kappa_iKuu_Kuf = Tdot(T.dot(Kfu_iKuu, self.Kappa), Kfu_iKuu.T)
-            kappa_outer = Tdot(self.kappa.T, self.kappa, 'kappa_outer')  
-
-            KL = -0.5*self.B*self.Q*(1 + T.exp(self.log_sigma)**2 - 2*self.log_sigma) \
-                 +0.5*nlinalg.trace(Tdot(iKuu_Kuf_Kfu_iKuu, kappa_outer)) \
-                 +0.5*self.Q*(nlinalg.trace(self.Kff) - nlinalg.trace(Kfu_iKuu_Kuf) + nlinalg.trace(Kfu_iKuu_Kappa_iKuu_Kuf))
+            kappa_outer = Tdot(self.kappa.T, self.kappa, 'kappa_outer')
+            AtA = dot(self.A.T, self.A, 'A''.A' )
+            0.5*self.Q*trace(self.L) + 0.5*trace(dot(AtA,kappa_outer) \
+                + 0.5*self.Q+trace(dot(AtA,self.Kappa)) - 0.5*self.Q*self.B - 0.5*self.Q*self.logDetL 
             KL.name = 'KL_qp'
         else:
             raise RuntimeError("Case not implemented")
