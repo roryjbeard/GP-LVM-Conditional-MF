@@ -114,68 +114,63 @@ def shared_ones_like(shared_var):
     return th.shared(np.ones(shared_var.get_value(borrow=True).shape).astype(shared_var.dtype),
                          broadcastable=shared_var.broadcastable)
 
-def getname(D):
-    if type(D) == int or type(D) == float:
-        Dname = str(D)
-    elif hasattr(D,'name'):
-        Dname = Dname
+def getname(T):
+    if type(T) == int or type(T) == float:
+        name = str(T)
+    elif hasattr(T, 'name') and not T.name == None:
+        name = T.name
     else:
-        RuntimeError('Could not get name')
-    return Dname
-
-def Tname(A, B, op, name=None):
-    
-    Aname = getname(A)
-    Bname = getname(B)
-
-    if not name == None:
-        pass
-    elif not Aname == None and not Bname == None:
-        name = Aname + op + Bname
-    elif not Aname == None:
-        name = Aname + op + '?'
-    elif not Bname == None:
-        name = '?' + 'op' + Bname
-    else:
-        name = None
+        name = '?'
     return name
+
+def inName(A, B, op, name=None):
+    if name == None:
+        Aname = getname(A)
+        Bname = getname(B)
+        Cname = '(' + Aname + op + Bname + ')'
+    else:
+        Cname = name
+    return Cname
 
 def dot(A, B, name=None):
     C = T.dot(A,B)
-    C.name = Tname(A, B, '.', name)
+    C.name = inName(A, B, ' . ', name)
     return C
 
 def minus(A, B, name=None):
     C = A - B
-    C.name = Tname(A, B, '-', name)
+    C.name = inName(A, B, ' - ', name)
     return C
 
 def plus(A, B, name=None):
     C = A + B
-    C.name = Tname(A, B, '+', name)
+    C.name = inName(A, B, ' + ', name)
     return C
 
 def mul(A, B, name=None):
     C = A * B
-    C.name = Tname(A, B, '*', name)
+    C.name = inName(A, B, ' * ', name)
     return C
 
 def softplus(A, name=None):
-    return T_function(A, T.net.softplus, 'softplus', name)
+    return namedFunction(A, T.nnet.softplus, 'softplus', name)
 
 def sigmoid(A, name=None):
-    return T_function(A, T.net.sigmoid, 'sigmoid', name)
+    return namedFunction(A, T.nnet.sigmoid, 'sigmoid', name)
 
 def trace(A, name=None):
-    return T_function(A, nlinalg.trace, 'trace', name)
+    return namedFunction(A, nlinalg.trace, 'trace', name)
 
 def tanh(A, name=None):
-    return T_function(A, T.tanh, 'tanh', name)
+    return namedFunction(A, T.tanh, 'tanh', name)
 
-def T_function(A, func, funcname, name):
+def namedFunction(A, func, funcname, name):
     B = func(A)
-    Aname = getname(A)
-    B.name = funcname + '(' + Aname + ')' 
+    if name == None:
+        Aname = getname(A)
+        B.name = funcname + '(' + Aname + ')'
+    else:
+        B.name = name 
     return B
 
 

@@ -11,7 +11,7 @@ import collections
 
 from optimisers import Adam
 from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, \
-     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag, dot, minus, plus, mul
+     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag, dot, minus, plus, mul, softplus, sigmoid, trace
 
 # precision = np.float64
 precision = th.config.floatX
@@ -69,7 +69,7 @@ class SGPDV(object):
                  encoderType_qX='FreeForm2',  # 'MLP', 'Kernel'.
                  encoderType_rX='FreeForm2',  # 'MLP', 'Kernel'
                  Xu_optimise=False,
-                 numberOfEncoderHiddenUnits=0
+                 numberOfEncoderHiddenUnits=10
                  ):
 
         self.numTestSamples = 5000
@@ -86,7 +86,6 @@ class SGPDV(object):
 
         self.encoderType_qX = encoderType_qX
         self.encoderType_rX = encoderType_rX
-        self.encoderType_ru = encoderType_ru
         self.Xu_optimise = Xu_optimise
 
         self.y = th.shared(data)
@@ -136,9 +135,9 @@ class SGPDV(object):
 
         # Random variables
         self.xi    = srng.normal(size=(self.B, self.R), avg=0.0, std=1.0, ndim=None)
-        self.alpha = srng.normal(size=(self.Q, self.M), avg=0.0, std=1.0, ndim=None)
-        self.beta  = srng.normal(size=(self.Q, self.B), avg=0.0, std=1.0, ndim=None)
-        self.eta.name   = 'xi'
+        self.alpha = srng.normal(size=(self.M, self.Q), avg=0.0, std=1.0, ndim=None)
+        self.beta  = srng.normal(size=(self.B, self.Q), avg=0.0, std=1.0, ndim=None)
+        self.xi.name   = 'xi'
         self.alpha.name = 'alpha'
         self.beta.name  = 'beta'
         
@@ -163,7 +162,7 @@ class SGPDV(object):
 
                 self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
 
-                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]                
+                Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
                 Phi_batch_sqrt.name = 'Phi_batch_sqrt'
                 
                 self.Phi = dot(Phi_batch_sqrt, Phi_batch_sqrt.T, 'Phi')
@@ -199,7 +198,7 @@ class SGPDV(object):
             # [RxB] = sigmoid( [RxH] . [HxB] + repmat([Rx1],[1,B]) )
             mu_qX = sigmoid(plus(dot(self.W2_qX, h_qX), self.b2_qX), 'mu_qX' )
             # [1xB] = 0.5 * ( [1xH] . [HxB] + repmat([1x1],[1,B]) )
-            log_sigma_qX = mul( 0.5, plus((dot(self.W3_qX, h_qX), self.b3_qX)), 'log_sigma_qX')
+            log_sigma_qX = mul( 0.5, plus(dot(self.W3_qX, h_qX), self.b3_qX), 'log_sigma_qX')
 
             self.phi  = mu_qX.T  # [BxR]
             (self.Phi,self.cPhi,self.iPhi,self.logDetPhi) \
@@ -223,40 +222,41 @@ class SGPDV(object):
         self.kappa = sharedZeroMatrix(self.M, self.Q, 'kappa')
         self.Kappa_sqrt = sharedZeroMatrix(self.M, self.M, 'Kappa_sqrt')
         self.Kappa = dot(self.Kappa_sqrt, self.Kappa_sqrt.T, 'Kappa')
+        print self.Kappa.name
         (self.cKappa, self.iKappa, self.logDetKappa) \
                     = cholInvLogDet(self.Kappa, self.M, 0)
         self.qu_vars = [self.Kappa_sqrt, self.kappa]
 
         # Calculate latent co-ordinates Xf
         # [BxR]  = [BxR] + [BxB] . [BxR]
-        self.Xz = plus( self.phi + dot(self.cPhi, self.xi), 'Xf' )
+        self.Xz = plus( self.phi, dot(self.cPhi, self.xi), 'Xf' )
         # Inducing points co-ordinates
         self.Xu = sharedZeroMatrix(self.M, self.R, 'Xu')
         # Kernels
         self.Kzz = kfactory.kernel(self.Xz, None,    self.log_theta, 'Kff')
-        self.Kzu = kfactory.kernel(self.Xz, self.Xu, self.log_theta, 'Kfu')
         self.Kuu = kfactory.kernel(self.Xu, None,    self.log_theta, 'Kuu')
+        self.Kzu = kfactory.kernel(self.Xz, self.Xu, self.log_theta, 'Kfu')
         (self.cKuu, self.iKuu, self.logDetKuu) = cholInvLogDet(self.Kuu, self.M, self.jitter)
 
         # Variational distribution
+        # A has dims [BxM] = [BxM] . [MxM]
+        self.A  = dot(self.Kzu, self.iKuu, 'A')
         # L is the covariance of conditional distribution q(z|u,Xf)
-        self.L  = minus( self.Kzz, dot(dot(self.Kzu, self.iKuu), self.Kzu.T), 'L')
-        (self.cL, self.iL, self.logDetL) = cholInvLogDet(self.L, self.B, self.jitter)
+        self.C  = minus( self.Kzz, dot(self.A, self.Kzu.T), 'C')
+        (self.cC, self.iC, self.logDetC) = cholInvLogDet(self.C, self.B, self.jitter)
 
         # Sample u_q from q(u_q) = N(u_q; kappa_q, Kappa )  [MxQ]
-        self.u  = plus( self.kappa + (dot(self.cKappa, self.alpha)), 'u')
+        self.u  = plus( self.kappa, (dot(self.cKappa, self.alpha)), 'u')
         # compute mean of z [QxB]
-        # A has dims [BxM] = [BxM] . [MxM]
-        self.A  = dot(self.Kfu, self.iKuu, 'A')
         # [BxQ] = [BxM] * [MxQ]
         self.mu = dot(self.A, self.u, 'mu')
-        # Sample f from q(f|u,X) = N( mu_q, Sigma )
+        # Sample f from q(f|u,X) = N( mu_q, C )
         # [BxQ] =  
-        self.z  = plus(self.mu, (dot(self.cL, self.eta)), 'z')
+        self.z  = plus(self.mu, (dot(self.cC, self.beta)), 'z')
 
         self.qz_vars = [self.log_theta]
 
-        self.iUpsilon = plus(self.iKappa, dot(self.A.T, dot(self.iL, self.A) ), 'iUpsilon')
+        self.iUpsilon = plus(self.iKappa, dot(self.A.T, dot(self.iC, self.A) ), 'iUpsilon')
         _, self.Upsilon, self.negLogDetUpsilon = cholInvLogDet(self.iUpsilon, self.M, self.jitter)
 
         if self.encoderType_rX == 'MLP':
@@ -269,11 +269,11 @@ class SGPDV(object):
             self.b3_rX = sharedZeroVector(self.R, 'b3_rX', broadcastable=(False, True))
 
             # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
-            h_rX = plus( T_nnet_softplus(dot(self.W1_rX, T.concatenate((self.z, self.y_miniBatch.T))), self.b1_rX, 'h_rX')
+            h_rX = plus(softplus(dot(self.W1_rX, T.concatenate((self.z.T, self.y_miniBatch.T)))), self.b1_rX, 'h_rX')
             # [RxB] = softplus( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
-            mu_rX = plus( T_nnet_softplus(dot(self.W2_rX, h_rX)), self.b2_rX, 'mu_rX')
+            mu_rX = plus(softplus(dot(self.W2_rX, h_rX)), self.b2_rX, 'mu_rX')
             # [RxB] = 0.5*( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
-            log_sigma_rX = mul( 0.5, plus(dot(self.W3_rX, h_rX), self.b3_rX), log_sigma_rX, 'log_sigma_rX')
+            log_sigma_rX = mul( 0.5, plus(dot(self.W3_rX, h_rX), self.b3_rX), 'log_sigma_rX')
 
             self.tau  = mu_rX.T
             (self.Tau, self.cTau, self.iTau, self.logDetTau) \
@@ -379,15 +379,12 @@ class SGPDV(object):
                 rnd(var)
 
     def setKernelParameters(self,
-                            theta,
-                            theta_min=-np.inf, theta_max=np.inf,
+                            theta,    theta_min=-np.inf, theta_max=np.inf,
                             gamma=[], gamma_min=-np.inf, gamma_max=np.inf,
                             omega=[], omega_min=-np.inf, omega_max=np.inf
                             ):
 
         self.log_theta.set_value(np.asarray(np.log(theta), dtype=precision).flatten())
-        self.log_sigma.set_value(np.asarray(np.log(sigma), dtype=precision))
-
         self.log_theta_min = np.array(np.log(theta_min), dtype=precision).flatten()
         self.log_theta_max = np.array(np.log(theta_max), dtype=precision).flatten()
 
@@ -449,12 +446,12 @@ class SGPDV(object):
         self.L = self.log_p_y_z() + self.addtionalBoundTerms()
         self.L.name = 'L'
 
-        if p_z_gaussian
+        if p_z_gaussian:
             self.L += -self.KL_qp()
         else:
             self.L += self.log_p_z() - self.log_q_z_uX()
 
-        self.L += self.H_qu() + self.H_qX() + self.negH_q_u_zX() + log_r_X_z()
+        self.L += self.H_qu() + self.H_qX() + self.negH_q_u_zX() + self.log_r_X_z()
 
         self.dL = T.grad(self.L, self.gradientVariables)
         for i in range(len(self.dL)):
@@ -472,11 +469,11 @@ class SGPDV(object):
 
     def H_qu(self):
         H = 0.5*self.M*self.Q*(1+log2pi) + 0.5*self.Q*self.logDetKappa
-        H.name = H_qu
+        H.name = 'H_qu'
         return H
 
     def H_qX(self):
-        H = 0.5*self.R*self.B*(1+log2pi) + 0.5*self.R*self.logDetTau 
+        H = 0.5*self.R*self.B*(1+log2pi) + 0.5*self.R*self.logDetPhi
         H.name = 'H_qX'
         return H
 
@@ -486,7 +483,7 @@ class SGPDV(object):
         return H
 
     def log_r_X_z(self):
-        X_m_tau = minus(self.Xf, self.tau)
+        X_m_tau = minus(self.Xz, self.tau)
         X_m_tau_vec = T.reshape(X_m_tau, [self.B * self.R, 1])
         X_m_tau_vec.name = 'X_m_tau_vec'
         log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
@@ -572,7 +569,6 @@ class SGPDV(object):
 
         self.sample_alpha()
         self.sample_beta()
-        self.sample_eta()
         self.sample_xi()
 
     def epochSample(self):

@@ -62,9 +62,7 @@ va = VA(
     x_train,                   # [NxP] matrix of observations
     kernelType=kernelType,
     encoderType_qX=encoderType_qX,  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel'.
-    encoderType_qu=encoderType_qu,  # 'Kernel'
-    encoderType_rX=encoderType_rX,  # 'FreeForm1', 'FreeForm2', 'MLP', 'Kernel', 'NoEncoding'.
-    encoderType_ru=encoderType_ru,  # 'FreeForm', 'MLP', 'NoEncoding'
+    encoderType_rX=encoderType_rX,  # 'MLP', 'Kernel', 'NoEncoding'.
     Xu_optimise=Xu_optimise,
     numHiddenUnits_encoder=numHiddenUnits_encoder,
     numHiddentUnits_decoder=numHiddentUnits_decoder,

@@ -12,7 +12,7 @@ from theano.tensor import nlinalg
 
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
-from utils import log_mean_exp_stable, Tdot, nlinalg_trace
+from utils import log_mean_exp_stable, dot, trace, softplus
 
 precision = th.config.floatX
 
@@ -28,7 +28,7 @@ class VA(SGPDV):
             encoderType_qX='FreeForm2',  # MLP', 'Kernel'.
             encoderType_rX='FreeForm2',  # MLP', 'Kernel'.
             Xu_optimise=False,
-            numHiddenUnits_encoder=0,
+            numHiddenUnits_encoder=10,
             numHiddentUnits_decoder=10,
             continuous=True
         ):
@@ -84,8 +84,8 @@ class VA(SGPDV):
 
         if self.continuous:
 
-            h_decoder  = T.nnet.softplus(T.dot(self.W1,self.z) + self.b1)
-            mu_decoder = T.dot(self.W2, h_decoder) + self.b2
+            h_decoder  = softplus(T.dot(self.W1,self.z.T) + self.b1)
+            mu_decoder = dot(self.W2, h_decoder) + self.b2
             log_sigma_decoder = 0.5*(T.dot(self.W3, h_decoder) + self.b3)
             log_pyz    = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
                                 - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
@@ -111,10 +111,10 @@ class VA(SGPDV):
     def KL_qp(self):
 
         if self.continuous:
-            kappa_outer = Tdot(self.kappa.T, self.kappa, 'kappa_outer')
+            kappa_outer = dot(self.kappa, self.kappa.T, 'kappa_outer')
             AtA = dot(self.A.T, self.A, 'A''.A' )
-            0.5*self.Q*trace(self.L) + 0.5*trace(dot(AtA,kappa_outer) \
-                + 0.5*self.Q+trace(dot(AtA,self.Kappa)) - 0.5*self.Q*self.B - 0.5*self.Q*self.logDetL 
+            KL = 0.5*self.Q*trace(self.C) + 0.5*trace(dot(AtA,kappa_outer)) \
+                + 0.5*self.Q+trace(dot(AtA,self.Kappa)) - 0.5*self.Q*self.B - 0.5*self.Q*self.logDetC
             KL.name = 'KL_qp'
         else:
             raise RuntimeError("Case not implemented")
@@ -146,53 +146,52 @@ if __name__ == "__main__":
     np.random.seed(1)
 
     #nnumberOfInducingPoints, batchSize, dimX, dimZ, data, numHiddenUnits
-    va = VA( 3, 20, 2, 2, np.random.rand(40,3), encoderType_qX='FreeForm', encoderType_rX='FreeForm', encoderType_ru='FreeForm')
+    va = VA( 3, 20, 2, 2, np.random.rand(40,3), encoderType_qX='MLP', encoderType_rX='MLP')
 
     log_p_y_z_eqn = va.log_p_y_z()
     log_p_y_z_var = [va.Xu]
-    log_p_y_z_var.extend(va.qf_vars)
+    log_p_y_z_var.extend(va.qz_vars)
     log_p_y_z_var.extend(va.qu_vars)
     log_p_y_z_var.extend(va.qX_vars)
     log_p_y_z_var.extend(va.likelihoodVariables)
     log_p_y_z_grad = T.grad(log_p_y_z_eqn, log_p_y_z_var)
 
-    KL_qr_eqn = va.KL_qr()
-    KL_qr_var = []
-    KL_qr_var.extend(va.qu_vars)
-    KL_qr_var.extend(va.qX_vars)
-    KL_qr_var.extend(va.rX_vars)
-    KL_qr_var.extend(va.ru_vars)
-    KL_qr_grad = T.grad(KL_qr_eqn, KL_qr_var)
+    log_r_X_z_eqn = va.log_r_X_z()
+    log_r_X_z_var = [va.Xu]
+    log_r_X_z_var.extend(va.qX_vars)
+    log_r_X_z_var.extend(va.qz_vars)
+    log_r_X_z_var.extend(va.qu_vars)
+    log_r_X_z_var.extend(va.rX_vars)
+    log_r_X_z_grad = T.grad(log_r_X_z_eqn, log_r_X_z_var)
 
     KL_qp_eqn = va.KL_qp()
-    KL_qp_var = []
+    KL_qp_var = [va.Xu]
+    KL_qp_var.extend(va.qz_vars)
     KL_qp_var.extend(va.qu_vars)
     KL_qp_var.extend(va.qX_vars)
+    KL_qp_var_grad = T.grad(KL_qp_eqn, KL_qp_var)
 
-    log_r_uX_z_eqn = va.log_r_uX_z()
-    log_r_uX_z_var = []
-    log_r_uX_z_var.extend(va.ru_vars)
-    log_r_uX_z_var.extend(va.rX_vars)
-    T.grad(log_r_uX_z_eqn, log_r_uX_z_var)
+    negH_q_u_zX_eqn = va.negH_q_u_zX()
+    negH_q_u_zX_var = [va.Xu, va.Kappa]
+    negH_q_u_zX_var.extend(va.qz_vars)
+    negH_q_u_zX_var.extend(va.qX_vars)
+    negH_q_u_zX_grad = T.grad(negH_q_u_zX_eqn, negH_q_u_zX_var)
 
-    log_q_uX_equ = va.log_q_uX()
-    log_q_uX_var = []
-    log_q_uX_var.extend(va.qu_vars)
-    log_q_uX_var.extend(va.qX_vars)
-    T.grad(log_q_uX_equ, log_q_uX_var)
+    T.grad(va.H_qu(), va.Kappa)
+    if va.encoderType_qX == 'MLP':
+        T.grad(va.H_qX(), [va.W1_qX, va.W3_qX, va.b1_qX, va.b3_qX])
+    else:
+        T.grad(va.H_qX(), va.Phi)
 #
 #    va.gradientVariables = [va.upsilon]
 #
-    va.construct_L_using_r( p_z_gaussian=True,  r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L_using_r( p_z_gaussian=True,  r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L_using_r( p_z_gaussian=False, r_uX_z_gaussian=True,  q_f_Xu_equals_r_f_Xuz=True )
-#    va.construct_L_using_r( p_z_gaussian=False, r_uX_z_gaussian=False, q_f_Xu_equals_r_f_Xuz=True )
-#
+    va.construct_L_using_r( p_z_gaussian=True )
+
     va.randomise(rndQR=False)
 
     va.sample()
 
-    va.setKernelParameters(0.01, 1*np.ones((2,)),gamma=1*np.ones((2,)),omega=1*np.ones((2,)) )
+    va.setKernelParameters(1*np.ones((2,)),gamma=1*np.ones((2,)),omega=1*np.ones((2,)) )
 
     va.printSharedVariables()
 
@@ -204,14 +203,19 @@ if __name__ == "__main__":
     print 'KL_qp'
     print th.function([], va.KL_qp())()
 
-    print 'KL_qr'
-    print th.function([], va.KL_qr())()
+    print 'log_r_X_z'
+    print th.function([], va.log_r_X_z())()
 
-    print 'log_q_f_uX'
-    print th.function([], va.log_q_f_uX())()
+    print 'negH_q_u_zX_eqn'
+    print th.function([], va.negH_q_u_zX())()
 
-    print 'log_r_uX_z'
-    print th.function([], va.log_r_uX_z())()
+    print 'H_qu'
+    print th.function([], va.H_qu())()
+
+    print 'H_qX'
+    print th.function([], va.H_qX())()
+ 
+    va.construct_L_dL_functions()
 
     for i in range(len(va.gradientVariables)):
         f  = lambda x: va.L_test( x, va.gradientVariables[i] )

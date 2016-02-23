@@ -15,7 +15,7 @@
 \newcommand{\xb}{\mathbf{x}}
 \newcommand{\ub}{\mathbf{u}}
 \newcommand{\zb}{\mathbf{z}}
-\newcommand{\Lb}{\mathbf{L}}
+\newcommand{\Cb}{\mathbf{C}}
 \newcommand{\Ab}{\mathbf{A}}
 \newcommand{\yb}{\mathbf{y}}
 \newcommand{\dd}{\mathrm{d}}
@@ -112,16 +112,16 @@ Noticing the final KL divergence term is always positive we can drop this term t
 \begin{align}
 p(\zb) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \vec{0}, \mathbb{I}_B) \\
 q(\ub) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \kappa_q, \Kappa) \\
-q(\zb|\ub,X_z) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \underbrace{\Kzu\Kuu^{-1}}_{\Ab}\ub_q, \underbrace{\Kzz-\Kzu\Kuu^{-1}\Kuz}_{\Lb}) \\
-q(X_z) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \tau_r, \Tau)
+q(\zb|\ub,X_z) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \underbrace{\Kzu\Kuu^{-1}}_{\Ab}\ub_q, \underbrace{\Kzz-\Kzu\Kuu^{-1}\Kuz}_{\Cb}) \\
+q(X_z) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \phi_r, \Phi)
 \end{align}
 %
 \begin{align}
 &\Ex_{q(\ub,X_z)}\left[\KL\left(q(\zb|\ub,X_z)||p(\zb)\right)\right] \notag \\
-&= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Lb) + \zb_q^\top\zb - B -  \log\det\Lb \right)\right] \\
-&= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Lb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Lb \right)\right] \\
-&=\Ex_{q(X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Lb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Lb \right)\right] \\
-&=\Ex_{q(X_z)}\left[\frac{Q}{2}\tr(\Lb) + \frac{1}{2}\sum_{q=1}^Q\;\tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + \frac{Q}{2}\;\tr(\Ab^\top\Ab\Kappa) - \frac{QB}{2} -  \frac{Q}{2}\;\log\det\Lb \right]
+&= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \zb_q^\top\zb - B -  \log\det\Cb \right)\right] \\
+&= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Cb \right)\right] \\
+&=\Ex_{q(X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Cb \right)\right] \\
+&=\Ex_{q(X_z)}\left[\frac{Q}{2}\tr(\Cb) + \frac{1}{2}\sum_{q=1}^Q\;\tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + \frac{Q}{2}\;\tr(\Ab^\top\Ab\Kappa) - \frac{QB}{2} -  \frac{Q}{2}\;\log\det\Cb \right]
 \end{align}
 %
 The entropy of $q(\ub)$ is:
@@ -135,7 +135,7 @@ The entropy of $q(X_z)$ is:
 %
 \begin{align}
 -\Ex_{q(X_z)}\left[\log q(\ub)\right] &= \sum_{r=1}^R H[q(\xb_r)] \\
-&= \frac{RB}{2}(1+\log(2\pi))) + \frac{R}{2}\log\det(\Tau)
+&= \frac{RB}{2}(1+\log(2\pi))) + \frac{R}{2}\log\det(\Phi)
 \end{align}
 %
 We decompose $r$ as $r(\ub,X_z|\zb) = r(\ub|\zb,X_z)r(X_z|\zb)$. 
@@ -148,10 +148,10 @@ We set $r(\ub|\zb,X_z) = q(\ub|\zb,X_z)$ which we can compute exactly.
 %
 \begin{align}
 q(\ub|\zb,X_z) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \upsilon_q, \Upsilon) \\
-%\Lb^{-1} &= [\Kzz^{-1}-\Kzz^{-1}\Kzu\{ \Kuz\Kzz^{-1}\Kzu-\Kuu\}^{-1}\Kuz\Kzz^{-1} ] \\
-\Upsilon &= (\Kappa^{-1} + \Ab^\top\Lb^{-1}\Ab)^{-1} \\
-%&= \Kappa^{-1} - \Kappa^{-1} \Ab^\top (\Lb+ \Ab\Kappa^{-1}\Ab^\top)^{-1}\Ab\Kappa^{-1}\\
-\upsilon_q &= (\Kappa^{-1} + \Ab^\top\Lb^{-1}\Ab)^{-1}[\Ab^\top \Lb^{-1}\zb_q + \Kappa^{-1}\kappa]
+%\Cb^{-1} &= [\Kzz^{-1}-\Kzz^{-1}\Kzu\{ \Kuz\Kzz^{-1}\Kzu-\Kuu\}^{-1}\Kuz\Kzz^{-1} ] \\
+\Upsilon &= (\Kappa^{-1} + \Ab^\top\Cb^{-1}\Ab)^{-1} \\
+%&= \Kappa^{-1} - \Kappa^{-1} \Ab^\top (\Cb+ \Ab\Kappa^{-1}\Ab^\top)^{-1}\Ab\Kappa^{-1}\\
+\upsilon_q &= (\Kappa^{-1} + \Ab^\top\Cb^{-1}\Ab)^{-1}[\Ab^\top \Cb^{-1}\zb_q + \Kappa^{-1}\kappa]
 \end{align}
 %
 Therefore:
