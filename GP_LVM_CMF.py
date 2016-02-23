@@ -89,7 +89,7 @@ class SGPDV(object):
         self.encoderType_qX = encoderType_qX
         self.encoderType_rX = encoderType_rX
         self.encoderType_ru = encoderType_ru
-        self.encoderType_qu = encoderType_qu        
+        self.encoderType_qu = encoderType_qu
         self.Xu_optimise = Xu_optimise
 
         self.y = th.shared(data)
@@ -168,9 +168,9 @@ class SGPDV(object):
             if encoderType_qX == 'FreeForm1':
 
                 self.Phi_full_sqrt = sharedZeroMatrix(self.N, self.N, 'Phi_full_sqrt')
-                
+
                 Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
-                
+
                 self.Phi = Tdot(Phi_batch_sqrt, Phi_batch_sqrt.T, 'Phi')
 
                 Phi_batch_sqrt.name = 'Phi_batch_sqrt'
@@ -204,7 +204,7 @@ class SGPDV(object):
             # [HxB] = softplus( [HxP] . [BxP]^T + repmat([Hx1],[1,B]) )
             h_qX = T.nnet.softplus(Tdot(self.W1_qX, self.y_miniBatch.T) + self.b1_qX)
             # [RxB] = sigmoid( [RxH] . [HxB] + repmat([Rx1],[1,B]) )
-            mu_qX = T.nnet.sigmoid(Tdot(self.W2_qX, h_qX) + self.b2_qX)
+            mu_qX = Tdot(self.W2_qX, h_qX) + self.b2_qX
             # [1xB] = 0.5 * ( [1xH] . [HxB] + repmat([1x1],[1,B]) )
             log_sigma_qX = 0.5 * (Tdot(self.W3_qX, h_qX) + self.b3_qX)
 
@@ -265,7 +265,7 @@ class SGPDV(object):
             # [HxQ] = softplus( [HxP] . [PxQ] + repmat([Hx1],[1,Q]) )
             h2_qu = T.nnet.softplus(Tdot(h1_qu, self.W2_qu) + self.b2_qu)
             # [MxQ] = sigmoid( [MxH] . [HxQ] + repmat([Mx1],[1,Q]) )
-            mu_qu = T.nnet.sigmoid(Tdot(self.W3_qu, h2_qu) + self.b3_qu)
+            mu_qu = Tdot(self.W3_qu, h2_qu) + self.b3_qu
             # [1xM] = 0.5 * ( [1xH] . [HxM] + repmat([1x1],[1,B]) )
             log_sigma_qu = 0.5 * (Tdot(self.W4_qu, h2_qu) + self.b4_qu)
 
@@ -277,7 +277,7 @@ class SGPDV(object):
             self.kappa = mu_qu.T # [QxM]
             (self.Kappa, self.cKappa, self.iKappa, self.logDetKappa) \
                 = diagCholInvLogDet_fromLogDiag(log_sigma_qu, 'Kappa') # [MxM]
-            
+
             self.qu_vars = [self.W1_qu, self.W2_qu, self.W3_qu, self.W4_qu, self.b1_qu, self.b2_qu, self.b3_qu, self.b4_qu]
 
         else:
@@ -358,7 +358,7 @@ class SGPDV(object):
             # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
             h_rX = T.nnet.softplus(Tdot(self.W1_rX, T.concatenate((self.z, self.y_miniBatch.T))) + self.b1_rX)
             # [RxB] = softplus( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
-            mu_rX = T.nnet.sigmoid(Tdot(self.W2_rX, h_rX) + self.b2_rX)
+            mu_rX = Tdot(self.W2_rX, h_rX) + self.b2_rX
             # [RxB] = 0.5*( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
             log_sigma_rX = 0.5 * (Tdot(self.W3_rX, h_rX) + self.b3_rX)
 
@@ -437,7 +437,7 @@ class SGPDV(object):
             # [HxQ] = softplus( [HxB] . [BxQ] + repmat([Hx1], [1,Q]) )
             h2_ru = T.nnet.softplus(Tdot(h1_ru, self.W2_ru) + self.b2_ru)
             # [MxQ] = softplus( [MxH] . [HxQ] + repmat([Hx1], [1,Q]) )
-            mu_ru = T.nnet.sigmoid(Tdot(self.W3_ru, h2_ru) + self.b3_ru)
+            mu_ru = Tdot(self.W3_ru, h2_ru) + self.b3_ru
             # [MxQ] = 0.5*( [MxH] . [HxQ] + repmat([Hx1], [1,Q]) )
             log_sigma_ru = 0.5 * (Tdot(self.W4_ru, h2_ru) + self.b4_ru)
 
@@ -490,7 +490,8 @@ class SGPDV(object):
             elif var.name.startswith('W1') or \
                     var.name.startswith('W2') or \
                     var.name.startswith('W3') or \
-                    var.name.startswith('W4'):
+                    var.name.startswith('W4') or \
+                    var.name.startswith('W_'):
                 print 'Randomising ' + var.name
                 # Hidden layer weights are uniformly sampled from a symmetric interval
                 # following [Xavier, 2010]
@@ -685,7 +686,7 @@ class SGPDV(object):
         xOuter = Tdot(X_m_phi, X_m_phi.T, 'xOuter')
         # [MxM] = [RxM]^T . [RxM]
         u_m_kappa = Tminus(self.u - self.kappa)
-        # [?] 
+        # [?]
         uOuter = Tdot(u_m_kappa.T, u_m_kappa, 'uOuter')
 
         log_q_X = -0.5 * self.B * self.R * log2pi - 0.5 * self.R * self.logDetPhi \
