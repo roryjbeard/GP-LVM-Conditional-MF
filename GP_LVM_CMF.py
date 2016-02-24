@@ -11,7 +11,7 @@ import collections
 
 from optimisers import Adam
 from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, \
-     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag, dot, minus, plus, mul, softplus, sigmoid, trace
+     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag, dot, minus, plus, mul, softplus, sigmoid, trace, div
 
 # precision = np.float64
 precision = th.config.floatX
@@ -167,7 +167,7 @@ class SGPDV(object):
                 
                 self.Phi = dot(Phi_batch_sqrt, Phi_batch_sqrt.T, 'Phi')
 
-                (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, 0)
+                self.cPhi, _, self.logDetPhi = cholInvLogDet(self.Phi, self.B, 0)
 
                 self.qX_vars = [self.Phi_full_sqrt, self.phi_full]
 
@@ -178,7 +178,7 @@ class SGPDV(object):
                 Phi_batch_logdiag = self.Phi_full_logdiag[self.currentBatch]
                 Phi_batch_logdiag.name = 'Phi_batch_logdiag'
 
-                (self.Phi, self.cPhi, self.iPhi, self.logDetPhi) \
+                self.Phi, self.cPhi, _, self.logDetPhi \
                     = diagCholInvLogDet_fromLogDiag(Phi_batch_logdiag, 'Phi')
 
                 self.qX_vars = [self.Phi_full_logdiag, self.phi_full]
@@ -196,7 +196,7 @@ class SGPDV(object):
             # [HxB] = softplus( [HxP] . [BxP]^T + repmat([Hx1],[1,B]) )
             h_qX = softplus(plus(dot(self.W1_qX, self.y_miniBatch.T), self.b1_qX), 'h_qX' )
             # [RxB] = sigmoid( [RxH] . [HxB] + repmat([Rx1],[1,B]) )
-            mu_qX = sigmoid(plus(dot(self.W2_qX, h_qX), self.b2_qX), 'mu_qX' )
+            mu_qX = plus(dot(self.W2_qX, h_qX), self.b2_qX, 'mu_qX')
             # [1xB] = 0.5 * ( [1xH] . [HxB] + repmat([1x1],[1,B]) )
             log_sigma_qX = mul( 0.5, plus(dot(self.W3_qX, h_qX), self.b3_qX), 'log_sigma_qX')
 
@@ -232,6 +232,7 @@ class SGPDV(object):
         self.Xz = plus( self.phi, dot(self.cPhi, self.xi), 'Xf' )
         # Inducing points co-ordinates
         self.Xu = sharedZeroMatrix(self.M, self.R, 'Xu')
+
         # Kernels
         self.Kzz = kfactory.kernel(self.Xz, None,    self.log_theta, 'Kff')
         self.Kuu = kfactory.kernel(self.Xu, None,    self.log_theta, 'Kuu')
@@ -243,7 +244,7 @@ class SGPDV(object):
         self.A  = dot(self.Kzu, self.iKuu, 'A')
         # L is the covariance of conditional distribution q(z|u,Xf)
         self.C  = minus( self.Kzz, dot(self.A, self.Kzu.T), 'C')
-        (self.cC, self.iC, self.logDetC) = cholInvLogDet(self.C, self.B, self.jitter)
+        self.cC, self.iC, self.logDetC = cholInvLogDet(self.C, self.B, self.jitter)
 
         # Sample u_q from q(u_q) = N(u_q; kappa_q, Kappa )  [MxQ]
         self.u  = plus( self.kappa, (dot(self.cKappa, self.alpha)), 'u')
@@ -271,34 +272,41 @@ class SGPDV(object):
             # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
             h_rX = plus(softplus(dot(self.W1_rX, T.concatenate((self.z.T, self.y_miniBatch.T)))), self.b1_rX, 'h_rX')
             # [RxB] = softplus( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
-            mu_rX = plus(softplus(dot(self.W2_rX, h_rX)), self.b2_rX, 'mu_rX')
+            mu_rX = plus(dot(self.W2_rX, h_rX), self.b2_rX, 'mu_rX')
             # [RxB] = 0.5*( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
             log_sigma_rX = mul( 0.5, plus(dot(self.W3_rX, h_rX), self.b3_rX), 'log_sigma_rX')
 
             self.tau  = mu_rX.T
-            (self.Tau, self.cTau, self.iTau, self.logDetTau) \
-                = diagCholInvLogDet_fromLogDiag(log_sigma_rX, 'Tau')
+
+            # Diagonal optimisation of Tau
+            self.Tau_isDiagonal = True
+            self.Tau = T.reshape(log_sigma_rX, [self.B * self.R, 1])
+            self.logDetTau = T.sum(log_sigma_rX)
+            self.Tau.name = 'Tau'
+            self.logDetTau.name = 'logDetTau'
 
             self.rX_vars = [self.W1_rX, self.W2_rX, self.W3_rX, self.b1_rX, self.b2_rX, self.b3_rX]
 
         elif self.encoderType_rX == 'Kernel':
 
+            self.tau = sharedZeroMatrix(self.B, self.R, 'tau')
+
             # Tau_r [BxB] = kernel( [[BxQ]^T,[BxP]^T].T )
             Tau_r = kfactory.kernel(T.concatenate((self.z.T, self.y_miniBatch.T)).T, None, self.log_omega, 'Tau_r')
             (cTau_r, iTau_r, logDetTau_r) = cholInvLogDet(Tau_r, self.B, self.jitter)
-
+            
             # self.Tau  = slinalg.kron(T.eye(self.R), Tau_r)
             self.cTau = slinalg.kron(cTau_r, T.eye(self.R))
             self.iTau = slinalg.kron(iTau_r, T.eye(self.R))
+            
             self.logDetTau = logDetTau_r * self.R
-            self.tau = sharedZeroMatrix(self.B, self.R, 'tau')
-
             self.tau.name  = 'tau'
             # self.Tau.name  = 'Tau'
             self.cTau.name = 'cTau'
             self.iTau.name = 'iTau'
             self.logDetTau.name = 'logDetTau'
 
+            self.Tau_isDiagonal = False
             self.rX_vars = [self.log_omega]
 
         else:
@@ -334,7 +342,8 @@ class SGPDV(object):
             elif var.name.startswith('W1') or \
                     var.name.startswith('W2') or \
                     var.name.startswith('W3') or \
-                    var.name.startswith('W4'):
+                    var.name.startswith('W4') or \
+                    var.name.startswith('W_'):
                 print 'Randomising ' + var.name
                 # Hidden layer weights are uniformly sampled from a symmetric interval
                 # following [Xavier, 2010]
@@ -486,7 +495,11 @@ class SGPDV(object):
         X_m_tau = minus(self.Xz, self.tau)
         X_m_tau_vec = T.reshape(X_m_tau, [self.B * self.R, 1])
         X_m_tau_vec.name = 'X_m_tau_vec'
-        log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
+        if self.Tau_isDiagonal:
+            log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
+            - 0.5 * trace(dot(X_m_tau_vec.T, div(X_m_tau_vec,self.Tau)))        
+        else:
+            log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
             - 0.5 * trace(dot(X_m_tau_vec.T, dot(self.iTau, X_m_tau_vec)))
         log_rX_z.name = 'log_rX_z'
         return log_rX_z

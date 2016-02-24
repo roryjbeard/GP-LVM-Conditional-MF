@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 
 args = parser.parse_args()
 
+
 print "Loading MNIST data"
 #Retrieved from: http://deeplearning.net/data/mnist/mnist.pkl.gz
 
@@ -22,20 +23,24 @@ f = gzip.open('mnist.pkl.gz', 'rb')
 (x_train, t_train), (x_valid, t_valid), (x_test, t_test)  = cPickle.load(f)
 f.close()
 
-# print 'Loading PCA initialisation of Xf if it exists'
-# try:
-#     with open('PCA_init_Xf', 'rb') as f:
-#         Xf = pkl.load(f)
-# except:
-#     'Does not exist so performing the PCA now and saving result'
-#     pcaXf = PCA()
-#     Xf = pcaXf.fit_transform(x_train)
-#     with open('PCA_init_Xf', 'wb') as ff:
-#         cPickle.dump(Xf, ff)
+
+[N,dimX] = x_train.shape
+
+print 'Loading PCA initialisation of Xf with dimX components if it exists'
+filename = 'PCA_init_Xf_{}_components.pkl'.format(dimX)
+try:
+    with open(filename, 'rb') as f:
+        Xf = cPickle.load(f)
+except:
+    'Does not exist so performing the PCA now and saving result'
+    pcaXf = PCA(n_components=dimX)
+    Xf = pcaXf.fit_transform(x_train)
+    filename = 'PCA_init_Xf_{}_components'.format(dimX)
+    with open(filename, 'wb') as ff:
+        cPickle.dump(Xf, ff)
+
 
 data = x_train
-
-[N,dimX] = data.shape
 
 dimZ = 40
 dimX = 3

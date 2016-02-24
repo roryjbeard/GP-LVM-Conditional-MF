@@ -20,7 +20,6 @@ def t_repeat(x, num_repeats, axis):
 def srng(seed=123):
     return MRG_RandomStreams(seed=seed)
 
-
 def invLogDet( C ):
     # Return inv(A) and log det A where A = C . C^T 
     iC = nlinalg.matrix_inverse(C)
@@ -84,7 +83,6 @@ def diagCholInvLogDet_fromDiag(diag_vec, name):
 
     return(diag_mat,chol,inv,logDet)
 
-
 def log_mean_exp_stable(x, axis):
     m = T.max(x, axis=axis, keepdims=True)
     return m + T.log(T.mean(T.exp(x - m), axis=axis, keepdims=True))
@@ -94,13 +92,13 @@ def np_log_mean_exp_stable(x, axis=0):
     return m + np.log(np.mean(np.exp(x - m), axis=axis, keepdims=True))
 
 def sharedZeroMatrix(M, N, name, dtype=th.config.floatX):
-    return th.shared(np.asfortranarray(np.zeros((M, N)), dtype), name=name)
+    return th.shared(np.asarray(np.zeros((M, N)), dtype), name=name)
 
 def sharedZeroVector(M, name, dtype=th.config.floatX, broadcastable=[]):
     if len(broadcastable) == 0:
-        return th.shared(np.asfortranarray(np.zeros((M, 1)), dtype), name=name)
+        return th.shared(np.asarray(np.zeros((M, 1)), dtype), name=name)
     else:
-        return th.shared(np.asfortranarray(np.zeros((M, 1)), dtype), name=name, broadcastable=broadcastable)
+        return th.shared(np.asarray(np.zeros((M, 1)), dtype), name=name, broadcastable=broadcastable)
 
 def sharedZeroArray(M, name, dtype=th.config.floatX):
     return th.shared(np.zeros((M,)).astype(dtype), name=name)
@@ -152,6 +150,11 @@ def mul(A, B, name=None):
     C.name = inName(A, B, ' * ', name)
     return C
 
+def div(A, B, name=None):
+    C = A / B
+    C.name = inName(A, B, ' / ', name)
+    return C
+
 def softplus(A, name=None):
     return namedFunction(A, T.nnet.softplus, 'softplus', name)
 
@@ -172,5 +175,3 @@ def namedFunction(A, func, funcname, name):
     else:
         B.name = name 
     return B
-
-

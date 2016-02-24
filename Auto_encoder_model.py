@@ -4,7 +4,7 @@ Created on Thu Feb  4 20:44:40 2016
 
 @author: clloyd
 """
- 
+
 import numpy as np
 import theano as th
 import theano.tensor as T
@@ -12,7 +12,7 @@ from theano.tensor import nlinalg
 
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
-from utils import log_mean_exp_stable, dot, trace, softplus
+from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix
 
 precision = th.config.floatX
 
@@ -29,7 +29,8 @@ class VA(SGPDV):
             encoderType_rX='FreeForm2',  # MLP', 'Kernel'.
             Xu_optimise=False,
             numHiddenUnits_encoder=10,
-            numHiddentUnits_decoder=10,
+            numHiddenUnits_decoder=10,
+            numHiddenLayers_decoder=2,
             continuous=True
         ):
 
@@ -46,23 +47,30 @@ class VA(SGPDV):
             numberOfEncoderHiddenUnits=numHiddenUnits_encoder
         )
 
-        self.HU_decoder = numHiddentUnits_decoder
+        self.HU_decoder = numHiddenUnits_decoder
+        self.numHiddenLayers_decoder = numHiddenLayers_decoder
         self.continuous = continuous
 
         # Construct appropriately sized matrices to initialise theano shares
-        HU_Q_mat = np.zeros((self.HU_decoder, self.Q), dtype=precision)
-        HU_vec   = np.zeros((self.HU_decoder, 1 ), dtype=precision)
-        P_HU_mat = np.zeros((self.P, self.HU_decoder), dtype=precision)
-        P_vec    = np.zeros((self.P, 1), dtype=precision)
 
-        self.W1 = th.shared(HU_Q_mat, name='W1')
-        self.W2 = th.shared(P_HU_mat, name='W2')
-        self.W3 = th.shared(P_HU_mat, name='W3')
-        self.b1 = th.shared(HU_vec,   name='b1', broadcastable=(False,True))
-        self.b2 = th.shared(P_vec,    name='b2', broadcastable=(False,True))
-        self.b3 = th.shared(P_vec,    name='b3', broadcastable=(False,True))
+        self.W_zh  = sharedZeroMatrix(self.HU_decoder, self.Q, 'W_zh')
+        self.W_hy1 = sharedZeroMatrix(self.P, self.HU_decoder, 'W_hy')
+        self.b_zh  = sharedZeroVector(self.HU_decoder, 'b_zh', broadcastable=(False,True))
+        self.b_hy1 = sharedZeroVector(self.P, 'b_zh', broadcastable=(False,True))
 
-        self.likelihoodVariables = [self.W1, self.W2, self.W3, self.b1, self.b2, self.b3]
+        self.likelihoodVariables = [self.W_zh, self.W_hy1, self.b_zh, self.b_hy1]
+
+        if self.numHiddenLayers_decoder == 2:
+            self.W_hh = sharedZeroMatrix(self.HU_decoder, self.HU_decoder, 'W_hh')
+            self.b_hh = sharedZeroVector(self.HU_decoder, 'b_hh', broadcastable=(False,True))
+
+            self.likelihoodVariables.extend([self.W_hh, self.b_hh])
+        if self.continuous:
+            self.W_hy2 = sharedZeroMatrix(self.P, self.HU_decoder, 'W_hy2')
+            self.b_hy2 = sharedZeroVector(self.P, 'b_hy2', broadcastable=(False,True))
+
+            self.likelihoodVariables.extend([self.W_hy2, self.b_hy2])
+
         self.gradientVariables.extend(self.likelihoodVariables)
 
         # Keep track of bounds and gradients for post analysis
@@ -75,18 +83,23 @@ class VA(SGPDV):
 
         if not self.continuous:
             # Optimal initial values for tanh transform are 1/4
-            # those for thes sigmoid transformgi
-            self.W1.set_value(self.W1.get_value()/4.0)
-            self.W2.set_value(self.W2.get_value()/4.0)
-            self.W3.set_value(self.W3.get_value()/4.0)
+            # those for the sigmoid transform
+
+            members = [attr for attr in dir(self)]
+
+            for member in members:
+                var = getattr(self, member)
+                if var.name.startswith('W_'):
+                    var.set_value(var.get_value()/4.0)
 
     def log_p_y_z(self):
 
         if self.continuous:
-
-            h_decoder  = softplus(T.dot(self.W1,self.z.T) + self.b1)
-            mu_decoder = dot(self.W2, h_decoder) + self.b2
-            log_sigma_decoder = 0.5*(T.dot(self.W3, h_decoder) + self.b3)
+            h_decoder  = softplus(dot(self.W_zh,self.z.T) + self.b_zh)
+            if self.numHiddenLayers_decoder == 2:
+                h_decoder = softplus(dot(self.W_hh, h_decoder) + self.b_hh)
+            mu_decoder = dot(self.W_hy1, h_decoder) + self.b_hy1
+            log_sigma_decoder = 0.5*(dot(self.W_hy2, h_decoder) + self.b_hy2)
             log_pyz    = T.sum( -(0.5 * np.log(2 * np.pi) + log_sigma_decoder) \
                                 - 0.5 * ((self.y_miniBatch.T - mu_decoder) / T.exp(log_sigma_decoder))**2 )
 
@@ -95,8 +108,10 @@ class VA(SGPDV):
             h_decoder.name         = 'h_decoder'
             log_pyz.name           = 'log_p_y_z'
         else:
-            h_decoder = tanh(T.dot(self.W1, self.z.T) + self.b1)
-            y_hat     = sigmoid(T.dot(self.W2, h_decoder) + self.b2)
+            h_decoder = tanh(dot(self.W_zh, self.z) + self.b_zh)
+            if self.numHiddenLayers_decoder == 2:
+                h_decoder = softplus(dot(W_hh, h_decoder) + self.b_hh)
+            y_hat     = sigmoid(dot(self.W_hy1, h_decoder) + self.b_hy1)
             log_pyz   = -T.nnet.binary_crossentropy(y_hat, self.y_miniBatch).sum()
             h_decoder.name = 'h_decoder'
             y_hat.name     = 'y_hat'
@@ -182,13 +197,13 @@ if __name__ == "__main__":
         T.grad(va.H_qX(), [va.W1_qX, va.W3_qX, va.b1_qX, va.b3_qX])
     else:
         T.grad(va.H_qX(), va.Phi)
-#
-#    va.gradientVariables = [va.upsilon]
-#
+
     va.construct_L_using_r( p_z_gaussian=True )
 
     va.randomise(rndQR=False)
 
+    va.epochSample()
+    va.iterator.set_value(0)
     va.sample()
 
     va.setKernelParameters(1*np.ones((2,)),gamma=1*np.ones((2,)),omega=1*np.ones((2,)) )
