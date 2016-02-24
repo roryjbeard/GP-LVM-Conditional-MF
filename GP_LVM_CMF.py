@@ -140,11 +140,11 @@ class SGPDV(object):
         self.xi.name   = 'xi'
         self.alpha.name = 'alpha'
         self.beta.name  = 'beta'
-        
+
         self.sample_xi    = th.function([], self.xi)
         self.sample_alpha = th.function([], self.alpha)
         self.sample_beta  = th.function([], self.beta)
-               
+
         self.sample_batchStream = th.function([], self.batchStream)
         self.sample_padStream   = th.function([], self.padStream)
 
@@ -164,7 +164,7 @@ class SGPDV(object):
 
                 Phi_batch_sqrt = self.Phi_full_sqrt[self.currentBatch][:, self.currentBatch]
                 Phi_batch_sqrt.name = 'Phi_batch_sqrt'
-                
+
                 self.Phi = dot(Phi_batch_sqrt, Phi_batch_sqrt.T, 'Phi')
 
                 self.cPhi, _, self.logDetPhi = cholInvLogDet(self.Phi, self.B, 0)
@@ -252,7 +252,7 @@ class SGPDV(object):
         # [BxQ] = [BxM] * [MxQ]
         self.mu = dot(self.A, self.u, 'mu')
         # Sample f from q(f|u,X) = N( mu_q, C )
-        # [BxQ] =  
+        # [BxQ] =
         self.z  = plus(self.mu, (dot(self.cC, self.beta)), 'z')
 
         self.qz_vars = [self.log_theta]
@@ -270,7 +270,7 @@ class SGPDV(object):
             self.b3_rX = sharedZeroVector(self.R, 'b3_rX', broadcastable=(False, True))
 
             # [HxB] = softplus( [Hx(Q+P)] . [(Q+P)xB] + repmat([Hx1], [1,B]) )
-            h_rX = plus(softplus(dot(self.W1_rX, T.concatenate((self.z.T, self.y_miniBatch.T)))), self.b1_rX, 'h_rX')
+            h_rX = softplus(plus(dot(self.W1_rX, T.concatenate((self.z.T, self.y_miniBatch.T))), self.b1_rX), 'h_rX')
             # [RxB] = softplus( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
             mu_rX = plus(dot(self.W2_rX, h_rX), self.b2_rX, 'mu_rX')
             # [RxB] = 0.5*( [RxH] . [HxB] + repmat([Rx1], [1,B]) )
@@ -294,11 +294,11 @@ class SGPDV(object):
             # Tau_r [BxB] = kernel( [[BxQ]^T,[BxP]^T].T )
             Tau_r = kfactory.kernel(T.concatenate((self.z.T, self.y_miniBatch.T)).T, None, self.log_omega, 'Tau_r')
             (cTau_r, iTau_r, logDetTau_r) = cholInvLogDet(Tau_r, self.B, self.jitter)
-            
+
             # self.Tau  = slinalg.kron(T.eye(self.R), Tau_r)
             self.cTau = slinalg.kron(cTau_r, T.eye(self.R))
             self.iTau = slinalg.kron(iTau_r, T.eye(self.R))
-            
+
             self.logDetTau = logDetTau_r * self.R
             self.tau.name  = 'tau'
             # self.Tau.name  = 'Tau'
@@ -359,7 +359,8 @@ class SGPDV(object):
             elif var.name.startswith('b1') or \
                     var.name.startswith('b2') or \
                     var.name.startswith('b3') or \
-                    var.name.startswith('b4'):
+                    var.name.startswith('b4') or \
+                    var.name.startswith('b_'):
                 print 'Setting ' + var.name + ' to all 0s'
                 # Offsets not randomised at all
                 var.set_value(np.zeros(var.get_value().shape, dtype=precision))
@@ -487,7 +488,7 @@ class SGPDV(object):
         return H
 
     def negH_q_u_zX(self):
-        H = -0.5*self.M*self.Q*(1+log2pi) + 0.5*self.Q*self.negLogDetUpsilon 
+        H = -0.5*self.M*self.Q*(1+log2pi) + 0.5*self.Q*self.negLogDetUpsilon
         H.name = 'negH_q_u_zX'
         return H
 
@@ -497,7 +498,7 @@ class SGPDV(object):
         X_m_tau_vec.name = 'X_m_tau_vec'
         if self.Tau_isDiagonal:
             log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
-            - 0.5 * trace(dot(X_m_tau_vec.T, div(X_m_tau_vec,self.Tau)))        
+            - 0.5 * trace(dot(X_m_tau_vec.T, div(X_m_tau_vec,self.Tau)))
         else:
             log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
             - 0.5 * trace(dot(X_m_tau_vec.T, dot(self.iTau, X_m_tau_vec)))

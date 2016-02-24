@@ -127,7 +127,7 @@ class VA(SGPDV):
 
         if self.continuous:
             kappa_outer = dot(self.kappa, self.kappa.T, 'kappa_outer')
-            AtA = dot(self.A.T, self.A, 'A''.A' )
+            AtA = dot(self.A.T, self.A)
             KL = 0.5*self.Q*trace(self.C) + 0.5*trace(dot(AtA,kappa_outer)) \
                 + 0.5*self.Q+trace(dot(AtA,self.Kappa)) - 0.5*self.Q*self.B - 0.5*self.Q*self.logDetC
             KL.name = 'KL_qp'
@@ -229,7 +229,7 @@ if __name__ == "__main__":
 
     print 'H_qX'
     print th.function([], va.H_qX())()
- 
+
     va.construct_L_dL_functions()
 
     for i in range(len(va.gradientVariables)):
