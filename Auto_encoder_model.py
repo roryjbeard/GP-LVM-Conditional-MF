@@ -92,6 +92,14 @@ class VA(SGPDV):
                 if var.name.startswith('W_'):
                     var.set_value(var.get_value()/4.0)
 
+    def generate_new_data(self, z_test):
+        h_decoder  = softplus(dot(self.W_zh,z_test.T) + self.b_zh)
+        if self.numHiddenLayers_decoder == 2:
+            h_decoder = softplus(dot(self.W_hh, h_decoder) + self.b_hh)
+        mu_decoder = dot(self.W_hy1, h_decoder) + self.b_hy1
+
+        return mu_decoder
+
     def log_p_y_z(self):
 
         if self.continuous:
