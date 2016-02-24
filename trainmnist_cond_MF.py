@@ -1,5 +1,4 @@
 
-
 from Auto_encoder_model import VA
 import numpy as np
 import argparse
@@ -26,36 +25,35 @@ f.close()
 
 [N,dimX] = x_train.shape
 
-print 'Loading PCA initialisation of Xf with dimX components if it exists'
-filename = 'PCA_init_Xf_{}_components.pkl'.format(dimX)
-try:
-    with open(filename, 'rb') as f:
-        Xf = cPickle.load(f)
-except:
-    'Does not exist so performing the PCA now and saving result'
-    pcaXf = PCA(n_components=dimX)
-    Xf = pcaXf.fit_transform(x_train)
-    filename = 'PCA_init_Xf_{}_components'.format(dimX)
-    with open(filename, 'wb') as ff:
-        cPickle.dump(Xf, ff)
+# print 'Loading PCA initialisation of Xf with dimX components if it exists'
+# filename = 'PCA_init_Xf_{}_components.pkl'.format(dimX)
+# try:
+#     with open(filename, 'rb') as f:
+#         Xf = cPickle.load(f)
+# except:
+#     'Does not exist so performing the PCA now and saving result'
+#     pcaXf = PCA(n_components=dimX)
+#     Xf = pcaXf.fit_transform(x_train)
+#     filename = 'PCA_init_Xf_{}_components'.format(dimX)
+#     with open(filename, 'wb') as ff:
+#         cPickle.dump(Xf, ff)
 
 
 data = x_train
 
 dimZ = 40
 dimX = 3
-batchSize = 100
-encoderType_qX='FreeForm2'
-encoderType_rX='FreeForm2'
-encoderType_qu='FreeForm'
-encoderType_ru='FreeForm2'
+batchSize = 200
+encoderType_qX='MLP'
+encoderType_rX='MLP'
 Xu_optimise=True
 kernelType='RBF'
-numHiddenUnits_encoder=200
-numHiddentUnits_decoder=200
-numberOfInducingPoints =50
+numHiddenUnits_encoder=400
+numHiddentUnits_decoder=400
+numberOfInducingPoints =500
 learning_rate = 1e-3
 numTestSamples = 100
+numHiddenLayers_decoder = 1
 
 print "Initialising"
 
@@ -70,13 +68,14 @@ va = VA(
     encoderType_rX=encoderType_rX,  # 'MLP', 'Kernel', 'NoEncoding'.
     Xu_optimise=Xu_optimise,
     numHiddenUnits_encoder=numHiddenUnits_encoder,
-    numHiddentUnits_decoder=numHiddentUnits_decoder,
+    numHiddenUnits_decoder=numHiddentUnits_decoder,
+    numHiddenLayers_decoder=numHiddenLayers_decoder,
     continuous=True
 )
 
 va.construct_L_using_r()
 
-va.setKernelParameters(0.01, 5*np.ones((2,)),
+va.setKernelParameters(5*np.ones((2,)),
     1e-100, 0.5,
     [1e-10,1e-10], [10,10] )
 
@@ -94,11 +93,11 @@ va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
-numberOfEpochs = 1
+numberOfEpochs = 10
 
 
 
-va.train(numberOfEpochs=numberOfEpochs, maxIters=20)
+va.train(numberOfEpochs=numberOfEpochs)
 
 #for i in range(1,8):
 #
