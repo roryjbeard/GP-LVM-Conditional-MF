@@ -42,7 +42,7 @@ f.close()
 
 data = x_train
 
-dimZ = 2
+dimZ = 40
 dimX = 3
 batchSize = 200
 encoderType_qX='MLP'
@@ -94,32 +94,34 @@ va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
-numberOfEpochs = 10
+numberOfEpochs = 100
 
 
 
 va.train(numberOfEpochs=numberOfEpochs)
 
-# Generate synthesised data from the learned decoder
-# at each point in a grid of a 2d latent space
+makePlots=False
+if makePlots:
+    # Generate synthesised data from the learned decoder
+    # at each point in a grid of a 2d latent space
 
-nx = ny = 20
-x_values = np.linspace(-3, 3, nx)
-y_values = np.linspace(-3, 3, ny)
+    nx = ny = 20
+    x_values = np.linspace(-3, 3, nx)
+    y_values = np.linspace(-3, 3, ny)
 
-canvas = np.empty((28*ny, 28*nx))
-va.create_new_data_function()
-for i, yi in enumerate(x_values):
-    for j, xi in enumerate(y_values):
-        z_mu = np.array([[xi, yi]])
-        va.z_test.set_value(z_mu)
-        x_mean = va.new_data_function()
-        canvas[(nx-i-1)*28:(nx-i)*28, j*28:(j+1)*28] = x_mean[0].reshape(28, 28)
+    canvas = np.empty((28*ny, 28*nx))
+    va.create_new_data_function()
+    for i, yi in enumerate(x_values):
+        for j, xi in enumerate(y_values):
+            z_mu = np.array([[xi, yi]])
+            va.z_test.set_value(z_mu)
+            x_mean = va.new_data_function()
+            canvas[(nx-i-1)*28:(nx-i)*28, j*28:(j+1)*28] = x_mean[0].reshape(28, 28)
 
-plt.figure(figsize=(8, 10))
-Xi, Yi = np.meshgrid(x_values, y_values)
-plt.imshow(canvas, origin="upper")
-plt.tight_layout()
+    plt.figure(figsize=(8, 10))
+    Xi, Yi = np.meshgrid(x_values, y_values)
+    plt.imshow(canvas, origin="upper")
+    plt.tight_layout()
 
 #for i in range(1,8):
 #
