@@ -561,21 +561,21 @@ class SGPDV(object):
 
         return self.lowerBounds
 
-    def init_Xu_from_Xf(self):
+    def init_Xu_from_Xz(self):
 
-        Xf_min = np.zeros(self.R,)
-        Xf_max = np.zeros(self.R,)
-        Xf_locations = th.function([], self.phi, no_default_updates=True) # [B x R]
+        Xz_min = np.zeros(self.R,)
+        Xz_max = np.zeros(self.R,)
+        Xz_locations = th.function([], self.phi, no_default_updates=True) # [B x R]
         for b in range(self.numberofBatchesPerEpoch):
             self.iterator.set_value(b)
-            Xf_batch = Xf_locations()
-            Xf_min = np.min( (Xf_min, Xf_batch.min(axis=0)), axis=0)
-            Xf_max = np.max( (Xf_min, Xf_batch.max(axis=0)), axis=0)
+            Xz_batch = Xz_locations()
+            Xz_min = np.min( (Xz_min, Xz_batch.min(axis=0)), axis=0)
+            Xz_max = np.max( (Xz_min, Xz_batch.max(axis=0)), axis=0)
 
-        Xf_min.reshape(-1,1)
-        Xf_max.reshape(-1,1)
-        Df = Xf_max - Xf_min
-        Xu = np.random.rand(self.M, self.R) * Df + Xf_min # [M x R]
+        Xz_min.reshape(-1,1)
+        Xz_max.reshape(-1,1)
+        Df = Xz_max - Xz_min
+        Xu = np.random.rand(self.M, self.R) * Df + Xz_min # [M x R]
 
         self.Xu.set_value(Xu, borrow=True)
 
