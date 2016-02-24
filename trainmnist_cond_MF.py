@@ -40,11 +40,10 @@ except:
         cPickle.dump(Xf, ff)
 
 data = x_train
-
-dimZ = 40
+dimZ = 2
 dimX = 30
-batchSize = 400
-encoderType_qX='FreeForm2'
+batchSize = 200
+encoderType_qX='MLP'
 encoderType_rX='MLP'
 Xu_optimise=True
 kernelType='ARD'
@@ -89,9 +88,18 @@ va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
+<<<<<<< HEAD
 numberOfEpochs = 5
+=======
+numberOfEpochs = 1
+
+
+
+>>>>>>> 239b2283cdf928f132f53629f00311930d891f57
 
 va.train(numberOfEpochs=numberOfEpochs, printDiagnostics=10)
+
+y_reconstr = va.create_new_data_function()
 
 makePlots=False
 if makePlots:
@@ -109,12 +117,14 @@ if makePlots:
             z_mu = np.array([[xi, yi]])
             va.z_test.set_value(z_mu)
             x_mean = va.new_data_function()
-            canvas[(nx-i-1)*28:(nx-i)*28, j*28:(j+1)*28] = x_mean[0].reshape(28, 28)
+            canvas[(nx-i-1)*28:(nx-i)*28, j*28:(j+1)*28] = x_mean.reshape(28, 28)
 
     plt.figure(figsize=(8, 10))
     Xi, Yi = np.meshgrid(x_values, y_values)
     plt.imshow(canvas, origin="upper")
     plt.tight_layout()
+    plt.show()
+
 
 #for i in range(1,8):
 #
