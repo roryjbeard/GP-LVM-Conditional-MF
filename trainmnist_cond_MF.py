@@ -98,6 +98,7 @@ numberOfEpochs = 100
 
 
 
+
 va.train(numberOfEpochs=numberOfEpochs)
 
 makePlots=False
