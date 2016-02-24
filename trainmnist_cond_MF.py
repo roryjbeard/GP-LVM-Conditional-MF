@@ -6,7 +6,7 @@ import gzip, cPickle
 import os
 import theano.tensor as T
 from matplotlib import pyplot as plt
-# from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 os.environ["LD_LIBRARY_PATH"]   = os.path.dirname(os.path.realpath(__file__)) + '/fastlin/'
@@ -26,29 +26,28 @@ f.close()
 
 [N,dimX] = x_train.shape
 
-# print 'Loading PCA initialisation of Xf with dimX components if it exists'
-# filename = 'PCA_init_Xf_{}_components.pkl'.format(dimX)
-# try:
-#     with open(filename, 'rb') as f:
-#         Xf = cPickle.load(f)
-# except:
-#     'Does not exist so performing the PCA now and saving result'
-#     pcaXf = PCA(n_components=dimX)
-#     Xf = pcaXf.fit_transform(x_train)
-#     filename = 'PCA_init_Xf_{}_components'.format(dimX)
-#     with open(filename, 'wb') as ff:
-#         cPickle.dump(Xf, ff)
-
+print 'Loading PCA initialisation of Xf with dimX components if it exists'
+filename = 'PCA_init_Xf_{}_components.pkl'.format(dimX)
+try:
+    with open(filename, 'rb') as f:
+        Xf = cPickle.load(f)
+except:
+    'Does not exist so performing the PCA now and saving result'
+    pcaXf = PCA(n_components=dimX)
+    Xf = pcaXf.fit_transform(x_train)
+    filename = 'PCA_init_Xf_{}_components'.format(dimX)
+    with open(filename, 'wb') as ff:
+        cPickle.dump(Xf, ff)
 
 data = x_train
 
 dimZ = 40
-dimX = 3
-batchSize = 200
-encoderType_qX='MLP'
+dimX = 30
+batchSize = 400
+encoderType_qX='FreeForm2'
 encoderType_rX='MLP'
 Xu_optimise=True
-kernelType='RBF'
+kernelType='ARD'
 numHiddenUnits_encoder=400
 numHiddentUnits_decoder=400
 numberOfInducingPoints =500
@@ -74,32 +73,25 @@ va = VA(
     continuous=True
 )
 
-va.construct_L_using_r()
-
-va.setKernelParameters(5*np.ones((2,)),
-    1e-100, 0.5,
-    [1e-10,1e-10], [10,10] )
-
 va.randomise()
 # va.Xz.set_value()
 va.init_Xu_from_Xz()
 
+theta = np.ones((1,dimX+1))*10
+va.setKernelParameters(theta)
 
 #va.printMemberTypes()
 #va.printSharedVariables()
 #va.printTheanoVariables()
 
-
+va.construct_L()
 va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
-numberOfEpochs = 100
+numberOfEpochs = 5
 
-
-
-
-va.train(numberOfEpochs=numberOfEpochs)
+va.train(numberOfEpochs=numberOfEpochs, printDiagnostics=10)
 
 makePlots=False
 if makePlots:
@@ -157,7 +149,7 @@ if makePlots:
 #    continuous=True
 #)
 
-#va.construct_L_using_r()
+#va.construct_L()
 #vatest.copyParameters(va)
 
 #testLogLhood = vatest.getMCLogLikelihood(numTestSamples)

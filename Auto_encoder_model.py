@@ -24,7 +24,7 @@ class VA(SGPDV):
             dimX,                   # Dimensionality of the latent co-ordinates
             dimZ,                   # Dimensionality of the latent variables
             data,                   # [NxP] matrix of observations
-            kernelType='RBF',
+            kernelType='ARD',
             encoderType_qX='FreeForm2',  # MLP', 'Kernel'.
             encoderType_rX='FreeForm2',  # MLP', 'Kernel'.
             Xu_optimise=False,
