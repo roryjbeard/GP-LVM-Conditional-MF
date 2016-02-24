@@ -92,11 +92,13 @@ class VA(SGPDV):
                 if var.name.startswith('W_'):
                     var.set_value(var.get_value()/4.0)
 
-    def generate_new_data(self, z_test):
+    def create_new_data_function(self):
+        self.z_test = sharedZeroMatrix(self.Q,1,'z_test')
         h_decoder  = softplus(dot(self.W_zh,z_test.T) + self.b_zh)
         if self.numHiddenLayers_decoder == 2:
             h_decoder = softplus(dot(self.W_hh, h_decoder) + self.b_hh)
         mu_decoder = dot(self.W_hy1, h_decoder) + self.b_hy1
+        self.new_data_function = th.function([], mu_decoder, no_default_updates=True)
 
         return mu_decoder
 
