@@ -121,7 +121,8 @@ q(X_z) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \phi_r, \Phi)
 &= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \zb_q^\top\zb - B -  \log\det\Cb \right)\right] \\
 &= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Cb \right)\right] \\
 &=\Ex_{q(X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Cb \right)\right] \\
-&=\Ex_{q(X_z)}\left[\frac{Q}{2}\tr(\Cb) + \frac{1}{2}\sum_{q=1}^Q\;\tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + \frac{Q}{2}\;\tr(\Ab^\top\Ab\Kappa) - \frac{QB}{2} -  \frac{Q}{2}\;\log\det\Cb \right]
+&=\Ex_{q(X_z)}\left[\frac{Q}{2}\tr(\Cb) + \frac{1}{2}\sum_{q=1}^Q\;\tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + \frac{Q}{2}\;\tr(\Ab^\top\Ab\Kappa) - \frac{QB}{2} -  \frac{Q}{2}\;\log\det\Cb \right] \\
+&=\Ex_{q(X_z)}\left[\frac{Q}{2}\tr(\Cb) + \frac{1}{2}\;\tr(\Ab^\top\Ab\kappa\kappa^\top) + \frac{Q}{2}\;\tr(\Ab^\top\Ab\Kappa) - \frac{QB}{2} -  \frac{Q}{2}\;\log\det\Cb \right]
 \end{align}
 %
 The entropy of $q(\ub)$ is:
