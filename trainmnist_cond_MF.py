@@ -94,7 +94,7 @@ va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
-numberOfEpochs = 10
+numberOfEpochs = 3
 
 
 
