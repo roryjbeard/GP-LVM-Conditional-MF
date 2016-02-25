@@ -42,8 +42,8 @@ f.close()
 
 data = x_train
 
-dimZ = 40
-dimX = 3
+dimZ = 50
+dimX = 100
 batchSize = 200
 encoderType_qX='MLP'
 encoderType_rX='MLP'
@@ -94,7 +94,7 @@ va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
-numberOfEpochs = 100
+numberOfEpochs = 7
 
 
 
