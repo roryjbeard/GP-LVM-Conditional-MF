@@ -42,8 +42,9 @@ f.close()
 
 data = x_train
 
-dimZ = 2
-dimX = 30
+
+dimZ = 50
+dimX = 100
 batchSize = 200
 encoderType_qX='MLP'
 encoderType_rX='MLP'
@@ -94,14 +95,15 @@ va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
-numberOfEpochs = 1
+numberOfEpochs = 10
 
 
 
 
 va.train(numberOfEpochs=numberOfEpochs)
 
-y_reconstr = va.create_new_data_function()
+y_reconstr = va.reconstruct_test_datum()
+imagine_from_prior = va.generate_random_datum_from_prior()
 
 makePlots=False
 if makePlots:

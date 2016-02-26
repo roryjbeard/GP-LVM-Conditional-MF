@@ -11,12 +11,14 @@ import theano.tensor as T
 from theano.tensor import nlinalg
 
 from GP_LVM_CMF import SGPDV
+from simple_encoder import MLPENC
 from testTools import checkgrad
-from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus
+from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, \
+sharedZeroMatrix, plus, minus, mul, diagCholInvLogDet_fromLogDiag, cholInvLogDet
 
 precision = th.config.floatX
 
-class VA(SGPDV):
+class VA(SGPDV,MLPENC):
 
     def __init__(self,
             numberOfInducingPoints, # Number of inducing ponts in sparse GP
@@ -31,25 +33,36 @@ class VA(SGPDV):
             numHiddenUnits_encoder=10,
             numHiddenUnits_decoder=10,
             numHiddenLayers_decoder=2,
-            continuous=True
+            continuous=True,
+            simpleEncoder=False
         ):
 
-        SGPDV.__init__(self,
-            numberOfInducingPoints, # Number of inducing ponts in sparse GP
-            batchSize,              # Size of mini batch
-            dimX,                   # Dimensionality of the latent co-ordinates
-            dimZ,                   # Dimensionality of the latent variables
-            data,                   # [NxP] matrix of observations
-            kernelType=kernelType,
-            encoderType_qX=encoderType_qX,
-            encoderType_rX=encoderType_rX,
-            Xu_optimise=Xu_optimise,
-            numberOfEncoderHiddenUnits=numHiddenUnits_encoder
-        )
+        if simpleEncoder==False:
+            SGPDV.__init__(self,
+                numberOfInducingPoints, # Number of inducing ponts in sparse GP
+                batchSize,              # Size of mini batch
+                dimX,                   # Dimensionality of the latent co-ordinates
+                dimZ,                   # Dimensionality of the latent variables
+                data,                   # [NxP] matrix of observations
+                kernelType=kernelType,
+                encoderType_qX=encoderType_qX,
+                encoderType_rX=encoderType_rX,
+                Xu_optimise=Xu_optimise,
+                numberOfEncoderHiddenUnits=numHiddenUnits_encoder
+            )
+        else:
+            MLPENC.__init__(self,
+                batchSize,
+                dimZ,
+                data,
+                encoderType='MLP',
+                numberOfEncoderHiddenUnits=numHiddenUnits_encoder
+                )
 
         self.HU_decoder = numHiddenUnits_decoder
         self.numHiddenLayers_decoder = numHiddenLayers_decoder
         self.continuous = continuous
+        self.kernelType = kernelType
 
         # Construct appropriately sized matrices to initialise theano shares
 
@@ -92,8 +105,8 @@ class VA(SGPDV):
                 if var.name.startswith('W_'):
                     var.set_value(var.get_value()/4.0)
 
-    def create_new_data_function(self):
-        # self.z_test = sharedZeroMatrix(self.Q,1,'z_test')
+    def construct_new_data_function(self):
+        self.z_test = sharedZeroMatrix(1,self.Q,'z_test')
         h_decoder  = softplus(dot(self.W_zh,self.z_test.T) + self.b_zh)
         if self.numHiddenLayers_decoder == 2:
             h_decoder = softplus(dot(self.W_hh, h_decoder) + self.b_hh)
@@ -103,30 +116,52 @@ class VA(SGPDV):
         return mu_decoder
 
     def reconstruct_test_datum(self):
-        self.y_test = self.y(np.random.choice(self.N, 1))
+        self.construct_new_data_function()
+        self.y_test = self.y[np.random.choice(self.N, 1)]
 
-        h_qX = softplus(plus(dot(self.W1_qX, self.y_test.T), self.b1_qX))
-        mu_qX = plus(dot(self.W2_qX, h_qX), self.b2_qX)
-        log_sigma_qX = mul( 0.5, plus(dot(self.W3_qX, h_qX), self.b3_qX))
+        if simpleEncoder==False:
+            h_qX = softplus(plus(dot(self.W1_qX, self.y_test.T), self.b1_qX))
+            mu_qX = plus(dot(self.W2_qX, h_qX), self.b2_qX)
+            log_sigma_qX = mul( 0.5, plus(dot(self.W3_qX, h_qX), self.b3_qX))
 
-        self.phi_test  = mu_qX.T  # [BxR]
-        (self.Phi_test,self.cPhi_test,self.iPhi_test,self.logDetPhi_test) \
-            = diagCholInvLogDet_fromLogDiag(log_sigma_qX)
+            self.phi_test  = mu_qX.T  # [BxR]
+            (self.Phi_test,self.cPhi_test,self.iPhi_test,self.logDetPhi_test) \
+                = diagCholInvLogDet_fromLogDiag(log_sigma_qX, 'Phi_test')
 
-        self.Xz_test = plus( self.phi_test, dot(self.cPhi_test, self.xi[0,:]))
+            self.Xz_test = plus( self.phi_test, dot(self.cPhi_test, self.xi[0,:]))
 
-        self.Kzz_test = kfactory.kernel(self.Xz_test, None,    self.log_theta)
-        self.Kzu_test = kfactory.kernel(self.Xz_test, self.Xu, self.log_theta)
+            from GP_LVM_CMF import kernelFactory
+            kfactory = kernelFactory(self.kernelType)
+            self.Kzz_test = kfactory.kernel(self.Xz_test, None,    self.log_theta, 'Kzz_test')
+            self.Kzu_test = kfactory.kernel(self.Xz_test, self.Xu, self.log_theta, 'Kzu_test')
 
-        self.A_test  = dot(self.Kzu_test, self.iKuu)
-        self.C_test  = minus( self.Kzz_test, dot(self.A_test, self.Kzu_test.T))
-        self.cC_test, self.iC_test, self.logDetC_test = cholInvLogDet(self.C_test, self.B, self.jitter)
+            self.A_test  = dot(self.Kzu_test, self.iKuu)
+            self.C_test  = minus( self.Kzz_test, dot(self.A_test, self.Kzu_test.T))
+            self.cC_test, self.iC_test, self.logDetC_test = cholInvLogDet(self.C_test, self.B, self.jitter)
 
-        self.u_test  = plus( self.kappa, (dot(self.cKappa, self.alpha)))
+            self.u_test  = plus( self.kappa, (dot(self.cKappa, self.alpha)))
 
-        self.mu_test = dot(self.A_test, self.u_test)
+            self.mu_test = dot(self.A_test, self.u_test)
 
-        self.z_test  = plus(self.mu_test, (dot(self.cC_test, self.beta[0,:])))
+            self.z_test  = plus(self.mu_test, (dot(self.cC_test, self.beta[0,:])))
+
+        else:
+            h_qZ = softplus(plus(dot(self.W1_qZ, self.y_test.T), self.b1_qZ))
+            mu_qZ = plus(dot(self.W2_qZ, h_qZ), self.b2_qZ)
+            log_sigma_qZ = mul( 0.5, plus(dot(self.W3_qZ, h_qZ), self.b3_qZ))
+
+            self.z_test = mu_qZ
+
+        retval = self.new_data_function()
+
+        return retval
+
+    def generate_random_datum_from_prior(self):
+        self.construct_new_data_function()
+        self.z_test.set_value(np.random.randn(1,self.Q))
+        retval = self.new_data_function()
+
+        return retval
 
     def log_p_y_z(self):
 
@@ -144,7 +179,7 @@ class VA(SGPDV):
             h_decoder.name         = 'h_decoder'
             log_pyz.name           = 'log_p_y_z'
         else:
-            h_decoder = tanh(dot(self.W_zh, self.z) + self.b_zh)
+            h_decoder = tanh(dot(self.W_zh, self.z.T) + self.b_zh)
             if self.numHiddenLayers_decoder == 2:
                 h_decoder = softplus(dot(W_hh, h_decoder) + self.b_hh)
             y_hat     = sigmoid(dot(self.W_hy1, h_decoder) + self.b_hy1)
