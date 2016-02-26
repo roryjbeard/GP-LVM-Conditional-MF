@@ -9,6 +9,7 @@ from theano.tensor.shared_randomstreams import RandomStreams
 import time
 import collections
 from myCond import myCond
+from printable import printable
 
 from optimisers import Adam
 from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, \
@@ -17,7 +18,6 @@ from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVe
 # precision = np.float64
 precision = th.config.floatX
 log2pi = T.constant(np.log(2 * np.pi))
-
 
 class kernelFactory(object):
 
@@ -69,16 +69,19 @@ class kernelFactory(object):
 srng = RandomStreams(seed=234)
 
 
-class SGPDV(object):
+class SGPDV(printable):
 
     def __init__(self,
-                 numberOfInducingPoints,  # Number of inducing ponts in sparse GP
-                 batchSize,              # Size of mini batch
+                 y_miniBatch,            # Size minibatch of data
+                 jitterProtect,
+                 numberOfInducingPoints, # Number of inducing ponts in sparse GP
+                 minibatchSize,          #
+                 dimY,                   # number of dimensions of each data point
                  dimX,                   # Dimensionality of the latent co-ordinates
                  dimZ,                   # Dimensionality of the latent variables
-                 data,                   # [NxP] matrix of observations
+                 use_r=True,
                  kernelType='ARD',
-                 encoderType_qX='FreeForm2',  # 'MLP', 'Kernel'.
+                 encoderType_qX='FreeForm2',  # 'MLP', 'Kernel'
                  encoderType_rX='FreeForm2',  # 'MLP', 'Kernel'
                  Xu_optimise=False,
                  numberOfEncoderHiddenUnits=10
@@ -86,22 +89,19 @@ class SGPDV(object):
 
         self.numTestSamples = 5000
 
-        # set the data
-        data = np.asarray(data, dtype=precision)
-        self.N = data.shape[0]  # Number of observations
-        self.P = data.shape[1]  # Dimension of each observation
+        self.y_miniBatch = y_miniBatch
+        self.B = minibatchSize
+        self.P = dimZ
         self.M = numberOfInducingPoints
-        self.B = batchSize
         self.R = dimX
         self.Q = dimZ
         self.H = numberOfEncoderHiddenUnits
 
+        self.y_miniBatch = y_miniBatch
+
         self.encoderType_qX = encoderType_qX
         self.encoderType_rX = encoderType_rX
         self.Xu_optimise = Xu_optimise
-
-        self.y = th.shared(data)
-        self.y.name = 'y'
 
         if kernelType == 'RBF':
             self.numberOfKernelParameters = 2
@@ -111,34 +111,6 @@ class SGPDV(object):
             self.numberOfKernelParameters = self.R + 1
         else:
             raise RuntimeError('Unrecognised kernel type')
-
-        self.lowerBound = -np.inf  # Lower bound
-
-        self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
-        numPad = self.numberofBatchesPerEpoch * self.B - self.N
-
-        self.batchStream = srng.permutation(n=self.N)
-        self.padStream   = srng.choice(size=(numPad,), a=self.N,
-                                       replace=False, p=None, ndim=None, dtype='int32')
-
-        self.batchStream.name = 'batchStream'
-        self.padStream.name = 'padStream'
-
-        self.iterator = th.shared(0)
-        self.iterator.name = 'iterator'
-
-        self.allBatches = T.reshape(T.concatenate((self.batchStream, self.padStream)), [self.numberofBatchesPerEpoch, self.B])
-        self.currentBatch = T.flatten(self.allBatches[self.iterator, :])
-
-        self.allBatches.name = 'allBatches'
-        self.currentBatch.name = 'currentBatch'
-
-        self.y_miniBatch = self.y[self.currentBatch, :]
-        self.y_miniBatch.name = 'y_miniBatch'
-
-        self.jitterDefault = np.float64(0.0001)
-        self.jitterGrowthFactor = np.float64(1.1)
-        self.jitter = th.shared(np.asarray(self.jitterDefault, dtype='float64'), name='jitter')
 
         kfactory = kernelFactory(kernelType)
 
@@ -225,7 +197,7 @@ class SGPDV(object):
             # Draw the latent coordinates from a GP with data co-ordinates
             self.Phi = kfactory.kernel(self.y_miniBatch, None, self.log_gamma, 'Phi')
             self.phi = sharedZeroMatrix(self.B, self.R, 'phi')
-            (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, self.jitter)
+            (self.cPhi, self.iPhi, self.logDetPhi) = cholInvLogDet(self.Phi, self.B, jitterProtect.jitter)
 
             self.qX_vars = [self.log_gamma]
 
@@ -244,6 +216,7 @@ class SGPDV(object):
         # Calculate latent co-ordinates Xf
         # [BxR]  = [BxR] + [BxB] . [BxR]
         self.Xz = plus( self.phi, dot(self.cPhi, self.xi), 'Xf' )
+        self.Xz_get_value = th.function([], self.Xz, no_default_updates=True)
         # Inducing points co-ordinates
         self.Xu = sharedZeroMatrix(self.M, self.R, 'Xu')
 
@@ -251,14 +224,14 @@ class SGPDV(object):
         self.Kzz = kfactory.kernel(self.Xz, None,    self.log_theta, 'Kff')
         self.Kuu = kfactory.kernel(self.Xu, None,    self.log_theta, 'Kuu')
         self.Kzu = kfactory.kernel(self.Xz, self.Xu, self.log_theta, 'Kfu')
-        self.cKuu, self.iKuu, self.logDetKuu = cholInvLogDet(self.Kuu, self.M, self.jitter)
+        self.cKuu, self.iKuu, self.logDetKuu = cholInvLogDet(self.Kuu, self.M, jitterProtect.jitter)
 
         # Variational distribution
         # A has dims [BxM] = [BxM] . [MxM]
         self.A = dot(self.Kzu, self.iKuu, 'A')
         # L is the covariance of conditional distribution q(z|u,Xf)
         self.C = minus( self.Kzz, dot(self.A, self.Kzu.T), 'C')
-        self.cC, self.iC, self.logDetC = cholInvLogDet(self.C, self.B, self.jitter)
+        self.cC, self.iC, self.logDetC = cholInvLogDet(self.C, self.B, jitterProtect.jitter)
 
         # Sample u_q from q(u_q) = N(u_q; kappa_q, Kappa )  [MxQ]
         self.u  = plus(self.kappa, (dot(self.cKappa, self.alpha)), 'u')
@@ -272,7 +245,7 @@ class SGPDV(object):
         self.qz_vars = [self.log_theta]
 
         self.iUpsilon = plus(self.iKappa, dot(self.A.T, dot(self.iC, self.A) ), 'iUpsilon')
-        _, self.Upsilon, self.negLogDetUpsilon = cholInvLogDet(self.iUpsilon, self.M, self.jitter)
+        _, self.Upsilon, self.negLogDetUpsilon = cholInvLogDet(self.iUpsilon, self.M, jitterProtect.jitter)
 
         if self.encoderType_rX == 'MLP':
 
@@ -307,7 +280,7 @@ class SGPDV(object):
 
             # Tau_r [BxB] = kernel( [[BxQ]^T,[BxP]^T].T )
             Tau_r = kfactory.kernel(T.concatenate((self.z.T, self.y_miniBatch.T)).T, None, self.log_omega, 'Tau_r')
-            (cTau_r, iTau_r, logDetTau_r) = cholInvLogDet(Tau_r, self.B, self.jitter)
+            (cTau_r, iTau_r, logDetTau_r) = cholInvLogDet(Tau_r, self.B, jitterProtect.jitter)
 
             # self.Tau  = slinalg.kron(T.eye(self.R), Tau_r)
             self.cTau = slinalg.kron(cTau_r, T.eye(self.R))
@@ -356,19 +329,35 @@ class SGPDV(object):
         self.condUpsilon.name = 'condUpsilon'
         self.Upsilon_conditionNumber = th.function([], self.condUpsilon, no_default_updates=True)
 
-        self.Xz_get_value = th.function([], self.Xz, no_default_updates=True)
+        self.H_qX = 0.5*self.R*self.B*(1+log2pi) + 0.5*self.R*self.logDetPhi
+        self.H_qX.name = 'H_qX'
+
+        self.H_qu = 0.5*self.M*self.Q*(1+log2pi) + 0.5*self.Q*self.logDetKappa
+        self.H_qu.name = 'H_qu'
+
+        self.negH_q_u_zX = -0.5*self.M*self.Q*(1+log2pi) + 0.5*self.Q*self.negLogDetUpsilon
+        self.negH_q_u_zX.name = 'negH_q_u_zX'
+
+        self.L = self.H_qu + self.H_qX + self.negH_q_u_zX
+
+        if use_r:
+            X_m_tau = minus(self.Xz, self.tau)
+            X_m_tau_vec = T.reshape(X_m_tau, [self.B * self.R, 1])
+            X_m_tau_vec.name = 'X_m_tau_vec'
+            if self.Tau_isDiagonal:
+                self.log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
+                - 0.5 * trace(dot(X_m_tau_vec.T, div(X_m_tau_vec,self.Tau)))
+            else:
+                self.log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
+                    - 0.5 * trace(dot(X_m_tau_vec.T, dot(self.iTau, X_m_tau_vec)))
+            self.log_rX_z.name = 'log_rX_z'
+            self.L += self.log_r_X_z
 
     def randomise(self, sig=1, rndQR=False):
 
         def rnd(var):
             if type(var) == np.ndarray:
                 return np.asarray(sig * np.random.randn(*var.shape), dtype=precision)
-            elif var.name == 'y':
-                pass
-            elif var.name == 'iterator':
-                pass
-            elif var.name == 'jitter':
-                pass
             elif var.name == 'TauRange':
                 pass
             elif var.name.startswith('W1') or \
@@ -469,133 +458,22 @@ class SGPDV(object):
         if self.encoderType_rX == 'Kernel':
             constrain(self.log_omega, self.log_omega_min, self.log_omega_max)
 
-    def log_p_y_z(self):
-        # This always needs overloading (specifying) in the derived class
-        return 0.0
+    def getMCLogLikelihood(self, numberOfTestSamples=100):
 
-    def log_p_z(self):
-        # Overload this function in the derived class if p_z_gaussian==False
-        return 0.0
-
-    def KL_qp(self):
-        # Overload this function in the derived classes if p_z_gaussian==True
-        return 0.0
-
-    def addtionalBoundTerms(self):
-        return 0
-
-    def construct_L(self, p_z_gaussian=True, use_r=True):
-
-        self.L = self.log_p_y_z() + self.addtionalBoundTerms()
-        self.L.name = 'L'
-
-        if p_z_gaussian:
-            self.L += -self.KL_qp()
-        else:
-            self.L += self.log_p_z() - self.log_q_z_uX()
-
-        self.L += self.H_qu() + self.H_qX() + self.negH_q_u_zX()
-        
-        if use_r:
-            self.L += self.log_r_X_z()
-
-        self.dL = T.grad(self.L, self.gradientVariables)
-        for i in range(len(self.dL)):
-            self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
-
-    def construct_L_predictive(self):
-        self.L = self.log_p_y_z()
-
-    def construct_L_dL_functions(self):
-        self.L_func = th.function([], self.L, no_default_updates=True)
-        self.dL_func = th.function([], self.dL, no_default_updates=True)
-
-    def H_qu(self):
-        H = 0.5*self.M*self.Q*(1+log2pi) + 0.5*self.Q*self.logDetKappa
-        H.name = 'H_qu'
-        return H
-
-    def H_qX(self):
-        H = 0.5*self.R*self.B*(1+log2pi) + 0.5*self.R*self.logDetPhi
-        H.name = 'H_qX'
-        return H
-
-    def negH_q_u_zX(self):
-        H = -0.5*self.M*self.Q*(1+log2pi) + 0.5*self.Q*self.negLogDetUpsilon
-        H.name = 'negH_q_u_zX'
-        return H
-
-    def log_r_X_z(self):
-        X_m_tau = minus(self.Xz, self.tau)
-        X_m_tau_vec = T.reshape(X_m_tau, [self.B * self.R, 1])
-        X_m_tau_vec.name = 'X_m_tau_vec'
-        if self.Tau_isDiagonal:
-            log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
-            - 0.5 * trace(dot(X_m_tau_vec.T, div(X_m_tau_vec,self.Tau)))
-        else:
-            log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
-            - 0.5 * trace(dot(X_m_tau_vec.T, dot(self.iTau, X_m_tau_vec)))
-        log_rX_z.name = 'log_rX_z'
-        return log_rX_z
-
-
-    def constructUpdateFunction(self, learning_rate=0.001, beta_1=0.99, beta_2=0.999, profile=False):
-
-        gradColl = collections.OrderedDict([(param, T.grad(self.L, param)) for param in self.gradientVariables])
-
-        self.optimiser = Adam(self.gradientVariables, learning_rate, beta_1, beta_2)
-
-        updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
-
-        # Get the update function to also return the bound!
-        self.updateFunction = th.function([], self.L, updates=updates, no_default_updates=True, profile=profile)
-
-    def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf, constrain=False, printDiagnostics=0):
-
-        startTime    = time.time()
-        wallClockOld = startTime
-        # For each iteration...
-
-        print "training for {} epochs with {} learning rate".format(numberOfEpochs, learningRate)
-
-        # pbar = progressbar.ProgressBar(maxval=numberOfIterations*numberOfEpochs).start()
-
-        for ep in range(numberOfEpochs):
-
-            self.epochSample()
-
-            for it in range(self.numberofBatchesPerEpoch):
-
+        self.epochSample()
+        ll = [0] * self.numberofBatchesPerEpoch * numberOfTestSamples
+        c = 0
+        for i in range(self.numberofBatchesPerEpoch):
+            print '{} of {}, {} samples'.format(i, self.numberofBatchesPerEpoch, numberOfTestSamples)
+            self.iterator.set_value(i)
+            self.jitter.set_value(self.jitterDefault)
+            for k in range(numberOfTestSamples):
                 self.sample()
-                self.iterator.set_value(it)
-                lbTmp = self.jitterProtect(self.updateFunction, reset=False)
-                if constrain:
-                    self.constrainKernelParameters()
+                ll[c] = self.jitterProtect(self.L_func, reset=False)
+                c += 1
 
-                lbTmp = lbTmp.flatten()
-                self.lowerBound = lbTmp[0]
-
-                currentTime  = time.time()
-                wallClock    = currentTime - startTime
-                stepTime     = wallClock - wallClockOld
-                wallClockOld = wallClock
-
-                print("\n Ep %d It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
-                      % (ep, it, wallClock, stepTime, self.lowerBound))
-                if printDiagnostics > 0 and (it % printDiagnostics) == 0:
-                    self.printDiagnostics()
-
-                self.lowerBounds.append((self.lowerBound, wallClock))
-
-                if ep * self.numberofBatchesPerEpoch + it > maxIters:
-                    break
-
-            if ep * self.numberofBatchesPerEpoch + it > maxIters:
-                break
-            # pbar.update(ep*numberOfIterations+it)
-        # pbar.finish()
-
-        return self.lowerBounds
+        return np_log_mean_exp_stable(ll)
+   
 
     def printDiagnostics(self):
         print 'Kernel lengthscales (log_theta) = {}'.format(self.log_theta.get_value())
@@ -605,8 +483,6 @@ class SGPDV(object):
         print 'Kappa condition number          = {}'.format(self.Kappa_conditionNumber())
         print 'Average Xu distance to origin   = {}'.format(np.linalg.norm(self.Xu.get_value(),axis=0).mean())
         print 'Average Xz distance to origin   = {}'.format(np.linalg.norm(self.Xz_get_value(),axis=0).mean())
-
-
 
     def init_Xu_from_Xz(self):
 
@@ -632,42 +508,6 @@ class SGPDV(object):
         self.sample_beta()
         self.sample_xi()
 
-    def epochSample(self):
-
-        self.sample_batchStream()
-        self.sample_padStream()
-        self.iterator.set_value(0)
-
-    def jitterProtect(self, func, reset=True):
-
-        passed = False
-        while not passed:
-            try:
-                val = func()
-                passed = True
-            except np.linalg.LinAlgError:
-                self.jitter.set_value(self.jitter.get_value() * self.jitterGrowthFactor)
-                print 'Increasing value of jitter. Jitter now: ' + str(self.jitter.get_value())
-        if reset:
-            self.jitter.set_value(self.jitterDefault)
-        return val
-
-    def getMCLogLikelihood(self, numberOfTestSamples=100):
-
-        self.epochSample()
-        ll = [0] * self.numberofBatchesPerEpoch * numberOfTestSamples
-        c = 0
-        for i in range(self.numberofBatchesPerEpoch):
-            print '{} of {}, {} samples'.format(i, self.numberofBatchesPerEpoch, numberOfTestSamples)
-            self.iterator.set_value(i)
-            self.jitter.set_value(self.jitterDefault)
-            for k in range(numberOfTestSamples):
-                self.sample()
-                ll[c] = self.jitterProtect(self.L_func, reset=False)
-                c += 1
-
-        return np_log_mean_exp_stable(ll)
-
     def copyParameters(self, other):
 
         if not self.R == other.R or not self.Q == other.Q or not self.M == other.M:
@@ -677,17 +517,11 @@ class SGPDV(object):
         for name in members:
             if not hasattr(other, name):
                 raise RuntimeError('Incompatible configurations')
-            elif name == 'y':
-                pass
             elif name == 'Phi_full_sqrt':
                 pass
             elif name == 'Phi_full_logdiag':
                 pass
             elif name == 'phi_full':
-                pass
-            elif name == 'jitter':
-                pass
-            elif name == 'iterator':
                 pass
             else:
                 selfVar  = getattr(self,  name)
@@ -697,35 +531,6 @@ class SGPDV(object):
                         type(selfVar) == type(otherVar):
                     print 'Copying ' + selfVar.name
                     selfVar.set_value(otherVar.get_value())
-
-    def printSharedVariables(self):
-
-        members = [attr for attr in dir(self)]
-        for name in members:
-            var = getattr(self, name)
-            if type(var) == T.sharedvar.ScalarSharedVariable or \
-               type(var) == T.sharedvar.TensorSharedVariable:
-                print var.name
-                print var.get_value()
-
-    def printMemberTypes(self, memberType=None):
-
-        members = [attr for attr in dir(self)]
-        for name in members:
-            var = getattr(self, name)
-            if memberType is None or type(var) == memberType:
-                print name + "\t" + str(type(var))
-
-    def printTheanoVariables(self):
-
-        members = [attr for attr in dir(self)]
-        for name in members:
-            var = getattr(self, name)
-            if not type(var) == th.compile.function_module.Function \
-                and hasattr(var, 'name'):
-                print var.name
-                var_fun = th.function([], var, no_default_updates=True)
-                print self.jitterProtect(var_fun)
 
     def L_test(self, x, variable):
 
