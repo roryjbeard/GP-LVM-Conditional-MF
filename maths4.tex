@@ -1,0 +1,167 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[top=20mm, bottom=20mm, left=30mm, right=30mm]{geometry}
+\usepackage{soul}
+\usepackage{bbm}
+%Gummi|061|=)
+\usepackage{setspace}
+\usepackage[usenames, dvipsnames]{color}
+
+\newcommand{\chris}[1]{\textcolor{ForestGreen}{#1}}
+\newcommand{\Tau}{\mathcal{T}}
+\newcommand{\Kappa}{\mathcal{K}}
+\newcommand{\xb}{\mathbf{x}}
+\newcommand{\ub}{\mathbf{u}}
+\newcommand{\zb}{\mathbf{z}}
+\newcommand{\fb}{\mathbf{f}}
+\newcommand{\Cb}{\mathbf{C}}
+\newcommand{\Ab}{\mathbf{A}}
+\newcommand{\yb}{\mathbf{y}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\Lo}{\mathcal{L}_1}
+\newcommand{\Laux}{\mathcal{L}_{\mathrm{aux}}}
+\newcommand{\Kff}{\mathbf{K}_{ff}}
+\newcommand{\Kuu}{\mathbf{K}_{uu}}
+\newcommand{\Kuf}{\mathbf{K}_{uf}}
+\newcommand{\Kfu}{\mathbf{K}_{fu}}
+\newcommand{\Ex}{\mathbb{E}}
+\newcommand{\KL}{\mathrm{KL}}
+\newcommand{\No}{\mathcal{N}}
+\newcommand{\chol}{\mathrm{chol}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\Wb}{\mathbf{W}}
+\newcommand{\hb}{\mathbf{h}}
+\newcommand{\bb}{\mathbf{b}}
+\doublespacing
+
+\setlength{\parindent}{0pt}
+
+\title{\textbf{Derivations and Equations}}
+\date{}
+\begin{document}
+
+\maketitle
+
+
+\section{Deriving the bound} % (fold)
+\label{sec:derive_bound}
+The standard variational formulation is
+%
+\begin{align}
+    \log p(\yb) &= \int q(\zb)\log\frac{p(\yb|\zb)p(\zb)}{q(\zb)}\frac{q(\zb)}{p(\zb|\yb)} \dd\zb\notag\\
+    &= \underbrace{\mathbb{E}_{q(\zb)}\big[ \log p(\yb|\zb)p(\zb) - \log q(\zb) \big]}_{\Lo} + \KL\big[ q(\zb)\Vert p(\zb|\yb) \big]\label{eq:logpy1}
+\end{align}
+
+We want $\fb = f(X_f)$ to come from a Guassian process. We also want to condition that GP on some $\ub=u(X_u)$ who's distribution, $q(\ub)$, we control.
+
+We want $u$ and $f$ to come from the same zero mean gaussian process
+%
+\begin{equation}
+    [f(X_f),u(X_u)]^\top \sim \mathcal{GP}(0,[K(X_f,X_f^\prime),K(X_f,X_u^\prime);K(X_u,X_f^\prime),K(X_u,X_u^\prime)])
+\end{equation}
+%
+where $K(X_f,X_f^\prime) = \Kff$, $K(X_f,X_u^\prime) = \Kfu$, $ K(X_u,X_f^\prime) = \Kuf$, $K(X_u,X_u^\prime) = \Kuu$.
+
+Therefore $\fb|\ub,X_f,X_u \sim \mathcal{N}(\Kfu\Kuu^{-1}\ub, \Kff - \Kfu\Kuu^{-1}\Kuf)$, but since the relationship between $\fb$ and $\ub$ is conjugate, and $\ub$ does not appear in the generative model, we may integrate it out at this point.
+%
+\begin{align}
+    q(\fb|\ub,X_f) &= \prod_{q=1}^Q \No(\fb_q | \Kff\Kuu^{-1}\ub_q, \Kff - \Kfu\Kuu^{-1}\Kuf)\\
+    q(\ub|X_f) &= \prod_{q=1}^Q \No(\ub_q|\kappa_q, \Kappa)\\
+    \implies q(\fb|X_f) &= \prod_{q=1}^Q \No(\fb_q | \Kff\Kuu^{-1}\kappa_q, \Kff - \Kfu\Kuu^{-1}(I + \Kappa\Kuu^{-1})\Kuf)
+\end{align}
+%
+We also want to treat the input locations $X_f$ as random variables with distribution $q(X_f)$ who's parameters we control.
+%
+\begin{align}
+q(\zb|\yb) &= \int_{\fb,X_f} q(\zb|\fb,\yb)q(\fb|X_f)q(X_f|\yb) \dd\fb \dd X_f \label{eq:qz1} \\
+&= \frac{q(\zb |\fb, \yb)q(\fb|X_f)q(X_f|\yb)}{q(\fb,X_f|\zb,\yb)} \label{eq:qz2}
+\end{align}
+%
+Note that the integral
+%
+\begin{equation}
+\int_{X_f} q(\fb|X_f)q(X_f|\yb) \dd X_f
+\end{equation}
+%
+is not tractable.
+%
+Re-writing $\Lo$ replacing the $q(\zb)$ in the expectation with Equation \ref{eq:qz1} and in the logarithm with Equation \ref{eq:qz2} gives.
+%
+\begin{align}
+\Lo &= \Ex_{q(\zb,\fb,X_f)}[\log p(\yb|\zb)p(\zb)] - \Ex_{q(\zb,\fb,X_f)}\left[\log\frac{q(\zb |\fb, \yb)q(\fb|X_f)q(X_f|\yb)}{q(\fb,X_f|\zb,\yb)}\right]
+\end{align}
+%
+This contains a term $q(\fb,X_f|\zb,\yb)$, that we cannot obtain so we introduce $r(\fb,X_f|\zb,\yb)$, allowing us to lower bound again as follows:
+%
+\begin{align}
+\Lo &= \Ex_{q(\zb,\fb,X_f|\yb)}[\log p(\yb|\zb)p(\zb)] - \Ex_{q(\zb,\fb,X_f|\yb)}\left[\log\frac{q(\zb |\fb, \yb)q(\fb|X_f)q(X_f|\yb)}{q(\fb,X_f | \zb,\yb)} \frac{r(\fb,X_f|\zb,\yb)}{r(\fb,X_f|\zb,\yb)}\right] \\
+&= \Ex_{q(\zb,\fb,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\zb,\fb,X_f|\yb)}\left[\log\frac{q(\zb|\fb,\yb)}{p(\zb)}\right] \notag \\
+&-\Ex_{q(\zb,\fb,X_f|\yb)}\left[\log\frac{q(\fb|X_f)q(X_f|\yb)}{r(\fb,X_f|\zb,\yb)}\right] + \Ex_{q(\zb,\fb,X_f|\yb)}\left[\log\frac{q(\fb,X_f|\zb,\yb)}{r(\fb,X_f|\zb,\yb)}\right] \\
+&= \Ex_{q(\zb,\fb,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,X_f|\yb)}\left[\Ex_{q(\zb|\fb,\yb)}\left\{\log\frac{q(\zb|\fb,\yb)}{p(\zb)}\right\}\right] \notag \\
+&-\Ex_{q(\zb,\fb,X_f|\yb)}\left[\log\frac{q(\fb|X_f)q(X_f|\yb)}{r(\fb,X_f|\zb,\yb)}\right] + \Ex_{q(\zb|\yb)}\left[\Ex_{q(\fb,X_f|\zb,\yb)}\left\{\log\frac{q(\fb,X_f|\zb,\yb)}{r(\fb,X_f|\zb,\yb)}\right\}\right] \\
+&= \Ex_{q(\zb,\fb,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,X_f|\yb)}\left[\KL\left(q(\zb|\fb,\yb)||p(\zb)\right)\right] \notag \\
+&-\Ex_{q(\zb,\fb,X_f|\yb)}\left[\log\frac{q(\fb|X_f)q(X_f|\yb)}{r(\fb,X_f|\zb,\yb)}\right] + \Ex_{q(\zb|\fb,X_f,\yb)}\left[\KL\left(q(\fb,X_f|\zb,\yb)||r(\fb,X_f|\zb,\yb)\right)\right]
+\end{align}
+%
+Noticing the final KL divergence term is always positive we can drop this term to obtain a lower bound $\Laux:$
+%
+\begin{align}
+\Lo &\ge \Ex_{q(\zb,\fb,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,X_f|\yb)}\left[\KL\left(q(\zb|\fb,\yb)||p(\zb)\right)\right] \notag \\
+&- \Ex_{q(\zb,X_f|\yb)}\left[ \Ex_{q(\fb,X_f|\zb,\yb)}\left\{\log q(\fb,X_f|\zb,\yb) \right\} \right] - \Ex_{q(X_f|\yb)}[\log q(X_f|\yb)] + \Ex_{q(\zb,\fb,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right] \\
+&\triangleq \Laux
+\end{align}
+%
+
+\begin{align}
+p(\zb) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \vec{0}, \mathbb{I}_B) \\
+q(\fb|X_z) &= \prod_{q=1}^Q \mathcal{N}(\fb_q; \underbrace{\Kfu\Kuu^{-1}}_{\Ab}\kappa_q, \underbrace{\Kff-\Kfu\Kuu^{-1}(I + \Kappa\Kuu^{-1})\Kuf}_{\Cb}) \\
+q(X_f|\yb) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \phi_r, \Phi) \\
+q(X_f[n,:]|\yb_n) &= \No(\yb_n; \mu_{q(X)}(\hb_{q(X)}), \sigma^2_{q(X)}(\hb_{q(X)})) \\
+\hb_{q(X)} &= \phi(\Wb^{(1)}_{q(X)}\yb + \bb^{(1)}_{q(X)}) \\
+\mu_{q(X)}(\hb_{q(X)}) &= \Wb^{(2)}_{q(X)}\hb_{q(X)} + \bb^{(2)}_{q(X)},\quad \log\sigma^2_{q(X)}(\hb_{q(X)}) = \Wb^{(3)}_{q(X)}\hb_{q(X)} + \bb^{(3)}_{q(X)} \\
+q(\zb|\fb,\yb) &= \No(\zb; \mu_z(\hb_z), \sigma^2_z(\hb_z)) \\
+\hb_z &= \phi(\Wb^{(1)}_z[\yb,\fb] + \bb^{(1)}_z) \\
+\mu_z(\hb_z) &= \Wb^{(2)}_z\hb_z + \bb^{(2)}_z,\quad \log\sigma^2_z(\hb_z) = \Wb^{(3)}_z\hb_z + \bb^{(3)}_z
+\end{align}
+%
+\begin{equation}
+\Ex_{q(\fb,X_f|\yb)}\left[\KL(q(\zb|\fb,\yb)||p(\zb))\right] = -\Ex_{q(\fb,X_f|\yb)}\left[ \frac{1}{2}\sum_{q=1}^Q\left( 1 + 2\log\sigma_z(q) - \mu^2_z(q) \right) \right]
+\end{equation}
+%
+The entropy of $q(X_f|\yb)$ is:
+%
+\begin{align}
+-\Ex_{q(X_f|\yb)}\left[\log q(X_f|\yb)\right] &= \sum_{n=1}^N H[q(X_f[n,:]|\yb] \\
+&= \frac{NR}{2}(1+\log(2\pi))) + \sum_{r=1}^R\log\sigma_{q(X)}[r].
+\end{align}
+%
+The expected entropy of $q(\fb|X_f)$ is:
+%
+\begin{align}
+    &- \Ex_{q(X_f|\yb)}\left[ \Ex_{q(\fb|X_f)}\left\{\log q(\fb|X_f) \right\} \right] \notag \\
+    &= \frac{N}{2}(1 + \log (2\pi)) + \frac{1}{2} \Ex_{q(X_f|\yb)}[\log|\Cb|].
+\end{align}
+%
+% We decompose $r$ as $r(\fb,X_f|\zb,\yb) = r(\fb|\zb,X_f)r(X_f|\fb,\yb)$ so that
+% %
+% \begin{align}
+% \Ex_{q(\zb,\fb,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right] &= \Ex_{q(\zb,\fb,X_f|\yb)}\left[\log r(\fb|\zb,X_f)\right] + \Ex_{q(\zb,\fb,X_f|\yb)}\left[\log r(X_f|\zb,\yb)\right]\\
+% &= \Ex_{q(\zb,X_f|\yb)}\left[ \Ex_{q(\fb|Xf,\yb)}\left[ \log r(\fb|\zb,X_f) \right] \right] + \Ex_{q(\zb|\yb)}\left[ \Ex_{q(X_f|\yb)}\left[ \log r(X_f|\zb,\yb) \right] \right]
+% \end{align}
+% %
+% of which the outer expectations are approximated in an unbiased way via Monte Carlo using samples generated by forward simulating the inference network from $\yb$ to $\zb$ and dropping any unneeded intermediate variable samples. The inner expectations produce cross-entropies which can be computed analytically as follows:
+%
+Finally we specify the auxiliary model as follows:
+%
+\begin{align}
+    r(\fb,X_f) &= \No(\mu_r(\hb_r), \sigma_r^2(\hb_r)) \\
+    \hb_r &= \phi(\Wb^{(1)}_r \hb_r + \bb^{(1)}_r) \\
+    \mu_r(\hb_r)&=\Wb^{(2)}_r \hb_r + \bb^{(2)}_r \\
+    \sigma^2_r(\hb_r)&=\Wb^{(3)}_r \hb_r + \bb^{(3)}_r
+\end{align}
+
+\end{document}
+
+
