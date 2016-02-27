@@ -31,6 +31,9 @@
 \newcommand{\No}{\mathcal{N}}
 \newcommand{\chol}{\mathrm{chol}}
 \newcommand{\tr}{\mathrm{tr}}
+\newcommand{\Wb}{\mathbf{W}}
+\newcommand{\hb}{\mathbf{h}}
+\newcommand{\bb}{\mathbf{b}}
 \doublespacing
 
 \setlength{\parindent}{0pt}
@@ -93,19 +96,19 @@ This contains a term $q(\fb,\ub,X_f|\zb,\yb)$, that we cannot obtain so we first
 %
 \begin{align}
 \Lo &= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}[\log p(\yb|\zb)p(\zb)] - \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log\frac{q(\zb |\fb, \yb)q(\fb|\ub,X_f)q(\ub)q(X_f|\yb)}{q(\ub|\fb, X_f, \zb)q(\fb,X_f | \zb,\yb)} \frac{r(\fb,X_f|\zb,\yb)}{r(\fb,X_f|\zb,\yb)}\right] \\
-&= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log\frac{q(\zb|\fb,\yb)}{p(\zb)}\right] \notag \\
+&= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log\frac{q(\zb|\fb,\yb)}{p(\zb)}\right] - \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[ \log\frac{q(\ub)}{q(\ub|\fb,X_f,\zb)} \right] \notag \\
 &-\Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log\frac{q(\fb|\ub,X_f)q(X_f|\yb)}{r(\fb,X_f|\zb,\yb)}\right] + \Ex_{q(\zb,\fb,X_f|\yb)}\left[\log\frac{q(\fb,X_f|\zb,\yb)}{r(\fb,X_f|\zb,\yb)}\right] \\
-&= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,\ub,X_f|\yb)}\left[\Ex_{q(\zb|\fb,\yb)}\left\{\log\frac{q(\zb|\fb,\yb)}{p(\zb)}\right\}\right] \notag \\
+&= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,\ub,X_f|\yb)}\left[\Ex_{q(\zb|\fb,\yb)}\left\{\log\frac{q(\zb|\fb,\yb)}{p(\zb)}\right\}\right] -\Ex_{q(\zb,\fb,X_f|\yb)}\left[\Ex_{q(\ub)}\left\{ \log\frac{q(\ub)}{q(\ub|\fb,X_f,\zb)} \right\}\right] \notag \\
 &-\Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log\frac{q(\fb|\ub,X_f)q(X_f|\yb)}{r(\fb,X_f|\zb,\yb)}\right] + \Ex_{q(\zb|\yb)}\left[\Ex_{q(\fb,X_f|\zb,\yb)}\left\{\log\frac{q(\fb,X_f|\zb,\yb)}{r(\fb,X_f|\zb,\yb)}\right\}\right] \\
-&= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,\ub,X_f|\yb)}\left[\KL\left(q(\zb|\fb,\yb)||p(\zb)\right)\right] \notag \\
+&= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,\ub,X_f|\yb)}\left[\KL\left(q(\zb|\fb,\yb)||p(\zb)\right)\right] -\Ex_{q(\zb,\fb,X_f|\yb)}\left[ \KL\left( q(\ub)||q(\ub|\fb,X_f,\zb) \right) \right] \notag \\
 &-\Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log\frac{q(\fb|\ub,X_f)q(X_f|\yb)}{r(\fb,X_f|\zb,\yb)}\right] + \Ex_{q(\zb|\fb,\ub,X_f,\yb)}\left[\KL\left(q(\fb,X_f|\zb,\yb)||r(\fb,X_f|\zb,\yb)\right)\right]
 \end{align}
 %
 Noticing the final KL divergence term is always positive we can drop this term to obtain a lower bound $\Laux:$
 %
 \begin{align}
-\Lo &\ge \Ex_{q(\zb)}[\log p(\yb|\zb)] - \Ex_{q(\ub,X_z)}\left[\KL\left(q(\zb|\ub,X_z)||p(\zb)\right)\right] \notag \\
-&-\Ex_{q(\ub)}\left[\log q(\ub)\right] - \Ex_{q(X_z)}\left[\log q(X_z)\right] + \Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub,X_z|\zb)\right] \\
+\Lo &\ge \Ex_{q(\zb,\fb,\ub,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,\ub,X_f|\yb)}\left[\KL\left(q(\zb|\fb,\yb)||p(\zb)\right)\right] -\Ex_{q(\zb,\fb,X_f|\yb)}\left[ \KL\left( q(\ub)||q(\ub|\fb,X_f,\zb) \right) \right] \notag \\
+&- \Ex_{q(\zb,\ub,X_f|\yb)}\left[ \Ex_{q(\fb|\ub,X_f)}\left\{\log q(\fb|\ub,X_f) \right\} \right] - \Ex_{q(X_f|\yb)}[\log q(X_f|\yb)] + \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right] \\
 &\triangleq \Laux
 \end{align}
 %
@@ -113,37 +116,38 @@ Noticing the final KL divergence term is always positive we can drop this term t
 \begin{align}
 p(\zb) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \vec{0}, \mathbb{I}_B) \\
 q(\ub) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \kappa_q, \Kappa) \\
-q(\zb|\ub,X_z) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \underbrace{\Kfu\Kuu^{-1}}_{\Ab}\ub_q, \underbrace{\Kff-\Kfu\Kuu^{-1}\Kuf}_{\Cb}) \\
-q(X_f) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \phi_r, \Phi)
+q(\fb|\ub,X_z) &= \prod_{q=1}^Q \mathcal{N}(\fb_q; \underbrace{\Kfu\Kuu^{-1}}_{\Ab}\ub_q, \underbrace{\Kff-\Kfu\Kuu^{-1}\Kuf}_{\Cb}) \\
+q(X_f|\yb) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \phi_r, \Phi) \\
+q(X_f[n,:]|\yb_n) &= \No(\yb_n; \mu_X(\hb_X), \sigma^2_X(\hb_X)) \\
+\hb_X &= \phi(\Wb^{(1)}_X\yb + \bb^{(1)}_X) \\
+\mu_X(\hb_X) &= \Wb^{(2)}_X\hb_X + \bb^{(2)}_X,\quad \log\sigma^2_X(\hb_X) = \Wb^{(3)}_X\hb_X + \bb^{(3)}_X \\
+q(\zb|\fb,\yb) &= \No(\zb; \mu_z(\hb_z), \sigma^2_z(\hb_z)) \\
+\hb_z &= \phi(\Wb^{(1)}_z[\yb,\fb] + \bb^{(1)}_z) \\
+\mu_z(\hb_z) &= \Wb^{(2)}_z\hb_z + \bb^{(2)}_z,\quad \log\sigma^2_z(\hb_z) = \Wb^{(3)}_z\hb_z + \bb^{(3)}_z
 \end{align}
 %
+\begin{equation}
+\Ex_{q(\fb,\ub,X_f|\yb)}\left[\KL(q(\zb|\fb,\yb)||p(\zb))\right] = -\Ex_{q(\fb,\ub,X_f|\yb)}\left[ \frac{1}{2}\sum_{q=1}^Q\left( 1 + 2\log\sigma_z(q) - \mu^2_z(q) \right) \right]
+\end{equation}
+%
+The entropy of $q(X_f)$ is:
+%
 \begin{align}
-&\Ex_{q(\ub,X_z)}\left[\KL\left(q(\zb|\ub,X_z)||p(\zb)\right)\right] \notag \\
-&= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \zb_q^\top\zb - B -  \log\det\Cb \right)\right] \\
-&= \Ex_{q(\ub,X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \ub_q^\top\Ab^\top\Ab\ub_q - B -  \log\det\Cb \right)\right] \\
-&=\Ex_{q(X_z)}\left[\frac{1}{2}\sum_{q=1}^Q \left(\tr(\Cb) + \Ex_{q(\ub_z)}[\tr(\Ab^\top\Ab\ub_q\ub_q^\top)] - B -  \log\det\Cb \right)\right] \\
-&=\Ex_{q(X_z)}\left[\frac{Q}{2}\tr(\Cb) + \frac{1}{2}\sum_{q=1}^Q\;\tr(\Ab^\top\Ab\kappa_q\kappa_q^\top) + \frac{Q}{2}\;\tr(\Ab^\top\Ab\Kappa) - \frac{QB}{2} -  \frac{Q}{2}\;\log\det\Cb \right] \\
-&=\Ex_{q(X_z)}\left[\frac{Q}{2}\tr(\Cb) + \frac{1}{2}\;\tr(\Ab^\top\Ab\kappa\kappa^\top) + \frac{Q}{2}\;\tr(\Ab^\top\Ab\Kappa) - \frac{QB}{2} -  \frac{Q}{2}\;\log\det\Cb \right]
+-\Ex_{q(X_f)}\left[\log q(X_f)\right] &= \sum_{n=1}^N H[q(X_f[n,:]] \\
+&= \frac{NR}{2}(1+\log(2\pi))) + \sum_{r=1}^R\log\sigma_X[r].
 \end{align}
 %
-The entropy of $q(\ub)$ is:
+The expected entropy of $q(\fb|\ub,X_f)$ is:
 %
 \begin{align}
--\Ex_{q(\ub)}\left[\log q(\ub)\right] &= \sum_{q=1}^Q H[q(\ub_q)] \\
-&= \frac{MQ}{2}(1+\log(2\pi))) + \frac{Q}{2}\log\det(\Kappa)
+    &- \Ex_{q(\zb,\ub,X_f|\yb)}\left[ \Ex_{q(\fb|\ub,X_f)}\left\{\log q(\fb|\ub,X_f) \right\} \right] \notag \\
+    &= \Ex_{q(X_f|\yb)}\frac{N}{2}(1 + \log (2\pi)) + \frac{1}{2} \Ex_{q(X_f|\yb)}[\log|\Cb|].
 \end{align}
 %
-The entropy of $q(X_z)$ is:
+We decompose $r$ as $r(\fb,X_f|\zb,\yb) = r(\fb|\zb,X_f)r(X_f|\fb,\yb)$ so that
 %
 \begin{align}
--\Ex_{q(X_z)}\left[\log q(\ub)\right] &= \sum_{r=1}^R H[q(\xb_r)] \\
-&= \frac{RB}{2}(1+\log(2\pi))) + \frac{R}{2}\log\det(\Phi)
-\end{align}
-%
-We decompose $r$ as $r(\ub,X_z|\zb) = r(\ub|\zb,X_z)r(X_z|\zb)$.
-%
-\begin{align}
-\Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub,X_z|\zb)\right] &= \Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub|X_z,\zb)\right] + \Ex_{q(\zb,X_z)}\left[\log r(X_z|\zb)\right]
+\Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right] &= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log r(\fb|\zb,X_f)\right] + \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log r(X_f|\zb,\yb)\right]
 \end{align}
 %
 We set $r(\ub|\zb,X_z) = q(\ub|\zb,X_z)$ which we can compute exactly.
