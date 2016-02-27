@@ -8,25 +8,30 @@ Created on Thu Feb  4 20:44:40 2016
 import numpy as np
 import theano as th
 import theano.tensor as T
-from theano.tensor import nlinalg
 
+from optimisers import Adam
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
 from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus
 
 precision = th.config.floatX
 
-class VA(SGPDV):
+class AutoEncoderModel(Printable):
 
     def __init__(self,
                  data,
-                 encoderType,    #MLP, Hybrid
+                 params,
+                 encoderType,        #MLP, Hybrid
                  encoderParameters,
-                 decoderType,    #MLP_decoder_moder, IBP_factor):
+                 decoderType,        #MLP_decoder_moder, IBP_factor
+                 decoderParameters):
 
         # set the data
         data = np.asarray(data, dtype=precision)
-        
+        self.N = data.shape[0]
+        self.P = data.shape[1] 
+        self.B = params['miniBatchSize']
+
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
@@ -49,50 +54,56 @@ class VA(SGPDV):
         self.y_miniBatch = self.y[self.currentBatch, :]
         self.y_miniBatch.name = 'y_miniBatch'
 
-        self.lowerBound = -np.inf  # Lower bound
+        self.sample_batchStream = th.function([], self.batchStream)
+        self.sample_padStream   = th.function([], self.padStream)
 
-        if encoderType == 'Hybrid'
+        self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
+
+        self.lowerBound = -np.inf  # Lower bound
+        self.lowerBounds = []
+
+        if encoder == ''
+
+        if encoderType == 'Hybrid':
             self.jitterProtector = jitterProtector()
             self.encoder = Hybrid_encoder(
                 self.y_miniBatch,
+                self.B,
                 self.jitterProtector,
-                encoderParams["numberOfInducingPoints"],
-                encoderParams["minibatchSize"],
-                encoderParams["dimY"],
-                encoderParams["dimX"],
-                encoderParams["dimZ"],
-                encoderParams["use_r"],
-                encoderParams["kernelType"],
-                encoderParams["encoderType_qX"],
-                encoderParams["encoderType_rX"],
-                encoderParams["Xu_optimise"],
-                encoderParams["numberOfEncoderHiddenUnits"] )
-        elif encoderType:
-            pass
-
-        if decoder == 'MLP':
-            self.decoder( self.encoder )
-
-
-
-        self.L = self.encoder.L + self.decoder.L
-
-
+                encoderParams)
+        elif encoderType == 'MLP':
+            self.encoder = MLP_encoder(
+                self.y_minBatch,
+                self.B,
+                encoderParams)
         else:
-            self.L += self.log_p_z() - self.log_q_z_uX()
+            raise RuntimeErorr('Unrecognised encoder type')
+
+        if decoderType == 'MLP':
+            self.decoder(decoderParams, self.y_miniBatch, decoderParams)
+        else:
+            raise RuntimeErorr('Unrecognised decoder type')
+
+        self.encoder.construct_L_terms()
+        self.decoder.construct_L_terms()
+        self.L = self.encoder.L_terms + self.decoder.L_terms
 
         self.dL = T.grad(self.L, self.gradientVariables)
         for i in range(len(self.dL)):
             self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
 
-def epochSample(self):
-
+    def epochSample(self):
         self.sample_batchStream()
         self.sample_padStream()
-        self.iterator.set_value(0)
 
-
- def train(self, numberOfEpochs=1, learningRate=1e-3, fudgeFactor=1e-6, maxIters=np.inf, constrain=False, printDiagnostics=0):
+    def train(self,
+        numberOfEpochs=1,
+        learningRate=1e-3,
+        fudgeFactor=1e-6,
+        maxIters=np.inf,
+        constrain=False,
+        printDiagnostics=0
+        ):
 
         startTime    = time.time()
         wallClockOld = startTime
@@ -104,11 +115,11 @@ def epochSample(self):
 
         for ep in range(numberOfEpochs):
 
-            self.epochSample()
+            self.sample()
 
             for it in range(self.numberofBatchesPerEpoch):
 
-                self.sample()
+                self.encoder.sample()
                 self.iterator.set_value(it)
                 lbTmp = self.jitterProtect(self.updateFunction, reset=False)
                 if constrain:
@@ -153,3 +164,20 @@ def epochSample(self):
     def construct_L_dL_functions(self):
         self.L_func = th.function([], self.L, no_default_updates=True)
         self.dL_func = th.function([], self.dL, no_default_updates=True)
+
+
+    def getMCLogLikelihood(self, numberOfTestSamples=100):
+
+        self.sample()
+        ll = [0] * self.numberofBatchesPerEpoch * numberOfTestSamples
+        c = 0
+        for i in range(self.numberofBatchesPerEpoch):
+            print '{} of {}, {} samples'.format(i, self.numberofBatchesPerEpoch, numberOfTestSamples)
+            self.iterator.set_value(i)
+            self.jitter.set_value(self.jitterDefault)
+            for k in range(numberOfTestSamples):
+                self.sample()
+                ll[c] = self.jitterProtect(self.L_func, reset=False)
+                c += 1
+
+        return np_log_mean_exp_stable(ll)
