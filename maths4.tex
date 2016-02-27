@@ -156,11 +156,14 @@ The expected entropy of $q(\fb|X_f)$ is:
 Finally we specify the auxiliary model as follows:
 %
 \begin{align}
-    r(\fb,X_f) &= \No(\mu_r(\hb_r), \sigma_r^2(\hb_r)) \\
-    \hb_r &= \phi(\Wb^{(1)}_r \hb_r + \bb^{(1)}_r) \\
+    r(\fb,X_f|\zb,\yb) &= \No(\mu_r(\hb_r), \sigma_r^2(\hb_r)) \\
+    \hb_r &= \phi(\Wb^{(1)}_r [\yb,\zb] + \bb^{(1)}_r) \\
     \mu_r(\hb_r)&=\Wb^{(2)}_r \hb_r + \bb^{(2)}_r \\
-    \sigma^2_r(\hb_r)&=\Wb^{(3)}_r \hb_r + \bb^{(3)}_r
+    \log\sigma^2_r(\hb_r)&=\Wb^{(3)}_r \hb_r + \bb^{(3)}_r
 \end{align}
+
+and the expected cross-entropy $\Ex_{q(\zb,\fb,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right]$ is approximated with an unbiased Monte Carlo estimation.
+
 
 \end{document}
 
