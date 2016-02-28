@@ -87,7 +87,7 @@ class AutoEncoderModel(Printable):
             raise RuntimeErorr('Unrecognised decoder type')
 
         self.encoder.construct_L_terms()
-        self.decoder.construct_L_terms()
+        self.decoder.construct_L_terms(self.encoder)
 
         self.L = self.encoder.L_terms + self.decoder.L_terms
 

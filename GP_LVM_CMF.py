@@ -233,18 +233,6 @@ class SGPDV(printable):
         self.log_theta_min = np.array(np.log(theta_min), dtype=precision)
         self.log_theta_max = np.array(np.log(theta_max), dtype=precision)
 
-        if self.encoderType_qX == 'Kernel':
-            self.log_gamma.set_value(
-                np.asarray(np.log(gamma), dtype=precision))
-            self.log_gamma_min = np.array(np.log(gamma_min), dtype=precision)
-            self.log_gamma_max = np.array(np.log(gamma_max), dtype=precision)
-
-        if self.encoderType_rX == 'Kernel':
-            self.log_omega.set_value(
-                np.asarray(np.log(omega), dtype=precision))
-            self.log_omega_min = np.array(np.log(omega_min), dtype=precision)
-            self.log_omega_max = np.array(np.log(omega_max), dtype=precision)
-
     def constrainKernelParameters(self):
 
         def constrain(variable, min_val, max_val):
@@ -266,11 +254,6 @@ class SGPDV(printable):
                     variable.set_value(vals)
 
         constrain(self.log_theta, self.log_theta_min, self.log_theta_max)
-
-        if self.encoderType_qX == 'Kernel':
-            constrain(self.log_gamma, self.log_gamma_min, self.log_gamma_max)
-        if self.encoderType_rX == 'Kernel':
-            constrain(self.log_omega, self.log_omega_min, self.log_omega_max)
 
     def init_Xu_from_Xf(self):
 

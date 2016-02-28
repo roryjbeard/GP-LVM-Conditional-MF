@@ -40,7 +40,7 @@ class Hybrid_encoder(Printable):
         gamma.name = 'gamma'
         self.sample_gamma = th.function([], gamma)
 
-        self.z = plus(self.mu_qz, mul(T.exp(self.log_sigma_qz * 0.5), gamma), 'z')
+        self.z = plus(self.mu_qz, mul(T.exp(self.log_sigma_qz), gamma), 'z')
 
         self.construct_rfXf(self.z)
 
