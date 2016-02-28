@@ -109,8 +109,8 @@ Noticing the final KL divergence term is always positive we can drop this term t
 %
 \begin{align}
 \Lo &\ge \Ex_{q(\zb,\fb,X_f|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb,X_f|\yb)}\left[\KL\left(q(\zb|\fb,\yb)||p(\zb)\right)\right] \notag \\
-&- \Ex_{q(\zb,X_f|\yb)}\left[ \Ex_{q(\fb,X_f|\zb,\yb)}\left\{\log q(\fb,X_f|\zb,\yb) \right\} \right] \notag\\
-&- \Ex_{q(X_f|\yb)}[\log q(X_f|\yb)] + \Ex_{q(\zb,\fb,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right] \\
+&- \Ex_{q(X_f|\yb)}[\log q(X_f|\yb)] - \Ex_{q(\fb|X_f,\yb)}[\log q(\fb|X_f,\yb)]\notag \\
+&+ \Ex_{q(\zb,\fb,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right] \\
 &\triangleq \Laux
 \end{align}
 %

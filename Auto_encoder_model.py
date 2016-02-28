@@ -61,8 +61,8 @@ class AutoEncoderModel(Printable):
         self.lowerBound = -np.inf  # Lower bound
         self.lowerBounds = []
 
+        self.jitterProtector = jitterProtector()
         if encoderType == 'Hybrid':
-            self.jitterProtector = jitterProtector()
             self.encoder = Hybrid_variational_model(
                 self.y_miniBatch,
                 self.B,
@@ -88,6 +88,7 @@ class AutoEncoderModel(Printable):
 
         self.encoder.construct_L_terms()
         self.decoder.construct_L_terms()
+
         self.L = self.encoder.L_terms + self.decoder.L_terms
 
         self.dL = T.grad(self.L, self.gradientVariables)
@@ -125,7 +126,7 @@ class AutoEncoderModel(Printable):
                 # Sample from the encoder
                 self.encoder.sample()
                 self.iterator.set_value(it)
-                lbTmp = self.jitterProtect(self.updateFunction, reset=False)
+                lbTmp = self.jitterProtector.jitterProtect(self.updateFunction, reset=False)
                 if constrain:
                     self.constrainKernelParameters()
 

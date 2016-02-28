@@ -176,3 +176,10 @@ def namedFunction(A, func, funcname, name):
     else:
         B.name = name 
     return B
+
+def conditionNumber(M):
+    cond = myCond()(M)
+    cond.name = 'cond(' + getname(M) + ')'
+    condNum = th.function(
+            [], cond, no_default_updates=True)
+    return condNum

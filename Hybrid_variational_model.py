@@ -10,45 +10,53 @@ import theano as th
 import theano.tensor as T
 from theano.tensor import nlinalg
 from printable import Printable
+from utils import plus, mul
 
 from GP_LVM_CMF import SGPDV
-from testTools import checkgrad
-from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus
 
-precision = th.config.floatX
-
-class Hyrid_encoder(printable):
+class Hybrid_encoder(Printable):
 
     def __init__(
 
-        def __init__(self, y_miniBatch, minbatchSize, dimY, dimZ, params):
+        def __init__(self, y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params):
 
-        self.B = minbatchSize
-        self.P = dimY
-        self.Q = dimZ
+        HU = params['numHiddenUnits_encoder']
+        HL = params['numHiddenLayers_encoder']
 
-        numHiddenUnits_encoder = params['numHiddenUnits_encoder']
-        numHiddenLayers_encoder = params['numHiddenLayers_encoder']
+        self.gp_encoder = SGPDV(y_miniBatch,
+                                miniBatchSize,
+                                dimY,
+                                dimZ,
+                                jitterProtect,
+                                params)
 
-                 dimY,
-                 dimZ,
-                 jitterProtect,
-                 params,
-                 )
+        self.mlp_encoder = MLP_Network(self, dimY, dimZ,
+                HL, 'encoder', num_layers=HL)
 
-        self.mlp_encoder = MLP_Network(self, self.P, self.Q,
-                numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
-        self.mu_encoder, self.log_sigma_encoder2 = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch))
+        self.mu_encoder, self.log_sigma_encoder2 \
+            = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch)))
          
-        self.beta = srng.normal(size=(self.Q, self.B), avg=0.0, std=1.0, ndim=None)
+        gamma = srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
+        gamma.name = 'gamma'
+        self.sample_gamma = th.function([], gamma)
 
-        self.z = self.mu_encoder + T.exp(self.log_sigma_encoder*0.5) * self.beta
+        self.z = plus(self.mu_qz, mul(T.exp(self.log_sigma_qz * 0.5), gamma), 'z')
 
-        self.gradientVariables = mlp.encoder1.params + mlp.encoder2.params
+        self.construct_rfXf(self.z)
+
+        self.gradientVariables = self.mlp_encoder.params + self.gp_encoder.gradientVariables
 
     def construct_L_terms():
-        pass
+        self.gp_encoder.construct_L_terms()
+        self.L_terms = self.gp_encoder.L_terms
 
     def sample(self):
-        self.sample_alpha()
-        self.sample_beta()
+        self.gp_encoder.sample_alpha()
+        self.gp_encoder.sample_beta()
+        self.gamma.sample()
+
+    def randomise(self):
+        self.gp_encoder.randomise()
+        self.mlp_encoder.randomise()
+
+

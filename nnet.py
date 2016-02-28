@@ -8,6 +8,7 @@ from utils import tanh, sigmoid, softplus, exp
 floatX = theano.config.floatX
 
 class Linear():
+
     def __init__(self, dim_in, dim_out, name):
         self.dim_in  = dim_in
         self.dim_out = dim_out
@@ -34,7 +35,8 @@ class Linear():
             X = var.ge
 
             symInterval = 4.0 * np.sqrt(6. / (X + Y))
-            X_Y_mat = np.asarray(np.random.uniform(size=(X, Y),
+            X_Y_mat = np.asarray(np.random.uniform(size=(X, Y)))
+            
         elif type(nonlinearity) == Linear:
             raise RuntimeError('Consecutive linear layers')
 
@@ -117,7 +119,7 @@ class MLP_Network():
         h_outin = self.hidden.setup(x_in)
         if self.continuous:
             mu = self.muLinear.setup(h_inout, **kwargs)
-            logsigma = self.logsigmaLinear.setup(h_inout, **kwargs)
+            logsigma = 0.5 * self.logsigmaLinear.setup(h_inout, **kwargs)
             mu.name = 'mu_' + name
             logsigma.name = 'logsimga' + name
             return (mu, sigma)

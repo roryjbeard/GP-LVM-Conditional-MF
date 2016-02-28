@@ -93,9 +93,6 @@ class SGPDV(printable):
         self.R = params['dimX']
         self.M = params['numberOfInducingPoints']
         self.H = params['numberOfEncoderHiddenUnits']
-        self.encoderType_qX = params['encoderType_qX']
-        self.encoderType_rX = params['encoderType_rX']
-        self.Xu_optimise = params['Xu_optimise']
         kernelType = params['kernelType']
 
         if kernelType == 'RBF':
@@ -112,85 +109,27 @@ class SGPDV(printable):
         # kernel parameters
         self.log_theta = sharedZeroMatrix(
             1, self.numberOfKernelParameters, 'log_theta', broadcastable=(True, False))  # parameters of Kuu, Kuf, Kff
-        self.log_omega = sharedZeroMatrix(
-            1, self.numberOfKernelParameters, 'log_omega', broadcastable=(True, False))  # parameters of Kuu, Kuf, Kff
-        self.log_gamma = sharedZeroMatrix(
-            1, self.numberOfKernelParameters, 'log_gamma', broadcastable=(True, False))  # parameters of Kuu, Kuf, Kff
-
+        
         # Random variables
-        self.alpha = srng.normal(
-            size=(self.B, self.R), avg=0.0, std=1.0, ndim=None)
-        self.beta = srng.normal(
-            size=(self.B, self.Q), avg=0.0, std=1.0, ndim=None)
-        self.alpha.name = 'alpha'
-        self.beta.name = 'beta'
+        alpha = srng.normal(size=(self.B, self.R), avg=0.0, std=1.0, ndim=None)
+        beta = srng.normal(size=(self.B, self.Q), avg=0.0, std=1.0, ndim=None)
+        alpha.name = 'alpha'
+        beta.name = 'beta'
 
-        self.sample_alpha = th.function([], self.alpha)
-        self.sample_beta = th.function([], self.beta)
+        self.sample_alpha = th.function([], alpha)
+        self.sample_beta = th.function([], beta)
 
-        # Compute parameters of q(X)
-        if self.encoderType_qX == 'FreeForm1' or self.encoderType_qX == 'FreeForm2':
-            # Have a normal variational distribution over location of latent
-            # co-ordinates
-
-            self.phi_full = sharedZeroMatrix(self.N, self.R, 'phi_full')
-            self.phi = self.phi_full[self.currentBatch, :]
-            self.phi.name = 'phi'
-
-            if encoderType_qX == 'FreeForm1':
-
-                self.Phi_full_sqrt = sharedZeroMatrix(
-                    self.N, self.N, 'Phi_full_sqrt')
-                Phi_batch_sqrt = self.Phi_full_sqrt[
-                    self.currentBatch][:, self.currentBatch]
-                Phi_batch_sqrt.name = 'Phi_batch_sqrt'
-                self.Phi = dot(Phi_batch_sqrt, Phi_batch_sqrt.T, 'Phi')
-                self.cPhi, _, self.logDetPhi = cholInvLogDet(
-                    self.Phi, self.B, 0)
-                self.qX_vars = [self.Phi_full_sqrt, self.phi_full]
-
-            else:
-
-                self.Phi_full_logdiag = sharedZeroArray(
-                    self.N, 'Phi_full_logdiag')
-                Phi_batch_logdiag = self.Phi_full_logdiag[self.currentBatch]
-                Phi_batch_logdiag.name = 'Phi_batch_logdiag'
-                self.Phi, self.cPhi, _, self.logDetPhi \
-                    = diagCholInvLogDet_fromLogDiag(Phi_batch_logdiag, 'Phi')
-                self.qX_vars = [self.Phi_full_logdiag, self.phi_full]
-
-        elif self.encoderType_qX == 'MLP':
-
-            self.mlp1_qX = MLP_Network(self.P, self.R, self.H, 'qX')
-            mu_qX, log_sigma_qX = self.mlp1_qX.setup(self.y_miniBatch.T)
-            self.phi = mu_qX.T  # [BxR]
-            self.Phi, self.cPhi, self.iPhi, self.logDetPhi \
-                = diagCholInvLogDet_fromLogDiag(log_sigma_qX, 'Phi')
-            self.qX_vars = mlp1_qX.params
-
-        elif self.encoderType_qX == 'Kernel':
-
-            # Draw the latent coordinates from a GP with data co-ordinates
-            self.Phi = kfactory.kernel(
-                self.y_miniBatch, None, self.log_gamma, 'Phi')
-            self.phi = sharedZeroMatrix(self.B, self.R, 'phi')
-            (self.cPhi, self.iPhi, self.logDetPhi) \
-                = cholInvLogDet(self.Phi, self.B, jitterProtect.jitter)
-            self.qX_vars = [self.log_gamma]
-
-        else:
-            raise RuntimeError(
-                'Unrecognised encoding for q(X): ' + self.encoderType_qX)
-
+        self.mlp_qX = MLP_Network(self.P, self.R, self.H, 'qX')
+        self.mu_qX, self.log_sigma_qX = self.mlp1_qX.setup(self.y_miniBatch.T)
+        
         # Variational distribution q(u)
         self.kappa = sharedZeroMatrix(self.M, self.Q, 'kappa')
         self.Kappa_sqrt = sharedZeroMatrix(self.M, self.M, 'Kappa_sqrt')
         self.Kappa = dot(self.Kappa_sqrt, self.Kappa_sqrt.T, 'Kappa')
-        self.qu_vars = [self.Kappa_sqrt, self.kappa]
 
         # Calculate latent co-ordinates Xf
         # [BxR]  = [BxR] + [BxB] . [BxR]
-        self.Xf = plus(self.phi, dot(self.cPhi, self.alpha), 'Xf')
+        self.Xf = mu_qX.T + T.exp(log_sigma_qX).T * self.alpha
         self.Xf_get_value = th.function([], self.Xf, no_default_updates=True)
         # Inducing points co-ordinates
         self.Xu = sharedZeroMatrix(self.M, self.R, 'Xu')
@@ -213,117 +152,51 @@ class SGPDV(printable):
             = cholInvLogDet(self.Sigma, self.B, jitterProtect.jitter)
         self.mu = dot(self.A, self.kappa, 'mu')
         # Sample f from q(f|X) = N(mu, Sigma)
-        self.f = plus(self.mu, (dot(self.cC, self.beta)), 'z')
-        self.qz_vars = [self.log_theta]
+        self.f = plus(self.mu, (dot(self.cSigma, self.beta)), 'f')
 
         # Gradient variables - should be all the th.shared variables
-        # We always want to optimise these variables
-        if self.Xu_optimise:
-            self.gradientVariables = [self.Xu]
-        else:
-            self.gradientVariables = []
+        self.gradientVariables.extend(mlp1_qX.params)
+        self.gradientVariables.extend([self.kappa, self.Kappa_sqrt, self.Xu, self.kappa,log_theta])
 
-        self.gradientVariables.extend(self.qf_vars)
-        self.gradientVariables.extend(self.qX_vars)
-
-        self.condKappa = myCond()(self.Kappa)
-        self.condKappa.name = 'condKappa'
-        self.Kappa_conditionNumber = th.function(
-            [], self.condKappa, no_default_updates=True)
-
-        self.condKuu = myCond()(self.Kuu)
-        self.condKuu.name = 'condKuu'
-        self.Kuu_conditionNumber = th.function(
-            [], self.condKuu, no_default_updates=True)
-
-        self.condSigma = myCond()(self.Sigma)
-        self.condSigma.name = 'condSigma'
-        self.Sigma_conditionNumber = th.function(
-            [], self.condSigma, no_default_updates=True)
+        self.Kappa_conditionNumber = conditionNumber(self.kappa)
+        self.Kuu_conditionNumber   = conditionNumber(self.Kuu)
+        self.Sigma_conditionNumber = conditionNumber(self.Sigma)
 
     def self.construct_rX(z):
 
-        self.z = z
-
-        if self.encoderType_rX == 'MLP':
-
-            self.rX_mlp = MLP_Network(self.Q + self.P, self.R, 1, self.H, Softplus, 'rX'):
-            mu_rX, log_sigma_rX = self.setup(
-                T.concatenate((self.z.T, self.y_miniBatch.T)))
-            self.tau = mu_rX.T
-
-            # Diagonal optimisation of Tau
-            self.Tau_isDiagonal = True
-            self.Tau = T.reshape(log_sigma_rX, [self.B * self.R, 1])
-            self.logDetTau = T.sum(log_sigma_rX)
-            self.Tau.name = 'Tau'
-            self.logDetTau.name = 'logDetTau'
-
-            self.rX_vars = self.rX_mlp.params
-
-        elif self.encoderType_rX == 'Kernel':
-
-            self.tau = sharedZeroMatrix(self.B, self.R, 'tau')
-
-            # Tau_r [BxB] = kernel( [[BxQ]^T,[BxP]^T].T )
-            Tau_r = kfactory.kernel(
-                T.concatenate((self.z.T, self.y_miniBatch.T)).T, None, self.log_omega, 'Tau_r')
-            (cTau_r, iTau_r, logDetTau_r) = cholInvLogDet(
-                Tau_r, self.B, jitterProtect.jitter)
-            # self.Tau  = slinalg.kron(T.eye(self.R), Tau_r)
-            self.cTau = slinalg.kron(cTau_r, T.eye(self.R))
-            self.iTau = slinalg.kron(iTau_r, T.eye(self.R))
-            self.logDetTau = logDetTau_r * self.R
-            self.tau.name = 'tau'
-            # self.Tau.name  = 'Tau'
-            self.cTau.name = 'cTau'
-            self.iTau.name = 'iTau'
-            self.logDetTau.name = 'logDetTau'
-
-            self.Tau_isDiagonal = False
-            self.rX_vars = [self.log_omega]
-
-        else:
-            raise RuntimeError('Unrecognised encoding for r(X|z)')
-
-        self.gradientVariables.extend(self.rX_vars)
+        self.rfXf_mlp = MLP_Network(self.Q + self.P, self.Q + self.R, 1, self.H, Softplus, 'rfXf'):
+        self.mu_rfXf, self.log_sigma_rfXf = self.rfXf_mlp.setup(T.concatenate((z.T, self.y_miniBatch.T)))
+        self.gradientVariables.extend(self.rfXf_mlp.params)
 
     def construct_L_terms(self):
 
-        self.H_qX = 0.5 * self.R * self.B * \
-            (1 + log2pi) + 0.5 * self.R * self.logDetPhi
+        self.H_qX = 0.5 * self.R * self.B * (1 + log2pi) \
+            + self.R * T.sum(self.log_sigma_qX)
         self.H_qX.name = 'H_qX'
 
-        self.L_terms = self.H_qX
+        self.H_qf_Xf = 0.5 * self.B * (1 + log2pi) \
+            + 0.5 * self.logDetSigma
+        self.H_qf_Xf.name = 'H_qf_Xf'
 
-        if use_r:
-            X_m_tau = minus(self.Xf, self.tau)
-            X_m_tau_vec = T.reshape(X_m_tau, [self.B * self.R, 1])
-            X_m_tau_vec.name = 'X_m_tau_vec'
-            if self.Tau_isDiagonal:
-                self.log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
-                                - 0.5 * \
-                    trace(
-                        dot(X_m_tau_vec.T, div(X_m_tau_vec, self.Tau)))
-            else:
-                self.log_rX_z = -0.5 * self.R * self.B * log2pi - 0.5 * self.R * self.logDetTau \
-                    - 0.5 * \
-                    trace(dot(X_m_tau_vec.T, dot(self.iTau, X_m_tau_vec)))
-            self.log_rX_z.name = 'log_rX_z'
-            self.L_terms += self.log_r_X_z
+        # [(Q+R)xB] = [[BxQ],[BxR]]^T
+        fXf = T.concatenate((self.f, self.Xf), axis=1).T
 
-    def randomise(self, sig=1, rndQR=False):
+        fX_m_mu = minus(fXf, self.mu_rfXf)
+        
+        self.log_rfXf_zy = -0.5 * (self.R+self.Q) * self.B * log2pi \
+            - T.sum(self.log_sigma_rfXf)
+            - 0.5 * T.sum( div(fX_m_mu**2, T.exp(2*self.log_sigma_rfXf)))
+
+        self.log_rfXf_zy.name = 'log_rfXf_zy'
+
+        self.L_terms = plus(self.H_qX, plus(self.H_qf_Xf, self.log_r_fXf_zy))
+
+    def randomise(self, sig=1, srng):
 
         def rnd(var):
             if type(var) == np.ndarray:
-                return np.asarray(sig * np.random.randn(*var.shape), dtype=precision)
-            elif var.name == 'TauRange':
-                pass
+                return np.asarray(sig * srng.random.randn(*var.shape), dtype=precision)
             elif type(var) == T.sharedvar.TensorSharedVariable:
-                if var.name.endswith('logdiag'):
-                    print 'setting ' + var.name + ' to all 0s'
-                    var.set_value(
-                        np.zeros(var.get_value().shape, dtype=precision))
                 elif var.name.endswith('sqrt'):
                     print 'setting ' + var.name + ' to Identity'
                     n = var.get_value().shape[0]
@@ -333,7 +206,7 @@ class SGPDV(printable):
                     var.set_value(rnd(var.get_value()))
             elif type(var) == T.sharedvar.ScalarSharedVariable:
                 print 'Randomising ' + var.name
-                var.set_value(np.random.randn())
+                var.set_value(srng.random.randn())
             else:
                 raise RuntimeError('Unknown randomisation type')
 
@@ -347,8 +220,8 @@ class SGPDV(printable):
 
         if hasattr(self, 'mlp_qX'):
             self.mlp_qX.randomise()
-        if hasattr(self, 'mlp_rX'):
-            self.mlp_rX.randomise()
+        if hasattr(self, 'mlp_rfXf'):
+            self.mlp_rfXf.randomise()
 
     def setKernelParameters(self,
                             theta,    theta_min=-np.inf, theta_max=np.inf,
@@ -399,15 +272,6 @@ class SGPDV(printable):
         if self.encoderType_rX == 'Kernel':
             constrain(self.log_omega, self.log_omega_min, self.log_omega_max)
 
-    def printDiagnostics(self):
-        print 'Kernel lengthscales (log_theta) = {}'.format(self.log_theta.get_value())
-        print 'Kuu condition number            = {}'.format(self.Kuu_conditionNumber())
-        print 'C condition number              = {}'.format(self.C_conditionNumber())
-        print 'Upsilon condition number        = {}'.format(self.Upsilon_conditionNumber())
-        print 'Kappa condition number          = {}'.format(self.Kappa_conditionNumber())
-        print 'Average Xu distance to origin   = {}'.format(np.linalg.norm(self.Xu.get_value(), axis=0).mean())
-        print 'Average Xf distance to origin   = {}'.format(np.linalg.norm(self.Xf_get_value(), axis=0).mean())
-
     def init_Xu_from_Xf(self):
 
         Xf_min = np.zeros(self.R,)
@@ -427,10 +291,6 @@ class SGPDV(printable):
 
         self.Xu.set_value(Xu, borrow=True)
 
-    def sample(self):
-        self.sample_alpha()
-        self.sample_beta()
-
     def copyParameters(self, other):
 
         if not self.R == other.R or not self.Q == other.Q or not self.M == other.M:
@@ -439,14 +299,6 @@ class SGPDV(printable):
         members = [attr for attr in dir(self)]
         for name in members:
             if not hasattr(other, name):
-                raise RuntimeError('Incompatible configurations')
-            elif name == 'Phi_full_sqrt':
-                pass
-            elif name == 'Phi_full_logdiag':
-                pass
-            elif name == 'phi_full':
-                pass
-            else:
                 selfVar = getattr(self,  name)
                 otherVar = getattr(other, name)
                 if (type(selfVar) == T.sharedvar.ScalarSharedVariable or
@@ -470,3 +322,12 @@ class SGPDV(printable):
                 dL_var = dL_all[i]
 
         return dL_var
+
+    def printDiagnostics(self):
+        print 'Kernel lengthscales (log_theta) = {}'.format(self.log_theta.get_value())
+        print 'Kuu condition number            = {}'.format(self.Kuu_conditionNumber())
+        print 'C condition number              = {}'.format(self.C_conditionNumber())
+        print 'Upsilon condition number        = {}'.format(self.Upsilon_conditionNumber())
+        print 'Kappa condition number          = {}'.format(self.Kappa_conditionNumber())
+        print 'Average Xu distance to origin   = {}'.format(np.linalg.norm(self.Xu.get_value(), axis=0).mean())
+        print 'Average Xf distance to origin   = {}'.format(np.linalg.norm(self.Xf_get_value(), axis=0).mean())
