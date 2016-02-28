@@ -18,7 +18,7 @@ from GP_LVM_CMF import SGPDV
 
 class Hybrid_encoder(Printable):
 
-    def __init__(self, y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params):
+    def __init__(self, y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params, srng):
 
         HU = params['numHiddenUnits_encoder']
         HL = params['numHiddenLayers_encoder']
@@ -28,7 +28,10 @@ class Hybrid_encoder(Printable):
                                 dimY,
                                 dimZ,
                                 jitterProtect,
-                                params)
+                                params,
+                                srng)
+
+        self.srng = srng
 
         self.mlp_encoder = MLP_Network(self, dimY, dimZ,
                 HL, 'encoder', num_layers=HL)
@@ -36,7 +39,7 @@ class Hybrid_encoder(Printable):
         self.mu_encoder, self.log_sigma_encoder2 \
             = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch)))
 
-        gamma = srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
+        gamma = self.srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
         gamma.name = 'gamma'
         self.sample_gamma = th.function([], gamma)
 

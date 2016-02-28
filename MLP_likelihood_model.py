@@ -15,7 +15,9 @@ log2pi = np.log(2 * np.pi)
 
 class MLP_likelihood_model(Printable):
 
-    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, encoder, params):
+    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, encoder, params, srng):
+
+        self.srng = srng
 
         self.B = miniBatchSize
 
@@ -26,11 +28,11 @@ class MLP_likelihood_model(Printable):
         if self.continuous:
             self.mlp_decoder = MLP_Network(self, dimZ, dimY,
                 numHiddenUnits_decoder, 'decoder', num_layers=numHiddenLayers_decoder)
-            self.mu_decoder, self.log_sigma_decoder = self.mlp_decoder.setup(encoder.z)
+            self.mu_decoder, self.log_sigma_decoder = self.mlp_decoder.setup(encoder.z, 'decoder')
         else:
             self.mlp_decoder = MLP_Network(self, dimZ, dimY,
                 numHiddenUnits_decoder, 'decoder', num_layers=numHiddenLayers_decoder, continuous=False)
-            self.yhat = self.mlp_decoder.setup(encoder.z)
+            self.yhat = self.mlp_decoder.setup(encoder.z, 'decoder')
 
         self.gradientVariables = mlp.decoder.params
 
@@ -67,7 +69,7 @@ if __name__ == "__main__":
     from MLP_variational_model import MLP_variational_model
     encoder = MLP_variational_model(y_miniBatch, minBatchSize, dimY, dimZ, enc_params)
 
-    dec_params = {'numHiddenUnits_decoder' : 10, 'numHiddenLayers_decoder : 1'}
+    dec_params = {'numHiddenUnits_decoder' : 10, 'numHiddenLayers_decoder' : 1}
 
     decoder = MLP_likelihood_model(y_miniBatch, miniBatchSize, dimY, dimZ, encoder, dec_params)
 

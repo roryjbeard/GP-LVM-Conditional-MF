@@ -11,14 +11,16 @@ import theano.tensor as T
 from theano.tensor import nlinalg
 from printable import Printable
 
-from utils import log_mean_exp_stable
+from utils import log_mean_exp_stable, plus, mul, exp
 from nnet import MLP_Network
 
 precision = th.config.floatX
 
 class MLP_variational_model(Printable):
 
-    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params):
+    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng):
+
+        self.srng = srng
 
     	self.B = miniBatchSize
 
@@ -29,15 +31,15 @@ class MLP_variational_model(Printable):
         self.mlp_encoder = MLP_Network(dimY, dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
 
-        self.mu_encoder, self.log_sigma_encoder = self.mlp_encoder.setup(y_miniBatch)
+        self.mu_encoder, self.log_sigma_encoder = self.mlp_encoder.setup(y_miniBatch, 'encoder')
 
-        alpha = srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
+        alpha = self.srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
         self.sample_alpha = th.function([], alpha)
 
-        self.gradientVariables = self.encoder.params
+        self.gradientVariables = self.mlp_encoder.params
 
-        self.z = plus(self.mu_encoder, mul(T.exp(self.log_sigma_encoder*0.5), alpha))
+        self.z = plus(self.mu_encoder, mul(exp(self.log_sigma_encoder*0.5), alpha))
 
     def construct_L_terms():
         self.H = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_encoder)

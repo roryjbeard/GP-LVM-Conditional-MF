@@ -73,7 +73,7 @@ class kernelFactory(object):
             assert(False)
         return K
 
-srng = RandomStreams(seed=234)
+# self.srng = RandomStreams(seed=234)
 
 
 class SGPDV(Printable):
@@ -85,7 +85,10 @@ class SGPDV(Printable):
                  dimZ,
                  jitterProtect,
                  params,
+                 srng
                  ):
+
+        self.srng = srng
 
         self.y_miniBatch = y_miniBatch
         self.Q = dimZ
@@ -112,8 +115,8 @@ class SGPDV(Printable):
             1, self.numberOfKernelParameters, 'log_theta', broadcastable=(True, False))  # parameters of Kuu, Kuf, Kff
 
         # Random variables
-        alpha = srng.normal(size=(self.B, self.R), avg=0.0, std=1.0, ndim=None)
-        beta = srng.normal(size=(self.B, self.Q), avg=0.0, std=1.0, ndim=None)
+        alpha = self.srng.normal(size=(self.B, self.R), avg=0.0, std=1.0, ndim=None)
+        beta = self.srng.normal(size=(self.B, self.Q), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
         beta.name = 'beta'
 
@@ -192,11 +195,11 @@ class SGPDV(Printable):
 
         self.L_terms = plus(self.H_qX, plus(self.H_qf_Xf, self.log_r_fXf_zy))
 
-    def randomise(self, srng, sig=1):
+    def randomise(self, sig=1):
 
         def rnd(var):
             if type(var) == np.ndarray:
-                return np.asarray(sig * srng.random.randn(*var.shape), dtype=precision)
+                return np.asarray(sig * self.srng.random.randn(*var.shape), dtype=precision)
             elif type(var) == T.sharedvar.TensorSharedVariable:
                 if var.name.endswith('sqrt'):
                     print 'setting ' + var.name + ' to Identity'
@@ -207,7 +210,7 @@ class SGPDV(Printable):
                     var.set_value(rnd(var.get_value()))
             elif type(var) == T.sharedvar.ScalarSharedVariable:
                 print 'Randomising ' + var.name
-                var.set_value(srng.random.randn())
+                var.set_value(self.srng.random.randn())
             else:
                 raise RuntimeError('Unknown randomisation type')
 

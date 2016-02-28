@@ -3,7 +3,7 @@
 import theano
 import theano.tensor as T
 import numpy as np
-from utils import tanh, sigmoid, softplus, exp, plus, mul, sharedZeroMatrix
+from utils import tanh, sigmoid, softplus, exp, plus, mul, dot, sharedZeroMatrix
 floatX = theano.config.floatX
 
 class Linear():
@@ -16,7 +16,7 @@ class Linear():
         self.params = [self.W, self.b]
 
     def setup(self, x_in, **kwargs):
-        return plus(dot(self.W, x), self.b)
+        return plus(dot(self.W, x_in), self.b)
 
     def randomise(self, rnd, factor=1., nonlinearity=None):
         '''A randomly initialized linear layer.
@@ -44,28 +44,28 @@ class Tanh():
         self.params = []
 
     def setup(self, x_in, **kwargs):
-        return tanh(x)
+        return tanh(x_in)
 
 class Sigmoid():
     def __init__(self):
         self.params = []
 
     def setup(self, x_in, **kwargs):
-        return sigmoid(x)
+        return sigmoid(x_in)
 
 class Exponential():
     def __init__(self):
         self.params = []
 
     def setup(self, x_in, **kwargs):
-        return exp(x)
+        return exp(x_in)
 
 class Softplus():
     def __init__(self):
         self.params = []
 
     def setup(self, x_in, **kwargs):
-        return softplus(x)
+        return softplus(x_in)
 
 class NNet():
     def __init__(self):
@@ -104,30 +104,30 @@ class MLP_Network():
         self.hidden = NNet()
         self.hidden.addLayer(Linear(dim_in, num_hidden,'hidden_'+str(0)+'_'+name))
         self.hidden.addLayer(self.nonlinearity)
-        
+
         for i in range(1,num_layers):
             self.hidden.addLayer(Linear(num_hidden, num_hidden, 'hidden_'+str(i)+'_'+name))
             self.hidden.addLayer(self.nonlinearity)
-        
+
         if self.continuous:
             self.muLinear = Linear(num_hidden, dim_out, 'muLinear_' + name)
-            self.sigmaLinear = Linear(num_hidden, dim_out, 'sigmaLinear_' + name)
-            self.params = self.hidden.params + self.muLinear.params + self.sigmaLinear.params
+            self.logsigmaLinear = Linear(num_hidden, dim_out, 'logsigmaLinear_' + name)
+            self.params = self.hidden.params + self.muLinear.params + self.logsigmaLinear.params
         else:
             self.yhatLinear = Linear(num_hidden, dim_out, name, 'yhatLinear_' + name)
             self.yhatSigmoid = Sigmoid()
             self.params = self.hidden.params + self.yhatLinear.params
 
-    def setup(self, x_in, **kwargs):
+    def setup(self, x_in, name, **kwargs):
         h_outin = self.hidden.setup(x_in)
         if self.continuous:
-            mu = self.muLinear.setup(h_inout, **kwargs)
-            logsigma = 0.5 * self.logsigmaLinear.setup(h_inout, **kwargs)
+            mu = self.muLinear.setup(h_outin, **kwargs)
+            logsigma = 0.5 * self.logsigmaLinear.setup(h_outin, **kwargs)
             mu.name = 'mu_' + name
-            logsigma.name = 'logsimga' + name
-            return (mu, sigma)
+            logsigma.name = 'logsigma' + name
+            return (mu, logsigma)
         else:
-            h2 = self.yhatLinear.setup(h_inout, **kwargs)
+            h2 = self.yhatLinear.setup(h_outin, **kwargs)
             yhat = self.yhatSigmoid.setup(h2, **kwargs)
             yhat.name = 'yhat'
             return yhat

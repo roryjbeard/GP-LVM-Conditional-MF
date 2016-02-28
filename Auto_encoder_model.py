@@ -15,6 +15,7 @@ from testTools import checkgrad
 from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus, createSrng
 from Hybrid_variational_model import Hybrid_encoder
 from MLP_variational_model import MLP_variational_model
+from MLP_likelihood_model import MLP_likelihood_model
 from Hysterisis_variational_model import Hysterisis_encoder
 from jitterProtect import JitterProtect
 from printable import Printable
@@ -42,12 +43,12 @@ class AutoEncoderModel(Printable):
         self.Q = params['dimZ']
 
 
-        srng =  RandomStreams(125) #createSrng(seed=123)
+        self.srng =  RandomStreams(125) #createSrng(seed=123)
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
-        self.batchStream = srng.permutation(n=self.N)
-        self.padStream   = srng.choice(size=(numPad,), a=self.N,
+        self.batchStream = self.srng.permutation(n=self.N)
+        self.padStream   = self.srng.choice(size=(numPad,), a=self.N,
                                        replace=False, p=None, ndim=None, dtype='int32')
 
         self.batchStream.name = 'batchStream'
@@ -61,7 +62,7 @@ class AutoEncoderModel(Printable):
 
         self.currentBatch = T.flatten(self.allBatches[self.iterator, :])
         self.currentBatch.name = 'currentBatch'
-        
+
         self.y_miniBatch = self.y[self.currentBatch, :]
         self.y_miniBatch.name = 'y_miniBatch'
 
@@ -81,26 +82,31 @@ class AutoEncoderModel(Printable):
                 self.P,
                 self.Q,
                 self.jitterProtector,
-                encoderParameters)
+                encoderParameters,
+                self.srng)
         elif encoderType == 'MLP':
             self.encoder = MLP_variational_model(
                 self.y_miniBatch,
                 self.B,
                 self.P,
                 self.Q,
-                encoderParameters)
+                encoderParameters,
+                self.srng)
         elif encoderType == 'Hysterisis':
                 self.encoder = Hysterisis_variational_model(
                 self.y_miniBatch,
                 self.B,
                 self.P,
                 self.Q,
-                encoderParameters)
+                encoderParameters,
+                self.srng)
         else:
             raise RuntimeErorr('Unrecognised encoder type')
 
         if decoderType == 'MLP':
-            self.decoder(decoderParameters, self.y_miniBatch, decoderParameters)
+            self.decoder = MLP_likelihood_model(self.y_miniBatch,
+                decoderParameters, self.B, self.P, self.Q, encoder,
+                params, self.srng)
         else:
             raise RuntimeErorr('Unrecognised decoder type')
 

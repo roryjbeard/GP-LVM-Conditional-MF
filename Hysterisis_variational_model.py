@@ -19,7 +19,9 @@ log2pi = T.constant(np.log(2 * np.pi))
 
 class Hysterisis_encoder(Printable):
 
-    def __init__(self, y_miniBatch, minbatchSize, dimY, dimZ, params):
+    def __init__(self, y_miniBatch, minbatchSize, dimY, dimZ, params, srng):
+
+        self.srng = srng
 
         self.B = minbatchSize
 
@@ -30,7 +32,7 @@ class Hysterisis_encoder(Printable):
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
         self.mu_f_y, self.log_sigma_f_y = self.mlp_f_y.setup(y_miniBatch)
 
-        alpha = srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
+        alpha = self.srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
         self.sample_alpha = th.function([], alpha)
 
@@ -40,7 +42,7 @@ class Hysterisis_encoder(Printable):
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
         self.mu_qz_fy, self.log_sigma_qz_fy = self.mlp_z_fy.setup(T.concatenate((self.f, y_miniBatch)))
 
-        beta = srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
+        beta = self.srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
         beta.name = 'beta'
         self.sample_beta = th.function([], beta)
 
