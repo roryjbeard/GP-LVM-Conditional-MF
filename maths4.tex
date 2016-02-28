@@ -164,7 +164,27 @@ Finally we specify the auxiliary model as follows:
 \end{align}
 
 and the expected cross-entropy $\Ex_{q(\zb,\fb,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right]$ is approximated with an unbiased Monte Carlo estimation.
-
+%
+\section{Bound for the MLP hysteresis autoencoder}
+%
+In this we have just one set of auxiliary variables $\fb$ and the auxiliary lower bound is:
+%
+\begin{align}
+    \Lo &= \Ex_{q(\zb|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb|\yb)}\left[ \KL[q(\zb|\fb,\yb)||p(\zb)] \right] - \Ex_{q(\zb,\fb|\yb)}\left[ \log\frac{q(\fb|\yb)}{r(\fb|\zb,\yb)} \right]\\
+    &= \Ex_{q(\zb|\yb)}[\log p(\yb|\zb)] - \Ex_{q(\fb|\yb)}\left[ \KL[q(\zb|\fb,\yb)||p(\zb)] \right] + \mathrm{H}[q(\fb|\yb)] + \Ex_{q(\zb,\fb|\yb)}[\log r(\fb|\zb,\yb)].
+\end{align}
+%
+Where we have
+%
+\begin{equation}
+    \KL[q(\zb|\fb,\yb)||p(\zb)] = \frac{1}{2}\left\{ \mathrm{tr}(\Sigma_{z|f,y}) + \mu_{z|f,y}^\top\mu_{z|f,y} - \log| \Sigma_{z|f,y} | - N \right\}
+\end{equation}
+%
+and
+%
+\begin{equation}
+    \mathrm{H}[q(\fb|\yb)] = \frac{N}{2}(1 + \log(2\pi) + \log | \Sigma_{f|y} |.
+\end{equation}
 
 \end{document}
 
