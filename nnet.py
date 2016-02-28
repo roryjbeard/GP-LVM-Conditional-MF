@@ -4,6 +4,7 @@ import theano
 import theano.tensor as T
 import numpy as np
 from utils import tanh, sigmoid, softplus, exp, plus, mul, dot, sharedZeroMatrix
+
 floatX = theano.config.floatX
 
 class Linear():
@@ -23,7 +24,7 @@ class Linear():
         When factor is 1, the initialization is uniform as in Glorot, Bengio, 2010,
         assuming the layer is intended to be followed by the tanh nonlinearity.'''
         if type(nonlinearity) == Tanh:
-            scale = factor * np.sqrt(6./(n_in+n_out))
+            scale = factor * np.sqrt(6./(self.dim_in+self.dim_out))
             self.W.set_value(rnd.uniform(low=-scale,
                                      high=scale,
                                      size=(self.n_in, self.n_out)))
@@ -31,10 +32,7 @@ class Linear():
         elif type(nonlinearity) == Softplus:
             # Hidden layer weights are uniformly sampled from a symmetric interval
             # following [Xavier, 2010] those for the sigmoid transform
-            X = var.ge
-
-            symInterval = 4.0 * np.sqrt(6. / (X + Y))
-            X_Y_mat = np.asarray(np.random.uniform(size=(X, Y)))
+            pass
 
         elif type(nonlinearity) == Linear:
             raise RuntimeError('Consecutive linear layers')
@@ -77,20 +75,20 @@ class NNet():
         self.params += layer.params
         return self
 
-    def setup(self, x, **kwargs):
+    def setup(self, x_in, **kwargs):
         '''Returns the output of the last layer of the network'''
-        y = x
+        y = x_in
         for layer in self.layers:
             y = layer.setup(y, **kwargs)
         return y
 
     def randomise(self, factor, rnd):
         for i in range(len(self.layers)):
-            if type(layer) == Linear:
+            if type(self.layers[i]) == Linear:
                 if i < len(self.layers):
                     # Randomisation of the lay depends of what the
                     # non-linearity in the next layer is
-                    self.layers[i].randomise(factor, rnd, layer[i+1])
+                    self.layers[i].randomise(factor, rnd, self.layers[i+1])
                 else:
                     self.layers[i].randomise(factor, rnd)
 
@@ -118,13 +116,13 @@ class MLP_Network():
             self.yhatSigmoid = Sigmoid()
             self.params = self.hidden.params + self.yhatLinear.params
 
-    def setup(self, x_in, name, **kwargs):
+    def setup(self, x_in, **kwargs):
         h_outin = self.hidden.setup(x_in)
         if self.continuous:
             mu = self.muLinear.setup(h_outin, **kwargs)
             logsigma = 0.5 * self.logsigmaLinear.setup(h_outin, **kwargs)
-            mu.name = 'mu_' + name
-            logsigma.name = 'logsigma' + name
+            mu.name = 'mu_' + self.name
+            logsigma.name = 'logsimga' + self.name
             return (mu, logsigma)
         else:
             h2 = self.yhatLinear.setup(h_outin, **kwargs)

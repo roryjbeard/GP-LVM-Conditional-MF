@@ -10,17 +10,15 @@ import theano as th
 import theano.tensor as T
 
 from optimisers import Adam
-from GP_LVM_CMF import SGPDV
-from testTools import checkgrad
-from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus, createSrng
-from Hybrid_variational_model import Hybrid_encoder
+from utils import createSrng, np_log_mean_exp_stable
+from Hybrid_variational_model import Hybrid_variational_model
 from MLP_variational_model import MLP_variational_model
 from MLP_likelihood_model import MLP_likelihood_model
 from Hysterisis_variational_model import Hysterisis_encoder
 from jitterProtect import JitterProtect
 from printable import Printable
-from theano.tensor.shared_randomstreams import RandomStreams
-
+import time as time
+import collections
 
 precision = th.config.floatX
 
@@ -44,6 +42,7 @@ class AutoEncoderModel(Printable):
 
 
         self.srng =  RandomStreams(125) #createSrng(seed=123)
+
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
@@ -101,14 +100,14 @@ class AutoEncoderModel(Printable):
                 encoderParameters,
                 self.srng)
         else:
-            raise RuntimeErorr('Unrecognised encoder type')
+            raise RuntimeError('Unrecognised encoder type')
 
         if decoderType == 'MLP':
             self.decoder = MLP_likelihood_model(self.y_miniBatch,
                 decoderParameters, self.B, self.P, self.Q, encoder,
                 params, self.srng)
         else:
-            raise RuntimeErorr('Unrecognised decoder type')
+            raise RuntimeError('Unrecognised decoder type')
 
         self.encoder.construct_L_terms()
         self.decoder.construct_L_terms(self.encoder)
@@ -214,7 +213,7 @@ class AutoEncoderModel(Printable):
 
 if __name__ == "__main__":
 
-    params['miniBatchSize'] = 2
+    params = {'miniBatchSize':2, 'dimZ':20}
     data = np.ones((10,2))
     encoderType = 'MLP'
     encoderParameters = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1}

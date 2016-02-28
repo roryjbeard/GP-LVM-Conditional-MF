@@ -34,7 +34,7 @@ class Hybrid_encoder(Printable):
         self.srng = srng
 
         self.mlp_encoder = MLP_Network(self, dimY, dimZ,
-                HL, 'encoder', num_layers=HL)
+                HU, 'encoder', num_layers=HL)
 
         self.mu_encoder, self.log_sigma_encoder2 \
             = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch)))
@@ -49,7 +49,7 @@ class Hybrid_encoder(Printable):
 
         self.gradientVariables = self.mlp_encoder.params + self.gp_encoder.gradientVariables
 
-    def construct_L_terms():
+    def construct_L_terms(self):
         self.gp_encoder.construct_L_terms()
         self.L_terms = self.gp_encoder.L_terms
 
@@ -67,11 +67,11 @@ if __name__ == "__main__":
     params = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1}
     y_miniBatch = np.ones((2,2))
     miniBatchSize = 2
-    jitterProtect = jitterProjected()
+    jitterProtect = JitterProtect()
     dimY = 2
     dimZ = 2
 
-    hybrid = Hybrid_encoder(y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params)
+    hybrid = Hybrid_encoder(y_miniBatch, miniBatchSize, dimY, dimZ, params, jitterProtect)
 
     hybrid.construct_L_terms()
     hybrid.sample()
