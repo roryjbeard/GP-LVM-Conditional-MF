@@ -11,6 +11,7 @@ import theano.tensor as T
 from theano.tensor import nlinalg
 from printable import Printable
 from utils import plus, mul
+import nnet
 
 from GP_LVM_CMF import SGPDV
 
@@ -35,7 +36,7 @@ class Hybrid_encoder(Printable):
 
         self.mu_encoder, self.log_sigma_encoder2 \
             = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch)))
-         
+
         gamma = srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
         gamma.name = 'gamma'
         self.sample_gamma = th.function([], gamma)

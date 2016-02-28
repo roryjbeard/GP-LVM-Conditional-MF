@@ -9,6 +9,7 @@ import time
 import collections
 from myCond import myCond
 from printable import printable
+import nnet
 
 from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, \
     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag, \
@@ -109,7 +110,7 @@ class SGPDV(printable):
         # kernel parameters
         self.log_theta = sharedZeroMatrix(
             1, self.numberOfKernelParameters, 'log_theta', broadcastable=(True, False))  # parameters of Kuu, Kuf, Kff
-        
+
         # Random variables
         alpha = srng.normal(size=(self.B, self.R), avg=0.0, std=1.0, ndim=None)
         beta = srng.normal(size=(self.B, self.Q), avg=0.0, std=1.0, ndim=None)
@@ -121,7 +122,7 @@ class SGPDV(printable):
 
         self.mlp_qX = MLP_Network(self.P, self.R, self.H, 'qX')
         self.mu_qX, self.log_sigma_qX = self.mlp1_qX.setup(self.y_miniBatch.T)
-        
+
         # Variational distribution q(u)
         self.kappa = sharedZeroMatrix(self.M, self.Q, 'kappa')
         self.Kappa_sqrt = sharedZeroMatrix(self.M, self.M, 'Kappa_sqrt')
@@ -162,7 +163,7 @@ class SGPDV(printable):
         self.Kuu_conditionNumber   = conditionNumber(self.Kuu)
         self.Sigma_conditionNumber = conditionNumber(self.Sigma)
 
-    def self.construct_rX(z):
+    def construct_rX(z):
 
         self.rfXf_mlp = MLP_Network(self.Q + self.P, self.Q + self.R, 1, self.H, Softplus, 'rfXf'):
         self.mu_rfXf, self.log_sigma_rfXf = self.rfXf_mlp.setup(T.concatenate((z.T, self.y_miniBatch.T)))
@@ -182,7 +183,7 @@ class SGPDV(printable):
         fXf = T.concatenate((self.f, self.Xf), axis=1).T
 
         fX_m_mu = minus(fXf, self.mu_rfXf)
-        
+
         self.log_rfXf_zy = -0.5 * (self.R+self.Q) * self.B * log2pi \
             - T.sum(self.log_sigma_rfXf)
             - 0.5 * T.sum( div(fX_m_mu**2, T.exp(2*self.log_sigma_rfXf)))

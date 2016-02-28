@@ -9,6 +9,7 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 from printable import printable
+from utils import plus, div
 
 log2pi = np.log(2 * np.pi)
 
@@ -41,9 +42,10 @@ class MLP_likelihood_model(Printable):
                    - self.B
 
         if self.continuous:
-            self.log_p_y_z = 
+            self.log_pyz = T.sum( -(0.5*log2pi + T.sum(self.log_sigma_decoder)) \
+            - 0.5 * ((y_miniBatch.T - self.mu_decoder) / T.exp(self.log_sigma_decoder))**2 )
         else:
-            pass
+            self.log_pyz = -T.nnet.binary_crossentropy(self.mu_decoder, y_miniBatch).sum()
 
 
         self.L_terms = self.log_pyz + self.KL

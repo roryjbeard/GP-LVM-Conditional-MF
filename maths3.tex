@@ -64,7 +64,9 @@ We want $u$ and $f$ to come from the same zero mean gaussian process
 %
 where $K(X_f,X_f^\prime) = \Kff$, $K(X_f,X_u^\prime) = \Kfu$, $ K(X_u,X_f^\prime) = \Kuf$, $K(X_u,X_u^\prime) = \Kuu$.
 
-Therefore $\fb|\ub,X_f,X_u \sim \mathcal{N}(\Kfu\Kuu^{-1}\ub, \Kff - \Kfu\Kuu^{-1}\Kuf)$
+Therefore $\fb|\ub,X_f,X_u \sim \mathcal{N}(\Kfu\Kuu^{-1}\ub, \Kff - \Kfu\Kuu^{-1}\Kuf)$, but since the relationship between $\fb$ and $\ub$ is conjugate, and $\ub$ does not appear in the generative model, we may integrate it out at this point see (maths4.pdf).
+%
+
 
 We also want to treat the input locations $X_f$ as random variables with distribution $q(X_f)$ who's parameters we control.
 %
@@ -118,9 +120,9 @@ p(\zb) &= \prod_{q=1}^Q \mathcal{N}(\zb_q; \vec{0}, \mathbb{I}_B) \\
 q(\ub) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \kappa_q, \Kappa) \\
 q(\fb|\ub,X_z) &= \prod_{q=1}^Q \mathcal{N}(\fb_q; \underbrace{\Kfu\Kuu^{-1}}_{\Ab}\ub_q, \underbrace{\Kff-\Kfu\Kuu^{-1}\Kuf}_{\Cb}) \\
 q(X_f|\yb) &= \prod_{r=1}^R \mathcal{N}(\xb_r; \phi_r, \Phi) \\
-q(X_f[n,:]|\yb_n) &= \No(\yb_n; \mu_X(\hb_X), \sigma^2_X(\hb_X)) \\
+q(X_f[n,:]|\yb_n) &= \No(\yb_n; \mu_{q(X)}(\hb_X), \sigma^2_X(\hb_X)) \\
 \hb_X &= \phi(\Wb^{(1)}_X\yb + \bb^{(1)}_X) \\
-\mu_X(\hb_X) &= \Wb^{(2)}_X\hb_X + \bb^{(2)}_X,\quad \log\sigma^2_X(\hb_X) = \Wb^{(3)}_X\hb_X + \bb^{(3)}_X \\
+\mu_{q(X)}(\hb_X) &= \Wb^{(2)}_X\hb_X + \bb^{(2)}_X,\quad \log\sigma^2_X(\hb_X) = \Wb^{(3)}_X\hb_X + \bb^{(3)}_X \\
 q(\zb|\fb,\yb) &= \No(\zb; \mu_z(\hb_z), \sigma^2_z(\hb_z)) \\
 \hb_z &= \phi(\Wb^{(1)}_z[\yb,\fb] + \bb^{(1)}_z) \\
 \mu_z(\hb_z) &= \Wb^{(2)}_z\hb_z + \bb^{(2)}_z,\quad \log\sigma^2_z(\hb_z) = \Wb^{(3)}_z\hb_z + \bb^{(3)}_z
@@ -129,6 +131,12 @@ q(\zb|\fb,\yb) &= \No(\zb; \mu_z(\hb_z), \sigma^2_z(\hb_z)) \\
 \begin{equation}
 \Ex_{q(\fb,\ub,X_f|\yb)}\left[\KL(q(\zb|\fb,\yb)||p(\zb))\right] = -\Ex_{q(\fb,\ub,X_f|\yb)}\left[ \frac{1}{2}\sum_{q=1}^Q\left( 1 + 2\log\sigma_z(q) - \mu^2_z(q) \right) \right]
 \end{equation}
+%
+\begin{align}
+    \Ex_{q(\zb,\fb,X_f|\yb)}\left[ \KL\left( q(\ub)||q(\ub|\fb,X_f,\zb) \right) \right]\notag\\
+    &= \Ex_{q(\zb,\fb,X_f|\yb)}\left[  \right]
+\end{align}
+
 %
 The entropy of $q(X_f)$ is:
 %
@@ -150,10 +158,10 @@ We decompose $r$ as $r(\fb,X_f|\zb,\yb) = r(\fb|\zb,X_f)r(X_f|\fb,\yb)$ so that
 \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[ \log r(\fb,X_f|\zb,\yb) \right] &= \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log r(\fb|\zb,X_f)\right] + \Ex_{q(\zb,\fb,\ub,X_f|\yb)}\left[\log r(X_f|\zb,\yb)\right]
 \end{align}
 %
-We set $r(\ub|\zb,X_z) = q(\ub|\zb,X_z)$ which we can compute exactly.
+We can compute $q(\ub|\fb,X_f,\zb)$ exactly as:
 %
 \begin{align}
-q(\ub|\zb,X_z) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \upsilon_q, \Upsilon) \\
+q(\ub|\fb,X_f,\zb) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \upsilon_q, \Upsilon) \\
 %\Cb^{-1} &= [\Kzz^{-1}-\Kzz^{-1}\Kzu\{ \Kuz\Kzz^{-1}\Kzu-\Kuu\}^{-1}\Kuz\Kzz^{-1} ] \\
 \Upsilon &= (\Kappa^{-1} + \Ab^\top\Cb^{-1}\Ab)^{-1} \\
 %&= \Kappa^{-1} - \Kappa^{-1} \Ab^\top (\Cb+ \Ab\Kappa^{-1}\Ab^\top)^{-1}\Ab\Kappa^{-1}\\
@@ -163,9 +171,7 @@ q(\ub|\zb,X_z) &= \prod_{q=1}^Q \mathcal{N}(\ub_q; \upsilon_q, \Upsilon) \\
 Therefore:
 %
 \begin{align}
-\Ex_{q(\zb,\ub,X_z)}\left[\log r(\ub|X_z,\zb)\right] &= \Ex_{q(\zb,X_z)}\left[ \Ex_{q(\ub|\zb,X_z)} \left\{\log q(\ub|\zb,X_z) \right\} \right] \\
-&= \Ex_{q(\zb,X_z)}\left[-H(q(\ub|\zb,X_z)) \right] \\
-&= \Ex_{q(X_z)}\left[-\frac{MQ}{2}(1+\log(2\pi))) -\frac{Q}{2}\log\det(\Upsilon) \right]
+\KL\left[ q(\ub)||q(\ub|\fb,X_f,\zb) \right] =
 \end{align}
 %
 

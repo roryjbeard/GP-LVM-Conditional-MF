@@ -30,10 +30,10 @@
 \newcommand{\Ex}{\mathbb{E}}
 \newcommand{\KL}{\textrm{KL}}
 % I would prefer f or \mathbf{f} rather than F()
-\newcommand{\f}{f} 
+\newcommand{\f}{f}
 
 % Just a working title/suggestion
-\title{Blackbox variational inference using \\ the Gaussian process latent variable model}
+\title{Black-box Auxiliary Variational Inference}
 
 %\author{} % LEAVE BLANK FOR ORIGINAL SUBMISSION.
           % UAI  reviewing is double-blind.
@@ -47,7 +47,7 @@
 \textnormal{Machine Learning Research Group} \\
 \textnormal{Department of Engineering Science}\\
 \textnormal{University of Oxford} \\
-\url{{rbeard, clloyd, sjrob}@robots.ox.ac.uk}
+\url{{rory, clloyd, sjrob}@robots.ox.ac.uk}
 }
 
 \begin{document}
@@ -55,14 +55,12 @@
 \maketitle
 
 \begin{abstract}
-The purpose of this document is to provide both the basic paper template and
-submission guidelines. Abstracts should be a single paragraph, between 4--6 sentences long, ideally.
-Gross violations will trigger corrections at the camera-ready phase.
+We approach the problem of capturing the statistical dependence structure of the conditionally independent variational factors using a flexible, auxiliary variable method. We introduce two flexible auxiliary inference models; a deep neural net and a Bayesian non-paramteric model. We compare the performance of these models against each other and also consider a hybrid approach. The power of the approach lies in its ability to combine bottom-up and top-down learning in a fully Bayesian manner via a bidirectional augmented inference network.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
 
-We approach the problem of capturing the statistical dependence structure of the conditionally independent variational factors in a flexible, Bayesian nonparametric manner.
+
 Considering at first a latent variable model with a latent variable for each datum as well as some global parameters, a traditional (mean field) variational approach is to learn a factored approximation to the posterior in which each latent variable is independently distributed and governed by its own variational parameter.
 Clearly this is an overly restrictive approximation since conditioning on the data statistically couples the latent variables.
 With careful design some statistical dependence may be retained with so-called \emph{structured mean field} approximations (SAUL AND JORDAN, WIERGERNINCK), but the design is highly model specific and not AUTOMATICALLY SCALABLE?
@@ -70,7 +68,9 @@ A natural improvement is to couple the variational factors via a common variatio
 HOWEVER THE NECESSARY CRUCIAL DESIGN CHOICES MAKE THIS PROCEDURE DIFFICULT TO AUTOMATE AND SCALE?
 
 Rather than designing model specific, parametric variational priors..., we take inspiration from the Bayesian non-parametric dimensionality reduction method of.. GP-LVM... to learn a flexible, non-linear mapping from a shared latent auxiliary space to each conditionally independent variational factor.
-The dependence is induced by a fixed number of latent coordinates, the locations of which are learned so as to induce the optimal dependence structure. We refer to this scheme as the GP-LVM-conditional mean field
+The dependence is induced by a fixed number of latent coordinates, the locations of which are learned so as to induce the optimal dependence structure. We refer to this scheme as GP-LVM-conditional mean field (GP-LVM-CMF) inference.
+
+In addition to the GP-LVM, we introduce an auxiliary neural net approach which naturally extends the variational auto-encoder to a hierarchical version which is able to the bottom-up stochastic message passing of the variational encoder with top-down stochastic messages from a variational auxiliary decoder.
 
 From the perspective of the variational principle, we propose a drop-in replacement for mean field inference in which a rich, variational distribution is specified in the expanded space of variables we wish to infer augmented with auxiliary inference variables.
 This can be seen as specifying a non-parametric hierarchical variational model (CITE RANAGNATH 2015)... integrating over the auxiliary inference parameters recovers a marginal distribution as an infinite mixture of augmented distributions...
@@ -85,7 +85,7 @@ There has been much recent work which empirically demonstrates the success of ..
 Controlling the variance of the stochastic lower bounds: reparameterization trick... theoretical Lipschitz result, ease of implementation.
 
 
-l;asdf. We additionally introduce a kernel based approach to back-constrained amortization in which random functions are trained to capture the encoding process.
+We additionally introduce a kernel based approach to back-constrained amortization in which random functions are trained to capture the encoding process.
 WHY IS THIS GOOD: provable guarantees of kernel mappings, ameliorates pathological curvature??
 This also provokes a second look at the VAE in which, in addition to replacing the decoder with a Bayesian non-parametric mapping, the same adjustment is made for the decoding part of the architecture.
 
@@ -101,6 +101,17 @@ Experiments:
   \item Black-box approaches and SVI. Reparam trick for variance reduction, autoencoding and back-constraints for amortization.
   \item Augmented inference space, hierarchical variational distribution.
 \end{itemize}
+
+\subsubsection{Variational Auto-encoding}
+
+The VAE (2 REFERENCES) was introduced as a framework to train (potentially) deep neural net generative models in a scalable, Bayesian manner. The important insight of these authors was to reparameterise the variational variables as a deterministic transformation of a random variable drawn from a standard (parameterless) distribution so that gradient information relating to the variational parameters can be included in the stochastic gradients used to optimise the bound. Importantly this allows for variance control of the stochastic gradients, permitting practical convergence profiles, unlike the previously proposed sleep wake algorithm (REFERENCES).
+\\ |
+\\ |
+\\ |
+IMPORTANT VAE EQUATIONS
+\\ |
+\\ |
+\\ |
 
 \subsection{The Bayesian GP-LVM}\label{subsec:gplvm}
 
@@ -127,7 +138,7 @@ where the GPs are modelled as independent across the data dimensions.
 
 As is the case for the SVGP and the Bayesian GP-LVM, the inference model of the GP-LVM-CMF constructs a GP mapping to $N$ output values which is governed by a fixed number of auxiliary inducing variables.
 However the motivations for this conditional inducing structure are distinct in these three cases.
-For the sparse GP the desire is scalability; in particular to circumvent the costly $\mathcal{O}(N^3$ complexity of the covariance matrix inversion, which is then limited to $\mathcal{O}(N^2M)$ through variational compression.
+For the sparse GP the desire is scalability; in particular to circumvent the costly $\mathcal{O}(N^3)$ complexity of the covariance matrix inversion, which is then limited to $\mathcal{O}(N^2M)$ through variational compression.
 For the Bayesian GP-LVM the motivation is to be able to tractably integrate over the uncertainty associated with the unknown latent input locations.
 For the GP-LVM-CMF however there are no observations of the GP function values since they do not exist in the generative model, so their purpose here is to act as \emph{variational (pseudo) data} upon which the rest of the function values can be conditioned in the standard GP formulation.
 
@@ -153,7 +164,7 @@ We begin by applying the standard variational principle to lower bound the margi
 \end{align}
 %
 where we denote the set of all fixed point generative (resp. inference) model parameters to be learned by $\theta$ (resp. $\phi$), and we denote the set of all latent variables and parameters subject to inference by $Z$ (though later we will use $\eta$ to ...).
-Integrating \ref{eq:bound1} with respect to the auxiliary variables, noting that the marginal variational distribution over $Z$ can be expressed as 
+Integrating \ref{eq:bound1} with respect to the auxiliary variables, noting that the marginal variational distribution over $Z$ can be expressed as
 \begin{equation}
 q(Z) = \frac{q(Z|\f,U,X)q(\f,U,X)}{q(\f,U,X|Z)}
 \end{equation}
@@ -243,6 +254,9 @@ Including an optimisation procedure in the predictive step is an interesting ide
 \begin{itemize}
   \item Graphs for the 3 models.
   \item Algorithm in section \ref{sec:gplvmcmf}
+  \item Discussion of the aux variables acting as a stochastic hidden layer which provides smoothing...
+  \item Moreover, the additional KL penalisation between the variational posterior and the auxiliary distribution prevents the variational model trying to fit directly to the true posterior and instead does so via fitting its denominator (the var posterior) to the aux dist. The aux params are generated from both the latent variables and the data, acting as an intermediate between the generative likelihood model and the marginal variational model.
+  \item Links from above to batch normalisation - the auxiliary variables act like pseudo data which are global (not batch-specific).
 \end{itemize}
 
 \section{NOTES}

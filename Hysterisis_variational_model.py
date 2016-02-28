@@ -11,6 +11,7 @@ import theano.tensor as T
 
 from printable import Printable
 from utils import plus, mul
+import nnet
 
 precision = th.config.floatX
 
@@ -28,7 +29,7 @@ class Hysterisis_encoder(Printable):
         self.mlp_f_y = MLP_Network(self, dimY, dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
         self.mu_f_y, self.log_sigma_f_y = self.mlp_f_y.setup(y_miniBatch)
- 
+
         alpha = srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
         self.sample_alpha = th.function([], alpha)
@@ -38,7 +39,7 @@ class Hysterisis_encoder(Printable):
         self.mlp_z_fy = MLP_Network(self, dimY, dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
         self.mu_qz_fy, self.log_sigma_qz_fy = self.mlp_z_fy.setup(T.concatenate((self.f, y_miniBatch)))
-         
+
         beta = srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
         beta.name = 'beta'
         self.sample_beta = th.function([], beta)
@@ -52,7 +53,7 @@ class Hysterisis_encoder(Printable):
         self.gradientVariables = mlp.mlp_f_y.params + mlp.mlp_z_fy.params + self.mlp_rf_yz.params
 
     def construct_L_terms():
-        
+
         self.H_f_y = 0.5 * self.B * (1+log2pi) + T.sum(log_sigma_f_y)
         self.L_terms =  self.H_f_y
 
