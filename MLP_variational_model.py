@@ -34,12 +34,14 @@ class MLP_variational_model(Printable):
         alpha.name = 'alpha'
         self.sample_alpha = th.function([], alpha)
 
-        self.gradientVariables = mlp.encoder.params
+        self.gradientVariables = self.encoder.params
 
         self.z = plus(self.mu_encoder, mul(T.exp(self.log_sigma_encoder*0.5), alpha))
 
     def construct_L_terms():
-    	pass
+        self.H = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_encoder)
+
+        self.L_terms =  self.H
 
     def sample(self):
         self.sample_alpha()

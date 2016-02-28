@@ -47,7 +47,6 @@ class MLP_likelihood_model(Printable):
         else:
             self.log_pyz = -T.nnet.binary_crossentropy(self.mu_decoder, y_miniBatch).sum()
 
-
         self.L_terms = self.log_pyz + self.KL
 
     def randomise(self):

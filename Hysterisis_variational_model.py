@@ -50,11 +50,11 @@ class Hysterisis_encoder(Printable):
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
         self.mu_rf_yz, self.log_sigma_rf_yz = self.mlp_rf_yz.setup(T.concatenate((y_miniBatch,self.z)))
 
-        self.gradientVariables = mlp.mlp_f_y.params + mlp.mlp_z_fy.params + self.mlp_rf_yz.params
+        self.gradientVariables = self.mlp_f_y.params + self.mlp_z_fy.params + self.mlp_rf_yz.params
 
     def construct_L_terms():
 
-        self.H_f_y = 0.5 * self.B * (1+log2pi) + T.sum(log_sigma_f_y)
+        self.H_f_y = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_f_y)
         self.L_terms =  self.H_f_y
 
     def sample(self):
