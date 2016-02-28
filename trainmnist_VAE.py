@@ -27,7 +27,7 @@ params = {'miniBatchSize' : 200, 'dimZ':400}
 encoderType='MLP'
 decoderType='MLP'
 encoderParameters = {'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 1}
-decoderParameters = {'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 1}
+decoderParameters = {'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 1, 'continuous':True}
 
 print "Initialising"
 

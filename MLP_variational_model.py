@@ -30,7 +30,7 @@ class MLP_variational_model(Printable):
         self.mlp_encoder = MLP_Network(dimY, dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
 
-        self.mu_encoder, self.log_sigma_encoder = self.mlp_encoder.setup(y_miniBatch)
+        self.mu_qz, self.log_sigma_qz = self.mlp_encoder.setup(y_miniBatch)
 
         alpha = self.srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
@@ -38,10 +38,10 @@ class MLP_variational_model(Printable):
 
         self.gradientVariables = self.mlp_encoder.params
 
-        self.z = plus(self.mu_encoder, mul(exp(self.log_sigma_encoder*0.5), alpha))
+        self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), alpha), 'z')
 
     def construct_L_terms(self):
-        self.H = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_encoder)
+        self.H = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_qz)
 
         self.L_terms =  self.H
 

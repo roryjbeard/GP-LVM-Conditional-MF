@@ -15,48 +15,43 @@ log2pi = np.log(2 * np.pi)
 
 class MLP_likelihood_model(Printable):
 
-    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, encoder, params, srng):
-
-        self.srng = srng
+    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, encoder, params):
 
         self.B = miniBatchSize
-
+        self.y_miniBatch = y_miniBatch
+        
         numHiddenUnits_decoder = params['numHiddenUnits_decoder']
         numHiddenLayers_decoder = params['numHiddenLayers_decoder']
         self.continuous = params['continuous']
 
         if self.continuous:
-            self.mlp_decoder = MLP_Network(self, dimZ, dimY,
-                numHiddenUnits_decoder, 'decoder', num_layers=numHiddenLayers_decoder)
-            self.mu_decoder, self.log_sigma_decoder = self.mlp_decoder.setup(encoder.z, 'decoder')
+            self.mlp_decoder = MLP_Network(dimZ, dimY,
+                numHiddenUnits_decoder, 'decoder', num_layers=numHiddenLayers_decoder, continuous=True)
+            self.mu_decoder, self.log_sigma_decoder = self.mlp_decoder.setup(encoder.z)
         else:
-            self.mlp_decoder = MLP_Network(self, dimZ, dimY,
+            self.mlp_decoder = MLP_Network(dimZ, dimY,
                 numHiddenUnits_decoder, 'decoder', num_layers=numHiddenLayers_decoder, continuous=False)
-            self.yhat = self.mlp_decoder.setup(encoder.z, 'decoder')
+            self.yhat = self.mlp_decoder.setup(encoder.z)
 
-        self.gradientVariables = self.mlp.decoder.params
+        self.gradientVariables = self.mlp_decoder.params
 
     def construct_L_terms(self, encoder):
 
-        # self.KL_qp = 0.5*(T.sum(exp(encoder.log_simga_qz_fy*2))) \
-        #            + 0.5 * T.sum(encoder.mu_qz_fy**2) \
-        #            - T.sum(encoder.log_simga_qz_fy) \
-        #            - self.B
-
-        self.KL_qp = plus(0.5*(T.sum(exp(encoder.log_simga_qz_fy*2))),
-                        plus(0.5 * T.sum(encoder.mu_qz_fy**2),
-                        minus(plus(T.sum(encoder.log_simga_qz_fy) ,self.B))))
+        self.KL_qp = 0.5*(T.sum(exp(encoder.log_sigma_qz*2))) \
+                   + 0.5 * T.sum(encoder.mu_qz**2) \
+                   - T.sum(encoder.log_sigma_qz) \
+                   - self.B
 
         if self.continuous:
             self.log_pyz = T.sum( -(0.5*log2pi + self.log_sigma_decoder) \
-            - 0.5 * ((y_miniBatch.T - self.mu_decoder) / T.exp(self.log_sigma_decoder))**2 )
+            - 0.5 * ((self.y_miniBatch.T - self.mu_decoder) / T.exp(self.log_sigma_decoder))**2 )
         else:
             self.log_pyz = -T.nnet.binary_crossentropy(self.mu_decoder, y_miniBatch).sum()
 
-        self.L_terms = self.log_pyz + self.KL
+        self.L_terms = self.log_pyz + self.KL_qp
 
-    def randomise(self):
-        self.mlp_decoder.randomise()
+    def randomise(self, srng):
+        self.mlp_decoder.randomise(srng)
 
 
 if __name__ == "__main__":

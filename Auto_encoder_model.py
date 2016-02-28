@@ -11,10 +11,10 @@ import theano.tensor as T
 
 from optimisers import Adam
 from utils import createSrng, np_log_mean_exp_stable
-from Hybrid_variational_model import Hybrid_encoder
+from Hybrid_variational_model import Hybrid_variational_model
 from MLP_variational_model import MLP_variational_model
 from MLP_likelihood_model import MLP_likelihood_model
-from Hysterisis_variational_model import Hysterisis_encoder
+from Hysteresis_variational_model import Hysteresis_variational_model
 from jitterProtect import JitterProtect
 from printable import Printable
 import time as time
@@ -39,7 +39,6 @@ class AutoEncoderModel(Printable):
         self.P = data.shape[1]
         self.B = params['miniBatchSize']
         self.Q = params['dimZ']
-
 
         self.srng = createSrng(seed=123)
 
@@ -92,7 +91,7 @@ class AutoEncoderModel(Printable):
                 encoderParameters,
                 self.srng)
         elif encoderType == 'Hysterisis':
-                self.encoder = Hysterisis_variational_model(
+                self.encoder = Hysteresis_variational_model(
                 self.y_miniBatch,
                 self.B,
                 self.P,
@@ -103,9 +102,8 @@ class AutoEncoderModel(Printable):
             raise RuntimeError('Unrecognised encoder type')
 
         if decoderType == 'MLP':
-            self.decoder = MLP_likelihood_model(self.y_miniBatch,
-                decoderParameters, self.B, self.P, self.Q, self.encoder,
-                params, self.srng)
+            self.decoder = MLP_likelihood_model(self.y_miniBatch, self.B,
+                self.P, self.Q, self.encoder, decoderParameters)
         else:
             raise RuntimeError('Unrecognised decoder type')
 
@@ -113,6 +111,7 @@ class AutoEncoderModel(Printable):
         self.decoder.construct_L_terms(self.encoder)
 
         self.L = self.encoder.L_terms + self.decoder.L_terms
+        self.gradientVariables = self.encoder.gradientVariables + self.decoder.gradientVariables
 
         self.dL = T.grad(self.L, self.gradientVariables)
         for i in range(len(self.dL)):

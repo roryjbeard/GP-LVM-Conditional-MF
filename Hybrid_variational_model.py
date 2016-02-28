@@ -8,7 +8,6 @@ Created on Thu Feb  4 20:44:40 2016
 import numpy as np
 import theano as th
 import theano.tensor as T
-from theano.tensor import nlinalg
 from printable import Printable
 from utils import plus, mul
 from nnet import MLP_Network
@@ -16,7 +15,7 @@ from jitterProtect import JitterProtect
 
 from GP_LVM_CMF import SGPDV
 
-class Hybrid_encoder(Printable):
+class Hybrid_variational_model(Printable):
 
     def __init__(self, y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params, srng):
 
@@ -33,10 +32,9 @@ class Hybrid_encoder(Printable):
 
         self.srng = srng
 
-        self.mlp_encoder = MLP_Network(self, dimY, dimZ,
-                HU, 'encoder', num_layers=HL)
+        self.mlp_encoder = MLP_Network(self, dimY, dimZ, HU, 'encoder', num_layers=HL)
 
-        self.mu_encoder, self.log_sigma_encoder2 \
+        self.mu_qz, self.log_sigma_qz \
             = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch)))
 
         gamma = self.srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
@@ -71,7 +69,7 @@ if __name__ == "__main__":
     dimY = 2
     dimZ = 2
 
-    hybrid = Hybrid_encoder(y_miniBatch, miniBatchSize, dimY, dimZ, params, jitterProtect)
+    hybrid = Hybrid_variational_model(y_miniBatch, miniBatchSize, dimY, dimZ, params, jitterProtect)
 
     hybrid.construct_L_terms()
     hybrid.sample()

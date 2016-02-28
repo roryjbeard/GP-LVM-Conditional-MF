@@ -18,7 +18,7 @@ precision = th.config.floatX
 
 log2pi = T.constant(np.log(2 * np.pi))
 
-class Hysterisis_encoder(Printable):
+class Hysteresis_variational_model(Printable):
 
     def __init__(self, y_miniBatch, minbatchSize, dimY, dimZ, params, srng):
 
@@ -41,13 +41,13 @@ class Hysterisis_encoder(Printable):
 
         self.mlp_z_fy = MLP_Network(self, dimY, dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
-        self.mu_qz_fy, self.log_sigma_qz_fy = self.mlp_z_fy.setup(T.concatenate((self.f, y_miniBatch)))
+        self.mu_qz, self.log_sigma_qz = self.mlp_z_fy.setup(T.concatenate((self.f, y_miniBatch)))
 
         beta = self.srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
         beta.name = 'beta'
         self.sample_beta = th.function([], beta)
 
-        self.z = plus(self.mu_qz_fy, mul(T.exp(self.log_sigma_qz_fy*0.5), beta), 'z')
+        self.z = plus(self.mu_qz, mul(T.exp(self.log_sigma_qz*0.5), beta), 'z')
 
         self.mlp_rf_yz = MLP_Network(self, (dimY+dimZ), dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
