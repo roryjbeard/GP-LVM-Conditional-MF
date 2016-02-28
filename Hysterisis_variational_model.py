@@ -10,8 +10,9 @@ import theano as th
 import theano.tensor as T
 
 from printable import Printable
-from utils import plus, mul
-import nnet
+from utils import plus, mul, createSrng
+from nnet import MLP_Network
+from jitterProtect import JitterProtect
 
 precision = th.config.floatX
 
@@ -19,7 +20,7 @@ log2pi = T.constant(np.log(2 * np.pi))
 
 class Hysterisis_encoder(Printable):
 
-    def __init__(self, y_miniBatch, minbatchSize, dimY, dimZ, params):
+    def __init__(self, y_miniBatch, minbatchSize, dimY, dimZ, srng, params):
 
         self.B = minbatchSize
 
@@ -52,7 +53,7 @@ class Hysterisis_encoder(Printable):
 
         self.gradientVariables = self.mlp_f_y.params + self.mlp_z_fy.params + self.mlp_rf_yz.params
 
-    def construct_L_terms():
+    def construct_L_terms(self):
 
         self.H_f_y = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_f_y)
         self.L_terms =  self.H_f_y
@@ -71,11 +72,13 @@ if __name__ == "__main__":
     params = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1}
     y_miniBatch = np.ones((2,2))
     miniBatchSize = 2
-    jitterProtect = jitterProjected()
+    jitterProtect = JitterProtect()
     dimY = 2
     dimZ = 2
 
-    hyst = Hysterisis_encoder(y_miniBatch, minbatchSize, dimY, dimZ, params)
+    srng = createSrng(seed=123)
+
+    hyst = Hysterisis_encoder(y_miniBatch, miniBatchSize, dimY, dimZ,  params)
 
     hyst.construct_L_terms()
     hyst.sample()

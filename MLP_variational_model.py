@@ -8,24 +8,22 @@ Created on Thu Feb  4 20:44:40 2016
 import numpy as np
 import theano as th
 import theano.tensor as T
-from theano.tensor import nlinalg
 from printable import Printable
-
-from utils import log_mean_exp_stable
 from nnet import MLP_Network
+from utils import plus, mul
 
 precision = th.config.floatX
 
+log2pi = T.constant(np.log(2 * np.pi))
+
 class MLP_variational_model(Printable):
 
-    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params):
-
-    	self.B = miniBatchSize
-
-    	numHiddenUnits_encoder = params['numHiddenUnits_encoder']
+    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, srng, params):
+        
+        self.B = miniBatchSize
+        numHiddenUnits_encoder = params['numHiddenUnits_encoder']
         numHiddenLayers_encoder = params['numHiddenLayers_encoder']
-        print 'numHiddenLayers_encoder = ' + str(numHiddenLayers_encoder)
-
+        
         self.mlp_encoder = MLP_Network(dimY, dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
 
@@ -39,7 +37,7 @@ class MLP_variational_model(Printable):
 
         self.z = plus(self.mu_encoder, mul(T.exp(self.log_sigma_encoder*0.5), alpha))
 
-    def construct_L_terms():
+    def construct_L_terms(self):
         self.H = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_encoder)
 
         self.L_terms =  self.H

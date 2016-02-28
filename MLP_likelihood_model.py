@@ -6,10 +6,10 @@ Created on Thu Feb  4 20:44:40 2016
 """
 
 import numpy as np
-import theano as th
 import theano.tensor as T
 from printable import Printable
-from utils import plus, div, exp
+from utils import plus, exp, minus
+from nnet import MLP_Network
 
 log2pi = np.log(2 * np.pi)
 
@@ -32,7 +32,7 @@ class MLP_likelihood_model(Printable):
                 numHiddenUnits_decoder, 'decoder', num_layers=numHiddenLayers_decoder, continuous=False)
             self.yhat = self.mlp_decoder.setup(encoder.z)
 
-        self.gradientVariables = mlp.decoder.params
+        self.gradientVariables = self.mlp.decoder.params
 
     def construct_L_terms(self, encoder):
 
@@ -65,9 +65,9 @@ if __name__ == "__main__":
     dimZ = 2
 
     from MLP_variational_model import MLP_variational_model
-    encoder = MLP_variational_model(y_miniBatch, minBatchSize, dimY, dimZ, enc_params)
+    encoder = MLP_variational_model(y_miniBatch, miniBatchSize, dimY, dimZ, enc_params)
 
-    dec_params = {'numHiddenUnits_decoder' : 10, 'numHiddenLayers_decoder : 1'}
+    dec_params = {'numHiddenUnits_decoder' : 10, 'numHiddenLayers_decoder' : 1}
 
     decoder = MLP_likelihood_model(y_miniBatch, miniBatchSize, dimY, dimZ, encoder, dec_params)
 

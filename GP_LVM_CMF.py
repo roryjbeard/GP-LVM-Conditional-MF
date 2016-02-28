@@ -2,18 +2,13 @@
 import numpy as np
 import theano as th
 import theano.tensor as T
-from theano.tensor import slinalg, nlinalg
 from theano.tensor.shared_randomstreams import RandomStreams
 # import progressbar
-import time
-import collections
-from myCond import myCond
 from printable import Printable
 from nnet import MLP_Network
 
-from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, \
-    np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag, \
-    dot, minus, plus, mul, trace, div
+from utils import cholInvLogDet, sharedZeroMatrix, \
+    dot, minus, plus, div, conditionNumber
 
 # precision = np.float64
 precision = th.config.floatX
@@ -90,7 +85,7 @@ class SGPDV(Printable):
         self.y_miniBatch = y_miniBatch
         self.Q = dimZ
         self.P = dimY
-        self.B = minibatchSize
+        self.B = miniBatchSize
         self.R = params['dimX']
         self.M = params['numberOfInducingPoints']
         self.H = params['numberOfEncoderHiddenUnits']
@@ -130,7 +125,7 @@ class SGPDV(Printable):
 
         # Calculate latent co-ordinates Xf
         # [BxR]  = [BxR] + [BxB] . [BxR]
-        self.Xf = mu_qX.T + T.exp(log_sigma_qX).T * self.alpha
+        self.Xf = self.mu_qX.T + T.exp(self.log_sigma_qX).T * self.alpha
         self.Xf_get_value = th.function([], self.Xf, no_default_updates=True)
         # Inducing points co-ordinates
         self.Xu = sharedZeroMatrix(self.M, self.R, 'Xu')
@@ -156,16 +151,16 @@ class SGPDV(Printable):
         self.f = plus(self.mu, (dot(self.cSigma, self.beta)), 'f')
 
         # Gradient variables - should be all the th.shared variables
-        self.gradientVariables.extend(mlp1_qX.params)
-        self.gradientVariables.extend([self.kappa, self.Kappa_sqrt, self.Xu, self.kappa,log_theta])
+        self.gradientVariables.extend(self.mlp1_qX.params)
+        self.gradientVariables.extend([self.kappa, self.Kappa_sqrt, self.Xu, self.kappa, self.log_theta])
 
         self.Kappa_conditionNumber = conditionNumber(self.kappa)
         self.Kuu_conditionNumber   = conditionNumber(self.Kuu)
         self.Sigma_conditionNumber = conditionNumber(self.Sigma)
 
-    def construct_rX(z):
+    def construct_rX(self, z):
 
-        self.rfXf_mlp = MLP_Network(self.Q + self.P, self.Q + self.R, 1, self.H, Softplus, 'rfXf')
+        self.rfXf_mlp = MLP_Network(self.Q + self.P, self.Q + self.R, 1, self.H, 'rfXf')
         self.mu_rfXf, self.log_sigma_rfXf = self.rfXf_mlp.setup(T.concatenate((z.T, self.y_miniBatch.T)))
         self.gradientVariables.extend(self.rfXf_mlp.params)
 
