@@ -3,8 +3,7 @@
 import theano
 import theano.tensor as T
 import numpy as np
-from utils import tanh, sigmoid, softplus, exp
-
+from utils import tanh, sigmoid, softplus, exp, plus, mul, sharedZeroMatrix
 floatX = theano.config.floatX
 
 class Linear():
@@ -19,7 +18,7 @@ class Linear():
     def setup(self, x_in, **kwargs):
         return plus(dot(self.W, x), self.b)
 
-    def randomise(rnd, factor=1., nonlinearity=None):
+    def randomise(self, rnd, factor=1., nonlinearity=None):
         '''A randomly initialized linear layer.
         When factor is 1, the initialization is uniform as in Glorot, Bengio, 2010,
         assuming the layer is intended to be followed by the tanh nonlinearity.'''
@@ -85,7 +84,7 @@ class NNet():
             y = layer.setup(y, **kwargs)
         return y
 
-    def randomise(factor, rnd):
+    def randomise(self, factor, rnd):
         for i in range(len(self.layers)):
             if type(layer) == Linear:
                 if i < len(self.layers):
@@ -105,18 +104,21 @@ class MLP_Network():
         self.hidden = NNet()
         self.hidden.addLayer(Linear(dim_in, num_hidden,'hidden_'+str(0)+'_'+name))
         self.hidden.addLayer(self.nonlinearity)
+        
         for i in range(1,num_layers):
             self.hidden.addLayer(Linear(num_hidden, num_hidden, 'hidden_'+str(i)+'_'+name))
             self.hidden.addLayer(self.nonlinearity)
+        
         if self.continuous:
-            self.muLinear = Linear(num_hidden, dim_out, name, 'mu_' + name)
-            self.sigmaLinear = Linear(num_hidden, dim_out, name, 'sigma_' + name)
-            self.params = self.hidden.params + self.muLinear + self.sigmaLinear
+            self.muLinear = Linear(num_hidden, dim_out, 'muLinear_' + name)
+            self.sigmaLinear = Linear(num_hidden, dim_out, 'sigmaLinear_' + name)
+            self.params = self.hidden.params + self.muLinear.params + self.sigmaLinear.params
         else:
             self.yhatLinear = Linear(num_hidden, dim_out, name, 'yhatLinear_' + name)
             self.yhatSigmoid = Sigmoid()
+            self.params = self.hidden.params + self.yhatLinear.params
 
-    def setup(x_in, **kwargs):
+    def setup(self, x_in, **kwargs):
         h_outin = self.hidden.setup(x_in)
         if self.continuous:
             mu = self.muLinear.setup(h_inout, **kwargs)

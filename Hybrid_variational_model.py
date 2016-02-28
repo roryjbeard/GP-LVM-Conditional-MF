@@ -12,7 +12,7 @@ from theano.tensor import nlinalg
 from printable import Printable
 from utils import plus, mul
 from nnet import MLP_Network
-from jitterProjected import jitterProjected
+from jitterProtect import JitterProtect
 
 from GP_LVM_CMF import SGPDV
 

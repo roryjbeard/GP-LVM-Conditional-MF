@@ -16,8 +16,10 @@ from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, s
 from Hybrid_variational_model import Hybrid_encoder
 from MLP_variational_model import MLP_variational_model
 from Hysterisis_variational_model import Hysterisis_encoder
-from jitterProjected import jitterProjected
+from jitterProtect import JitterProtect
 from printable import Printable
+from theano.tensor.shared_randomstreams import RandomStreams
+
 
 precision = th.config.floatX
 
@@ -32,12 +34,15 @@ class AutoEncoderModel(Printable):
                  decoderParameters):
 
         # set the data
-        self.y = np.asarray(data, dtype=precision)
-        self.N = self.y.shape[0]
-        self.P = self.y.shape[1]
+        data = np.asarray(data, dtype=precision)
+        self.y = th.shared(data)
+        self.N = data.shape[0]
+        self.P = data.shape[1]
         self.B = params['miniBatchSize']
+        self.Q = params['dimZ']
 
-        srng = createSrng(seed=123)
+
+        srng =  RandomStreams(125) #createSrng(seed=123)
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
@@ -56,8 +61,7 @@ class AutoEncoderModel(Printable):
 
         self.currentBatch = T.flatten(self.allBatches[self.iterator, :])
         self.currentBatch.name = 'currentBatch'
-        self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
-
+        
         self.y_miniBatch = self.y[self.currentBatch, :]
         self.y_miniBatch.name = 'y_miniBatch'
 
@@ -67,22 +71,30 @@ class AutoEncoderModel(Printable):
         self.lowerBound = -np.inf  # Lower bound
         self.lowerBounds = []
 
-        self.jitterProtector = jitterProtected()
+        self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
+
+        self.jitterProtector = JitterProtect()
         if encoderType == 'Hybrid':
             self.encoder = Hybrid_variational_model(
                 self.y_miniBatch,
                 self.B,
+                self.P,
+                self.Q,
                 self.jitterProtector,
                 encoderParameters)
         elif encoderType == 'MLP':
             self.encoder = MLP_variational_model(
-                self.y_minBatch,
+                self.y_miniBatch,
                 self.B,
+                self.P,
+                self.Q,
                 encoderParameters)
         elif encoderType == 'Hysterisis':
                 self.encoder = Hysterisis_variational_model(
-                self.y_minBatch,
+                self.y_miniBatch,
                 self.B,
+                self.P,
+                self.Q,
                 encoderParameters)
         else:
             raise RuntimeErorr('Unrecognised encoder type')

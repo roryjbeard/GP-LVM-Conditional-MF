@@ -88,15 +88,7 @@ va.constructUpdateFunction()
 
 print "Training"
 learning_rate = 1e-3
-<<<<<<< HEAD
-numberOfEpochs = 5
-=======
 numberOfEpochs = 1
-
-
-
->>>>>>> 239b2283cdf928f132f53629f00311930d891f57
-
 va.train(numberOfEpochs=numberOfEpochs, printDiagnostics=10)
 
 y_reconstr = va.create_new_data_function()

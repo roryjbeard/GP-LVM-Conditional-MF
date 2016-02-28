@@ -23,7 +23,7 @@ learning_rate = 1e-3
 
 data = x_train
 dimZ = 40
-params = {'miniBatchSize' : 200}
+params = {'miniBatchSize' : 200, 'dimZ':400}
 encoderType='MLP'
 decoderType='MLP'
 encoderParameters = {'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 1}

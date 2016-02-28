@@ -2,7 +2,7 @@
 import numpy as np
 import theano as th
 
-class jitterProjected(object):
+class JitterProtect(object):
 
     def __init__(self):
         self.jitterDefault = np.float64(0.0001)
