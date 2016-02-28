@@ -104,7 +104,7 @@ class AutoEncoderModel(Printable):
 
         if decoderType == 'MLP':
             self.decoder = MLP_likelihood_model(self.y_miniBatch,
-                decoderParameters, self.B, self.P, self.Q, encoder,
+                decoderParameters, self.B, self.P, self.Q, self.encoder,
                 params, self.srng)
         else:
             raise RuntimeError('Unrecognised decoder type')

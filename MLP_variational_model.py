@@ -11,7 +11,7 @@ import theano.tensor as T
 from printable import Printable
 
 from nnet import MLP_Network
-from utils import plus, mul
+from utils import plus, mul, exp
 
 precision = th.config.floatX
 log2pi = T.constant(np.log(2 * np.pi))
@@ -21,6 +21,8 @@ class MLP_variational_model(Printable):
 
     def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng):
 
+        self.srng = srng
+
         self.B = miniBatchSize
         numHiddenUnits_encoder = params['numHiddenUnits_encoder']
         numHiddenLayers_encoder = params['numHiddenLayers_encoder']
@@ -28,7 +30,7 @@ class MLP_variational_model(Printable):
         self.mlp_encoder = MLP_Network(dimY, dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
 
-        self.mu_encoder, self.log_sigma_encoder = self.mlp_encoder.setup(y_miniBatch, 'encoder')
+        self.mu_encoder, self.log_sigma_encoder = self.mlp_encoder.setup(y_miniBatch)
 
         alpha = self.srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
