@@ -46,10 +46,11 @@ class AutoEncoderModel(Printable):
         self.iterator.name = 'iterator'
 
         self.allBatches = T.reshape(T.concatenate((self.batchStream, self.padStream)), [self.numberofBatchesPerEpoch, self.B])
-        self.currentBatch = T.flatten(self.allBatches[self.iterator, :])
-
         self.allBatches.name = 'allBatches'
+
+        self.currentBatch = T.flatten(self.allBatches[self.iterator, :])
         self.currentBatch.name = 'currentBatch'
+        self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
 
         self.y_miniBatch = self.y[self.currentBatch, :]
         self.y_miniBatch.name = 'y_miniBatch'
@@ -57,22 +58,23 @@ class AutoEncoderModel(Printable):
         self.sample_batchStream = th.function([], self.batchStream)
         self.sample_padStream   = th.function([], self.padStream)
 
-        self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
-
         self.lowerBound = -np.inf  # Lower bound
         self.lowerBounds = []
 
-        if encoder == ''
-
         if encoderType == 'Hybrid':
             self.jitterProtector = jitterProtector()
-            self.encoder = Hybrid_encoder(
+            self.encoder = Hybrid_variational_model(
                 self.y_miniBatch,
                 self.B,
                 self.jitterProtector,
                 encoderParams)
         elif encoderType == 'MLP':
-            self.encoder = MLP_encoder(
+            self.encoder = MLP_variational_model(
+                self.y_minBatch,
+                self.B,
+                encoderParams)
+        elif encoderType == 'Hysterisis':
+                self.encoder = Hysterisis_variational_model(
                 self.y_minBatch,
                 self.B,
                 encoderParams)
@@ -92,7 +94,7 @@ class AutoEncoderModel(Printable):
         for i in range(len(self.dL)):
             self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
 
-    def epochSample(self):
+    def sample(self):
         self.sample_batchStream()
         self.sample_padStream()
 
@@ -115,10 +117,12 @@ class AutoEncoderModel(Printable):
 
         for ep in range(numberOfEpochs):
 
+            # Sample a new batch
             self.sample()
 
             for it in range(self.numberofBatchesPerEpoch):
 
+                # Sample from the encoder
                 self.encoder.sample()
                 self.iterator.set_value(it)
                 lbTmp = self.jitterProtect(self.updateFunction, reset=False)
