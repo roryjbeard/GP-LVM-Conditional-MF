@@ -26,11 +26,11 @@ class Hysteresis_variational_model(Printable):
 
         self.B = minbatchSize
 
-        numHiddenUnits_encoder = params['numHiddenUnits_encoder']
-        numHiddenLayers_encoder = params['numHiddenLayers_encoder']
+        num_units = params['numHiddenUnits_encoder']
+        num_layers = params['numHiddenLayers_encoder']
 
-        self.mlp_f_y = MLP_Network(self, dimY, dimZ,
-                numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
+        self.mlp_f_y = MLP_Network(dimY, dimZ, name='Hyster_hidden',
+                num_units=num_units, num_layers=num_layers)
         self.mu_f_y, self.log_sigma_f_y = self.mlp_f_y.setup(y_miniBatch)
 
         alpha = self.srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
@@ -39,9 +39,10 @@ class Hysteresis_variational_model(Printable):
 
         self.f = plus(self.mu_f_y, mul(T.exp(self.log_sigma_f_y*0.5), alpha), 'f')
 
-        self.mlp_z_fy = MLP_Network(self, dimY, dimZ,
-                numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
-        self.mu_qz, self.log_sigma_qz = self.mlp_z_fy.setup(T.concatenate((self.f, y_miniBatch)))
+        self.mlp_z_fy = MLP_Network(dimY, dimZ, name='Hyster_output',
+                num_units=num_units, num_layers=num_layers)
+        self.mu_qz, self.log_sigma_qz \
+            = self.mlp_z_fy.setup(T.concatenate((self.f, y_miniBatch)))
 
         beta = self.srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
         beta.name = 'beta'
@@ -49,9 +50,10 @@ class Hysteresis_variational_model(Printable):
 
         self.z = plus(self.mu_qz, mul(T.exp(self.log_sigma_qz*0.5), beta), 'z')
 
-        self.mlp_rf_yz = MLP_Network(self, (dimY+dimZ), dimZ,
-                numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
-        self.mu_rf_yz, self.log_sigma_rf_yz = self.mlp_rf_yz.setup(T.concatenate((y_miniBatch,self.z)))
+        self.mlp_rf_yz = MLP_Network((dimY+dimZ), dimZ, name='Hyster_backconstrain',
+                num_units=num_units, num_layers=num_layers)
+        self.mu_rf_yz, self.log_sigma_rf_yz \
+            = self.mlp_rf_yz.setup(T.concatenate((y_miniBatch,self.z)))
 
         self.gradientVariables = self.mlp_f_y.params + self.mlp_z_fy.params + self.mlp_rf_yz.params
 

@@ -20,17 +20,17 @@ class MLP_likelihood_model(Printable):
         self.B = miniBatchSize
         self.y_miniBatch = y_miniBatch
         
-        numHiddenUnits_decoder = params['numHiddenUnits_decoder']
-        numHiddenLayers_decoder = params['numHiddenLayers_decoder']
+        num_units  = params['numHiddenUnits_decoder']
+        num_layers = params['numHiddenLayers_decoder']
         self.continuous = params['continuous']
 
         if self.continuous:
-            self.mlp_decoder = MLP_Network(dimZ, dimY,
-                numHiddenUnits_decoder, 'decoder', num_layers=numHiddenLayers_decoder, continuous=True)
+            self.mlp_decoder = MLP_Network(dimZ, dimY, name='mlp_decoder',
+                num_units=num_units, num_layers=num_layers, continuous=True)
             self.mu_decoder, self.log_sigma_decoder = self.mlp_decoder.setup(encoder.z)
         else:
-            self.mlp_decoder = MLP_Network(dimZ, dimY,
-                numHiddenUnits_decoder, 'decoder', num_layers=numHiddenLayers_decoder, continuous=False)
+            self.mlp_decoder = MLP_Network(dimZ, dimY, name='mlp_decoder',
+                num_units=num_units, num_layers=num_layers, continuous=False)
             self.yhat = self.mlp_decoder.setup(encoder.z)
 
         self.gradientVariables = self.mlp_decoder.params

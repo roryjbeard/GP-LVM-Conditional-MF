@@ -21,33 +21,30 @@ class MLP_variational_model(Printable):
 
     def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng):
 
-        self.srng = srng
-
         self.B = miniBatchSize
-        numHiddenUnits_encoder = params['numHiddenUnits_encoder']
-        numHiddenLayers_encoder = params['numHiddenLayers_encoder']
+        num_units  = params['numHiddenUnits_encoder']
+        num_layers = params['numHiddenLayers_encoder']
 
-        self.mlp_encoder = MLP_Network(dimY, dimZ,
-                numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
+        self.mlp_encoder = MLP_Network(dimY, dimZ, name='MLP_encoder',
+                num_units=num_units, num_layers=num_layers)
 
-        self.mu_qz, self.log_sigma_qz = self.mlp_encoder.setup(y_miniBatch)
+        self.mu_qz, self.log_sigma_qz = self.mlp_encoder.setup(y_miniBatch.T)
 
-        alpha = self.srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
+        alpha = srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
         self.sample_alpha = th.function([], alpha)
 
-        self.gradientVariables = self.mlp_encoder.params
-
         self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), alpha), 'z')
 
-    def construct_L_terms(self):
-        self.H = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_qz)
+        self.gradientVariables = self.mlp_encoder.params
 
-        self.L_terms =  self.H
+    def construct_L_terms(self):
+        self.H_qz = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_qz)
+
+        self.L_terms =  self.H_qz
 
     def sample(self):
         self.sample_alpha()
-
 
 if __name__ == "__main__":
     y_miniBatch = np.ones((2,2))

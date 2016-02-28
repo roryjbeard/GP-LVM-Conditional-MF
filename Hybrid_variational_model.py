@@ -19,8 +19,8 @@ class Hybrid_variational_model(Printable):
 
     def __init__(self, y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params, srng):
 
-        HU = params['numHiddenUnits_encoder']
-        HL = params['numHiddenLayers_encoder']
+        num_units = params['numHiddenUnits_encoder']
+        num_layers = params['numHiddenLayers_encoder']
 
         self.gp_encoder = SGPDV(y_miniBatch,
                                 miniBatchSize,
@@ -30,14 +30,13 @@ class Hybrid_variational_model(Printable):
                                 params,
                                 srng)
 
-        self.srng = srng
-
-        self.mlp_encoder = MLP_Network(self, dimY, dimZ, HU, 'encoder', num_layers=HL)
+        self.mlp_encoder = MLP_Network(self, dimY, dimZ, name='Hybrid_encoder', 
+            num_units=num_units, num_layers=num_layers)
 
         self.mu_qz, self.log_sigma_qz \
             = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch)))
 
-        gamma = self.srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
+        gamma = srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
         gamma.name = 'gamma'
         self.sample_gamma = th.function([], gamma)
 

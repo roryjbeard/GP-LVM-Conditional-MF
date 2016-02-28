@@ -1,9 +1,9 @@
 '''Classes used for describing and creating neural networks'''
 
 import theano
-import theano.tensor as T
 import numpy as np
-from utils import tanh, sigmoid, softplus, exp, plus, mul, dot, sharedZeroMatrix
+from utils import tanh, sigmoid, softplus, exp, plus, dot
+from utils import sharedZeroMatrix, sharedZeroVector
 
 floatX = theano.config.floatX
 
@@ -12,8 +12,8 @@ class Linear():
     def __init__(self, dim_in, dim_out, name):
         self.dim_in  = dim_in
         self.dim_out = dim_out
-        self.W = sharedZeroMatrix(dim_in, dim_out, 'W_' + name)
-        self.b = sharedZeroMatrix(1, dim_out, 'b_' + name, broadcastable=(True, False))
+        self.W = sharedZeroMatrix(dim_out, dim_in, 'W_' + name)
+        self.b = sharedZeroVector(dim_out, 'b_' + name, broadcastable=(False, True))
         self.params = [self.W, self.b]
 
     def setup(self, x_in, **kwargs):
@@ -94,25 +94,25 @@ class NNet():
 
 class MLP_Network():
 
-    def __init__(self, dim_in, dim_out, num_hidden, name, num_layers=1, continuous=True, nonlinearity=Softplus):
+    def __init__(self, dim_in, dim_out, name='', num_units=10, num_layers=1, continuous=True, nonlinearity=Softplus):
 
         self.nonlinearity = nonlinearity()
         self.name = name
         self.continuous = continuous
         self.hidden = NNet()
-        self.hidden.addLayer(Linear(dim_in, num_hidden,'hidden_'+str(0)+'_'+name))
+        self.hidden.addLayer(Linear(dim_in, num_units,'hidden_'+str(0)+'_'+name))
         self.hidden.addLayer(self.nonlinearity)
 
         for i in range(1,num_layers):
-            self.hidden.addLayer(Linear(num_hidden, num_hidden, 'hidden_'+str(i)+'_'+name))
+            self.hidden.addLayer(Linear(num_units, num_units, 'hidden_'+str(i)+'_'+name))
             self.hidden.addLayer(self.nonlinearity)
 
         if self.continuous:
-            self.muLinear = Linear(num_hidden, dim_out, 'muLinear_' + name)
-            self.logsigmaLinear = Linear(num_hidden, dim_out, 'logsigmaLinear_' + name)
+            self.muLinear = Linear(num_units, dim_out, 'muLinear_' + name)
+            self.logsigmaLinear = Linear(num_units, dim_out, 'logsigmaLinear_' + name)
             self.params = self.hidden.params + self.muLinear.params + self.logsigmaLinear.params
         else:
-            self.yhatLinear = Linear(num_hidden, dim_out, name, 'yhatLinear_' + name)
+            self.yhatLinear = Linear(num_units, dim_out, name, 'yhatLinear_' + name)
             self.yhatSigmoid = Sigmoid()
             self.params = self.hidden.params + self.yhatLinear.params
 
