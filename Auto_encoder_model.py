@@ -13,6 +13,10 @@ from optimisers import Adam
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
 from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus
+from Hybrid_variational_model import MLP_encoder
+from MLP_variational_model import MLP_variational_model
+from Hysterisis_variational_model import Hysterisis_encoder
+from jitterProjected import jitterProjected
 
 precision = th.config.floatX
 
@@ -29,7 +33,7 @@ class AutoEncoderModel(Printable):
         # set the data
         data = np.asarray(data, dtype=precision)
         self.N = data.shape[0]
-        self.P = data.shape[1] 
+        self.P = data.shape[1]
         self.B = params['miniBatchSize']
 
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
@@ -61,28 +65,28 @@ class AutoEncoderModel(Printable):
         self.lowerBound = -np.inf  # Lower bound
         self.lowerBounds = []
 
-        self.jitterProtector = jitterProtector()
+        self.jitterProtector = jitterProtected()
         if encoderType == 'Hybrid':
             self.encoder = Hybrid_variational_model(
                 self.y_miniBatch,
                 self.B,
                 self.jitterProtector,
-                encoderParams)
+                encoderParameters)
         elif encoderType == 'MLP':
             self.encoder = MLP_variational_model(
                 self.y_minBatch,
                 self.B,
-                encoderParams)
+                encoderParameters)
         elif encoderType == 'Hysterisis':
                 self.encoder = Hysterisis_variational_model(
                 self.y_minBatch,
                 self.B,
-                encoderParams)
+                encoderParameters)
         else:
             raise RuntimeErorr('Unrecognised encoder type')
 
         if decoderType == 'MLP':
-            self.decoder(decoderParams, self.y_miniBatch, decoderParams)
+            self.decoder(decoderParameters, self.y_miniBatch, decoderParameters)
         else:
             raise RuntimeErorr('Unrecognised decoder type')
 
@@ -186,3 +190,33 @@ class AutoEncoderModel(Printable):
                 c += 1
 
         return np_log_mean_exp_stable(ll)
+
+
+if __name__ == "__main__":
+
+    params['miniBatchSize'] = 2
+    data = np.ones((10,2))
+    encoderType = 'MLP'
+    encoderParameters['numHiddenUnits_encoder'] = 10
+    encoderParameters['numHiddenLayers_encoder'] = 1
+    decoderType = 'MLP'
+    decoderParameters['numHiddenUnits_decoder'] = 10
+    decoderParameters['numHiddenLayers_decoder'] = 1
+    ae = AutoEncoderModel(
+                 data,
+                 params,
+                 encoderType,        #MLP, Hybrid
+                 encoderParameters,
+                 decoderType,        #MLP_decoder_moder, IBP_factor
+                 decoderParameters)
+
+    ae.sample()
+
+    ae.construct_L_dL_functions()
+
+
+
+
+
+
+

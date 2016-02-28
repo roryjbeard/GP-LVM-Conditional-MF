@@ -65,3 +65,23 @@ class Hysterisis_encoder(Printable):
         self.mlp_f_y.randomise()
         self.mlp_z_fy.randomise()
         self.mlp_rf_yz.randomise()
+
+
+if __name__ == "__main__":
+    params['numHiddenUnits_encoder'] = 10
+    params['numHiddenLayers_encoder'] = 1
+    y_miniBatch = np.ones((2,2))
+    miniBatchSize = 2
+    jitterProtect = jitterProjected()
+    dimY = 2
+    dimZ = 2
+
+    hyst = Hysterisis_encoder(y_miniBatch, minbatchSize, dimY, dimZ, params)
+
+    hyst.construct_L_terms()
+    hyst.sample()
+    hyst.randomise()
+
+
+
+

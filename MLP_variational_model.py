@@ -12,23 +12,24 @@ from theano.tensor import nlinalg
 
 from testTools import checkgrad
 from utils import log_mean_exp_stable
+import nnet
 
 precision = th.config.floatX
 
 class MLP_variational_model(Printable):
 
-    def __init__(self, y_miniBatch, minBatchSize, dimY, dimZ, params):
+    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params):
 
-    	self.B = minBatchSize
+    	self.B = miniBatchSize
 
     	numHiddenUnits_encoder = params['numHiddenUnits_encoder']
         numHiddenLayers_encoder = params['numHiddenLayers_encoder']
- 
+
         self.mlp_encoder = MLP_Network(self, dimY, dimZ,
                 numHiddenUnits_encoder, 'encoder', num_layers=numHiddenLayers_encoder)
 
         self.mu_encoder, self.log_sigma_encoder = self.mlp_encoder.setup(y_miniBatch)
-         
+
         alpha = srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
         self.sample_alpha = th.function([], alpha)
@@ -43,7 +44,19 @@ class MLP_variational_model(Printable):
     def sample(self):
         self.sample_alpha()
 
-        
+
+if __name__ == "__main__":
+    y_miniBatch = np.ones((2,2))
+    miniBatchSize = 2
+    dimY = 2
+    dimZ = 2
+    enc_params['numHiddenUnits_encoder'] = 10
+    enc_params['numHiddenLayers_encoder'] = 1
+
+    encoder = MLP_variational_model(y_miniBatch, miniBatchSize, dimY, dimZ, enc_params)
+
+    encoder.construct_L_terms()
+    encoder.sample()
 
 
 
@@ -51,5 +64,6 @@ class MLP_variational_model(Printable):
 
 
 
- 
+
+
 

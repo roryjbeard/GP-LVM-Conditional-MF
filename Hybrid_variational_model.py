@@ -12,14 +12,13 @@ from theano.tensor import nlinalg
 from printable import Printable
 from utils import plus, mul
 import nnet
+from jitterProjected import jitterProjected
 
 from GP_LVM_CMF import SGPDV
 
 class Hybrid_encoder(Printable):
 
-    def __init__(
-
-        def __init__(self, y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params):
+    def __init__(self, y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params):
 
         HU = params['numHiddenUnits_encoder']
         HL = params['numHiddenLayers_encoder']
@@ -59,5 +58,21 @@ class Hybrid_encoder(Printable):
     def randomise(self):
         self.gp_encoder.randomise()
         self.mlp_encoder.randomise()
+
+
+if __name__ == "__main__":
+    params['numHiddenUnits_encoder'] = 10
+    params['numHiddenLayers_encoder'] = 1
+    y_miniBatch = np.ones((2,2))
+    miniBatchSize = 2
+    jitterProtect = jitterProjected()
+    dimY = 2
+    dimZ = 2
+
+    hybrid = Hybrid_encoder(y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params)
+
+    hybrid.construct_L_terms()
+    hybrid.sample()
+    hybrid.randomise()
 
 

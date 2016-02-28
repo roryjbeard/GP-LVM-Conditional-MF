@@ -53,3 +53,28 @@ class MLP_likelihood_model(Printable):
     def randomise(self):
         self.mlp_decoder.randomise()
 
+
+if __name__ == "__main__":
+    enc_params['numHiddenUnits_encoder'] = 10
+    enc_params['numHiddenLayers_encoder'] = 1
+    enc_params['continuous'] = True
+    y_miniBatch = np.ones((2,2))
+    miniBatchSize = 2
+    dimY = 2
+    dimZ = 2
+
+    from MLP_variational_model import MLP_variational_model
+    encoder = MLP_variational_model(y_miniBatch, minBatchSize, dimY, dimZ, enc_params)
+
+    dec_params['numHiddenUnits_decoder'] = 10
+    dec_params['numHiddenLayers_decoder'] = 1
+
+    decoder = MLP_likelihood_model(y_miniBatch, miniBatchSize, dimY, dimZ, encoder, dec_params)
+
+    decoder.construct_L_terms()
+    decoder.randomis()
+
+
+
+
+
