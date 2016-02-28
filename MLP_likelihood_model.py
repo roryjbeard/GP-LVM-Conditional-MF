@@ -42,7 +42,7 @@ class MLP_likelihood_model(Printable):
                    - self.B
 
         if self.continuous:
-            self.log_pyz = T.sum( -(0.5*log2pi + T.sum(self.log_sigma_decoder)) \
+            self.log_pyz = T.sum( -(0.5*log2pi + self.log_sigma_decoder) \
             - 0.5 * ((y_miniBatch.T - self.mu_decoder) / T.exp(self.log_sigma_decoder))**2 )
         else:
             self.log_pyz = -T.nnet.binary_crossentropy(self.mu_decoder, y_miniBatch).sum()
