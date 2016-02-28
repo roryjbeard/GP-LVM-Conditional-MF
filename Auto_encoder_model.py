@@ -11,7 +11,7 @@ import theano.tensor as T
 
 from optimisers import Adam
 from utils import createSrng, np_log_mean_exp_stable
-from Hybrid_variational_model import Hybrid_variational_model
+from Hybrid_variational_model import Hybrid_encoder
 from MLP_variational_model import MLP_variational_model
 from MLP_likelihood_model import MLP_likelihood_model
 from Hysterisis_variational_model import Hysterisis_encoder
@@ -41,7 +41,7 @@ class AutoEncoderModel(Printable):
         self.Q = params['dimZ']
 
 
-        self.srng =  RandomStreams(125) #createSrng(seed=123)
+        self.srng = createSrng(seed=123)
 
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
