@@ -8,8 +8,8 @@ Created on Thu Feb  4 20:44:40 2016
 import numpy as np
 import theano as th
 import theano.tensor as T
-from printable import printable
-from utils import plus, div
+from printable import Printable
+from utils import plus, div, exp
 
 log2pi = np.log(2 * np.pi)
 
@@ -36,10 +36,14 @@ class MLP_likelihood_model(Printable):
 
     def construct_L_terms(self, encoder):
 
-        self.KL_qp = 0.5*(T.sum(T.exp(encoder.log_simga_qz_fy*2))) \
-                   + 0.5 * T.sum(encoder.mu_qz_fy**2) \
-                   - T.sum(encoder.log_simga_qz_fy)
-                   - self.B
+        # self.KL_qp = 0.5*(T.sum(exp(encoder.log_simga_qz_fy*2))) \
+        #            + 0.5 * T.sum(encoder.mu_qz_fy**2) \
+        #            - T.sum(encoder.log_simga_qz_fy) \
+        #            - self.B
+
+        self.KL_qp = plus(0.5*(T.sum(exp(encoder.log_simga_qz_fy*2))),
+                        plus(0.5 * T.sum(encoder.mu_qz_fy**2),
+                        minus(plus(T.sum(encoder.log_simga_qz_fy) ,self.B))))
 
         if self.continuous:
             self.log_pyz = T.sum( -(0.5*log2pi + self.log_sigma_decoder) \
@@ -54,9 +58,7 @@ class MLP_likelihood_model(Printable):
 
 
 if __name__ == "__main__":
-    enc_params['numHiddenUnits_encoder'] = 10
-    enc_params['numHiddenLayers_encoder'] = 1
-    enc_params['continuous'] = True
+    enc_params = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1, 'continuous' : True}
     y_miniBatch = np.ones((2,2))
     miniBatchSize = 2
     dimY = 2
@@ -65,8 +67,7 @@ if __name__ == "__main__":
     from MLP_variational_model import MLP_variational_model
     encoder = MLP_variational_model(y_miniBatch, minBatchSize, dimY, dimZ, enc_params)
 
-    dec_params['numHiddenUnits_decoder'] = 10
-    dec_params['numHiddenLayers_decoder'] = 1
+    dec_params = {'numHiddenUnits_decoder' : 10, 'numHiddenLayers_decoder : 1'}
 
     decoder = MLP_likelihood_model(y_miniBatch, miniBatchSize, dimY, dimZ, encoder, dec_params)
 

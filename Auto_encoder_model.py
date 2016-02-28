@@ -13,10 +13,11 @@ from optimisers import Adam
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
 from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus
-from Hybrid_variational_model import MLP_encoder
+from Hybrid_variational_model import Hybrid_encoder
 from MLP_variational_model import MLP_variational_model
 from Hysterisis_variational_model import Hysterisis_encoder
 from jitterProjected import jitterProjected
+from printable import Printable
 
 precision = th.config.floatX
 
@@ -197,11 +198,9 @@ if __name__ == "__main__":
     params['miniBatchSize'] = 2
     data = np.ones((10,2))
     encoderType = 'MLP'
-    encoderParameters['numHiddenUnits_encoder'] = 10
-    encoderParameters['numHiddenLayers_encoder'] = 1
+    encoderParameters = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1}
     decoderType = 'MLP'
-    decoderParameters['numHiddenUnits_decoder'] = 10
-    decoderParameters['numHiddenLayers_decoder'] = 1
+    decoderParameters = {'numHiddenUnits_decoder' : 10, 'numHiddenLayers_decoder' : 1}
     ae = AutoEncoderModel(
                  data,
                  params,

@@ -9,6 +9,7 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 from theano.tensor import nlinalg
+from printable import Printable
 
 from testTools import checkgrad
 from utils import log_mean_exp_stable
@@ -52,8 +53,7 @@ if __name__ == "__main__":
     miniBatchSize = 2
     dimY = 2
     dimZ = 2
-    enc_params['numHiddenUnits_encoder'] = 10
-    enc_params['numHiddenLayers_encoder'] = 1
+    enc_params = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1}
 
     encoder = MLP_variational_model(y_miniBatch, miniBatchSize, dimY, dimZ, enc_params)
 

@@ -4,13 +4,12 @@ import theano as th
 
 class jitterProjected(object):
 
-	def __init__(self):
-		self.jitterDefault = np.float64(0.0001)
+    def __init__(self):
+        self.jitterDefault = np.float64(0.0001)
         self.jitterGrowthFactor = np.float64(1.1)
-        self.jitter = th.shared(np.asarray(self.jitterDefault, dtype='float64'), name='jitter') 
+        self.jitter = th.shared(np.asarray(self.jitterDefault, dtype='float64'), name='jitter')
 
     def jitterProtect(self, func, reset=True):
-
         passed = False
         while not passed:
             try:

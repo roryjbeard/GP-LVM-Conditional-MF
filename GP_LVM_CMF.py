@@ -8,8 +8,8 @@ from theano.tensor.shared_randomstreams import RandomStreams
 import time
 import collections
 from myCond import myCond
-from printable import printable
-import nnet
+from printable import Printable
+from nnet import MLP_Network
 
 from utils import cholInvLogDet, sharedZeroArray, sharedZeroMatrix, sharedZeroVector, \
     np_log_mean_exp_stable, diagCholInvLogDet_fromLogDiag, diagCholInvLogDet_fromDiag, \
@@ -76,7 +76,7 @@ class kernelFactory(object):
 srng = RandomStreams(seed=234)
 
 
-class SGPDV(printable):
+class SGPDV(Printable):
 
     def __init__(self,
                  y_miniBatch,
@@ -165,7 +165,7 @@ class SGPDV(printable):
 
     def construct_rX(z):
 
-        self.rfXf_mlp = MLP_Network(self.Q + self.P, self.Q + self.R, 1, self.H, Softplus, 'rfXf'):
+        self.rfXf_mlp = MLP_Network(self.Q + self.P, self.Q + self.R, 1, self.H, Softplus, 'rfXf')
         self.mu_rfXf, self.log_sigma_rfXf = self.rfXf_mlp.setup(T.concatenate((z.T, self.y_miniBatch.T)))
         self.gradientVariables.extend(self.rfXf_mlp.params)
 
@@ -185,20 +185,20 @@ class SGPDV(printable):
         fX_m_mu = minus(fXf, self.mu_rfXf)
 
         self.log_rfXf_zy = -0.5 * (self.R+self.Q) * self.B * log2pi \
-            - T.sum(self.log_sigma_rfXf)
+            - T.sum(self.log_sigma_rfXf) \
             - 0.5 * T.sum( div(fX_m_mu**2, T.exp(2*self.log_sigma_rfXf)))
 
         self.log_rfXf_zy.name = 'log_rfXf_zy'
 
         self.L_terms = plus(self.H_qX, plus(self.H_qf_Xf, self.log_r_fXf_zy))
 
-    def randomise(self, sig=1, srng):
+    def randomise(self, srng, sig=1):
 
         def rnd(var):
             if type(var) == np.ndarray:
                 return np.asarray(sig * srng.random.randn(*var.shape), dtype=precision)
             elif type(var) == T.sharedvar.TensorSharedVariable:
-                elif var.name.endswith('sqrt'):
+                if var.name.endswith('sqrt'):
                     print 'setting ' + var.name + ' to Identity'
                     n = var.get_value().shape[0]
                     var.set_value(np.eye(n))

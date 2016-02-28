@@ -21,29 +21,29 @@ def srng(seed=123):
     return MRG_RandomStreams(seed=seed)
 
 def invLogDet( C ):
-    # Return inv(A) and log det A where A = C . C^T 
+    # Return inv(A) and log det A where A = C . C^T
     iC = nlinalg.matrix_inverse(C)
     iC.name = 'i' + C.name
     iA = T.dot(iC.T, iC)
-    iA.name = 'i' + C.name[1:]        
+    iA.name = 'i' + C.name[1:]
     logDetA = 2.0*T.sum(T.log(T.abs_(T.diag(C))))
-    logDetA.name = 'logDet' + C.name[1:]    
+    logDetA.name = 'logDet' + C.name[1:]
     return(iA, logDetA)
-    
+
 def jitterChol(A, dim, jitter):
 
     A_jitter = A + jitter * T.eye(dim)
-    
+
     cA = myCholesky()(A_jitter)
     cA.name = 'c' + A.name
 
     return cA
-    
+
 def cholInvLogDet(A, dim, jitter, fast=False):
 
     A_jitter = A + jitter * T.eye(dim)
     cA = myCholesky()(A_jitter)
-    cA.name = 'c' + A.name 
+    cA.name = 'c' + A.name
 
     if fast:
         (iA,logDetA) = invLogDet(cA)
@@ -55,7 +55,7 @@ def cholInvLogDet(A, dim, jitter, fast=False):
         logDetA.name = 'logDet' + A.name
 
     return(cA, iA, logDetA)
-    
+
 def diagCholInvLogDet_fromLogDiag(logdiag, name):
 
     diag = T.diag(T.exp(logdiag.flatten()))
@@ -67,11 +67,11 @@ def diagCholInvLogDet_fromLogDiag(logdiag, name):
     chol.name = 'c' + name
     inv.name = 'i' + name
     logDet.name = 'logDet' + name
-    
+
     return(diag,chol,inv,logDet)
-    
+
 def diagCholInvLogDet_fromDiag(diag_vec, name):
-    
+
     diag_mat = T.diag(diag_vec.flatten())
     inv  = T.diag(1.0/diag_vec.flatten())
     chol = T.diag(T.sqrt(diag_vec.flatten()))
@@ -156,6 +156,9 @@ def div(A, B, name=None):
     C.name = inName(A, B, ' / ', name)
     return C
 
+def exp(A, name=None):
+    return namedFunction(A, T.exp, 'exp', name)
+
 def softplus(A, name=None):
     return namedFunction(A, T.nnet.softplus, 'softplus', name)
 
@@ -174,7 +177,7 @@ def namedFunction(A, func, funcname, name):
         Aname = getname(A)
         B.name = funcname + '(' + Aname + ')'
     else:
-        B.name = name 
+        B.name = name
     return B
 
 def conditionNumber(M):

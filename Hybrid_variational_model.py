@@ -11,7 +11,7 @@ import theano.tensor as T
 from theano.tensor import nlinalg
 from printable import Printable
 from utils import plus, mul
-import nnet
+from nnet import MLP_Network
 from jitterProjected import jitterProjected
 
 from GP_LVM_CMF import SGPDV
@@ -61,8 +61,7 @@ class Hybrid_encoder(Printable):
 
 
 if __name__ == "__main__":
-    params['numHiddenUnits_encoder'] = 10
-    params['numHiddenLayers_encoder'] = 1
+    params = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1}
     y_miniBatch = np.ones((2,2))
     miniBatchSize = 2
     jitterProtect = jitterProjected()

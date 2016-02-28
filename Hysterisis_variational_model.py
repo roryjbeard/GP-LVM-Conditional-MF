@@ -68,8 +68,7 @@ class Hysterisis_encoder(Printable):
 
 
 if __name__ == "__main__":
-    params['numHiddenUnits_encoder'] = 10
-    params['numHiddenLayers_encoder'] = 1
+    params = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1}
     y_miniBatch = np.ones((2,2))
     miniBatchSize = 2
     jitterProtect = jitterProjected()
