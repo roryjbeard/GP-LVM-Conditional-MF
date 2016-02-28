@@ -3,6 +3,8 @@ import theano as th
 from theano import tensor as T
 from theano.tensor import nlinalg, slinalg
 from fastlin.myCholesky import myCholesky
+from theano.sandbox.rng_mrg import MRG_RandomStreams
+from theano.tensor.shared_randomstreams import RandomStreams
 
 def t_repeat(x, num_repeats, axis):
     '''Repeats x along an axis num_repeats times. Axis has to be 0 or 1, x has to be a matrix.'''
@@ -17,8 +19,9 @@ def t_repeat(x, num_repeats, axis):
             return T.alloc(x.dimshuffle(0, 'x', 1), x.shape[0], num_repeats, x.shape[1]).reshape((x.shape[0], num_repeats*x.shape[1]))
 
 
-def srng(seed=123):
-    return MRG_RandomStreams(seed=seed)
+def createSrng(seed=123):
+    # return MRG_RandomStreams(seed=seed) # this one works on GPU
+    return RandomStreams(seed=seed) # only works on CPU
 
 def invLogDet( C ):
     # Return inv(A) and log det A where A = C . C^T

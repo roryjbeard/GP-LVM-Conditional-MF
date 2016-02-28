@@ -12,7 +12,7 @@ import theano.tensor as T
 from optimisers import Adam
 from GP_LVM_CMF import SGPDV
 from testTools import checkgrad
-from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus
+from utils import log_mean_exp_stable, dot, trace, softplus, sharedZeroVector, sharedZeroMatrix, plus, createSrng
 from Hybrid_variational_model import Hybrid_encoder
 from MLP_variational_model import MLP_variational_model
 from Hysterisis_variational_model import Hysterisis_encoder
@@ -32,11 +32,12 @@ class AutoEncoderModel(Printable):
                  decoderParameters):
 
         # set the data
-        data = np.asarray(data, dtype=precision)
-        self.N = data.shape[0]
-        self.P = data.shape[1]
+        self.y = np.asarray(data, dtype=precision)
+        self.N = self.y.shape[0]
+        self.P = self.y.shape[1]
         self.B = params['miniBatchSize']
 
+        srng = createSrng(seed=123)
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
