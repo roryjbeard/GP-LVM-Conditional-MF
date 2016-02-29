@@ -9,7 +9,7 @@ import numpy as np
 import theano as th
 import theano.tensor as T
 
-from optimisers import Adam
+#from optimisers import Adam
 from utils import createSrng, np_log_mean_exp_stable
 from Hybrid_variational_model import Hybrid_variational_model
 from MLP_variational_model import MLP_variational_model
@@ -18,8 +18,11 @@ from Hysteresis_variational_model import Hysteresis_variational_model
 from jitterProtect import JitterProtect
 from printable import Printable
 import time as time
-import collections
-from theano.compile.nanguardmode import NanGuardMode
+#import collections
+#from theano.compile.nanguardmode import NanGuardMode
+import lasagne
+
+
 
 precision = th.config.floatX
 
@@ -80,9 +83,9 @@ class AutoEncoderModel(Printable):
                 self.B,
                 self.P,
                 self.Q,
-                self.jitterProtector,
                 encoderParameters,
-                self.srng)
+                self.srng,
+                self.jitterProtector)
         elif encoderParameters['Type'] == 'MLP':
             self.encoder = MLP_variational_model(
                 self.y_miniBatch,
@@ -91,7 +94,7 @@ class AutoEncoderModel(Printable):
                 self.Q,
                 encoderParameters,
                 self.srng)
-        elif encoderParameters['Type'] == 'Hysterisis':
+        elif encoderParameters['Type'] == 'Hysteresis':
                 self.encoder = Hysteresis_variational_model(
                 self.y_miniBatch,
                 self.B,
@@ -117,6 +120,9 @@ class AutoEncoderModel(Printable):
         self.dL = T.grad(self.L, self.gradientVariables)
         for i in range(len(self.dL)):
             self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
+        
+        self.sample_batchStream()
+        self.sample_padStream()
         
         # Initialise the variables in the networks
         rnd = np.random.RandomState(seed=numpyRandomSeed)
@@ -189,21 +195,36 @@ class AutoEncoderModel(Printable):
 
     def constructUpdateFunction(self, learning_rate=0.001, beta_1=0.99, beta_2=0.999, profile=False):
 
-        gradColl = collections.OrderedDict([(param, T.grad(self.L, param)) for param in self.gradientVariables])
+#        gradColl = collections.OrderedDict([(param, T.grad(self.L, param)) for param in self.gradientVariables])
+#
+#        self.optimiser = Adam(self.gradientVariables, learning_rate, beta_1, beta_2)
+#
+#        updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
+#
+#        # Get the update function to also return the bound!
+#        self.updateFunction = th.function([],
+#                                          self.L,
+#                                          updates=updates,
+#                                          no_default_updates=True,
+#                                          profile=profile),
+#                                          #mode=NanGuardMode(nan_is_error=True,
+#                                          #                  inf_is_error=True, 
+#                                          #                  big_is_error=True))
+##
 
-        self.optimiser = Adam(self.gradientVariables, learning_rate, beta_1, beta_2)
+        grads = T.grad(-self.L, self.gradientVariables)
+        clip_grad = 1
+        max_norm = 5
+        mgrads = lasagne.updates.total_norm_constraint(grads,max_norm=max_norm)
+        cgrads = [T.clip(g,-clip_grad, clip_grad) for g in mgrads]
+        
+        updates = lasagne.updates.adam(cgrads, self.gradientVariables, learning_rate=learning_rate)
 
-        updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
-
-        # Get the update function to also return the bound!
         self.updateFunction = th.function([],
-                                          self.L,
-                                          updates=updates,
-                                          no_default_updates=True,
-                                          profile=profile,
-                                          mode=NanGuardMode(nan_is_error=True,
-                                                            inf_is_error=True, 
-                                                            big_is_error=True))
+                                      self.L,
+                                      updates=updates,
+                                      no_default_updates=True)
+
 
     def construct_L_dL_functions(self):
         self.L_func = th.function([], self.L, no_default_updates=True)

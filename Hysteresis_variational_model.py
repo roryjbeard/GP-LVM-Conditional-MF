@@ -32,7 +32,7 @@ class Hysteresis_variational_model(Printable):
 
         self.mlp_f_y = MLP_Network(dimY, dimZ, name='Hyster_hidden',
                 num_units=num_units, num_layers=num_layers)
-        self.mu_f_y, self.log_sigma_f_y = self.mlp_f_y.setup(y_miniBatch)
+        self.mu_f_y, self.log_sigma_f_y = self.mlp_f_y.setup(y_miniBatch.T)
 
         alpha = self.srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
         alpha.name = 'alpha'
@@ -40,10 +40,10 @@ class Hysteresis_variational_model(Printable):
 
         self.f = plus(self.mu_f_y, mul(T.exp(self.log_sigma_f_y*0.5), alpha), 'f')
 
-        self.mlp_z_fy = MLP_Network(dimY, dimZ, name='Hyster_output',
+        self.mlp_z_fy = MLP_Network(dimY+dimZ, dimZ, name='Hyster_output',
                 num_units=num_units, num_layers=num_layers)
         self.mu_qz, self.log_sigma_qz \
-            = self.mlp_z_fy.setup(T.concatenate((self.f, y_miniBatch)))
+            = self.mlp_z_fy.setup(T.concatenate((self.f, y_miniBatch.T)))
 
         beta = self.srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
         beta.name = 'beta'
@@ -54,7 +54,7 @@ class Hysteresis_variational_model(Printable):
         self.mlp_rf_yz = MLP_Network((dimY+dimZ), dimZ, name='Hyster_backconstrain',
                 num_units=num_units, num_layers=num_layers)
         self.mu_rf_yz, self.log_sigma_rf_yz \
-            = self.mlp_rf_yz.setup(T.concatenate((y_miniBatch,self.z)))
+            = self.mlp_rf_yz.setup(T.concatenate((y_miniBatch.T,self.z)))
 
         self.gradientVariables = self.mlp_f_y.params + self.mlp_z_fy.params + self.mlp_rf_yz.params
 
@@ -75,10 +75,10 @@ class Hysteresis_variational_model(Printable):
         self.sample_alpha()
         self.sample_beta()
 
-    def randomise(self):
-        self.mlp_f_y.randomise()
-        self.mlp_z_fy.randomise()
-        self.mlp_rf_yz.randomise()
+    def randomise(self, rnd):
+        self.mlp_f_y.randomise(rnd)
+        self.mlp_z_fy.randomise(rnd)
+        self.mlp_rf_yz.randomise(rnd)
 
 
 if __name__ == "__main__":
@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     srng = createSrng(seed=123)
 
-    hyst = Hysterisis_encoder(y_miniBatch, miniBatchSize, dimY, dimZ,  params)
+    hyst = Hysteresis_variational_model(y_miniBatch, miniBatchSize, dimY, dimZ,  params)
 
     hyst.construct_L_terms()
     hyst.sample()

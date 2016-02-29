@@ -205,7 +205,7 @@ def log_elementwiseNormal(x, mu, log_sigma, name):
     lg.name = name
     return lg
 
-def elementwiseNormalEntropy(log_sigma, name, numberOfElements):
+def elementwiseNormalEntropy(log_sigma, numberOfElements, name):
     H = numberOfElements * 0.5 * (1+log2pi) + T.sum(log_sigma)
     H.name = name
     return H

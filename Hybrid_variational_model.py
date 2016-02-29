@@ -17,7 +17,7 @@ from GP_LVM_CMF import SGPDV
 
 class Hybrid_variational_model(Printable):
 
-    def __init__(self, y_miniBatch, minbatchSize, jitterProtect, dimY, dimZ, params, srng):
+    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng, jitterProtect):
 
         num_units = params['numHiddenUnits_encoder']
         num_layers = params['numHiddenLayers_encoder']
@@ -30,11 +30,11 @@ class Hybrid_variational_model(Printable):
                                 params,
                                 srng)
 
-        self.mlp_encoder = MLP_Network(self, dimY, dimZ, name='Hybrid_encoder', 
+        self.mlp_encoder = MLP_Network(dimY+dimZ, dimZ, name='Hybrid_encoder', 
             num_units=num_units, num_layers=num_layers)
 
         self.mu_qz, self.log_sigma_qz \
-            = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch)))
+            = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch),axis=1).T)
 
         gamma = srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
         gamma.name = 'gamma'
@@ -42,7 +42,7 @@ class Hybrid_variational_model(Printable):
 
         self.z = plus(self.mu_qz, mul(T.exp(self.log_sigma_qz), gamma), 'z')
 
-        self.construct_rfXf(self.z)
+        self.gp_encoder.construct_rfXf(self.z)
 
         self.gradientVariables = self.mlp_encoder.params + self.gp_encoder.gradientVariables
 
@@ -58,11 +58,11 @@ class Hybrid_variational_model(Printable):
     def sample(self):
         self.gp_encoder.sample_alpha()
         self.gp_encoder.sample_beta()
-        self.gamma.sample()
+        self.sample_gamma()
 
     def randomise(self, rnd):
-        self.gp_encoder.randomise()
-        self.mlp_encoder.randomise()
+        self.gp_encoder.randomise(rnd)
+        self.mlp_encoder.randomise(rnd)
         self.gp_encoder.init_Xu_from_Xf()
 
 

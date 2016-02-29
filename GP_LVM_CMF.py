@@ -91,7 +91,7 @@ class SGPDV(Printable):
         self.B = miniBatchSize
         self.R = params['dimX']
         self.M = params['numberOfInducingPoints']
-        self.H = params['numberOfEncoderHiddenUnits']
+        self.H = params['numHiddenUnits_encoder']
         kernelType = params['kernelType']
 
         if kernelType == 'RBF':
@@ -118,8 +118,9 @@ class SGPDV(Printable):
         self.sample_alpha = th.function([], alpha)
         self.sample_beta = th.function([], beta)
 
-        self.mlp_qX = MLP_Network(self.P, self.R, self.H, 'qX')
-        self.mu_qX, self.log_sigma_qX = self.mlp1_qX.setup(self.y_miniBatch.T)
+        self.mlp_qX = MLP_Network(self.P, self.R, 'qX',
+                                  num_units=self.H)
+        self.mu_qX, self.log_sigma_qX = self.mlp_qX.setup(self.y_miniBatch.T)
 
         # Variational distribution q(u)
         self.kappa = sharedZeroMatrix(self.M, self.Q, 'kappa')
@@ -128,13 +129,13 @@ class SGPDV(Printable):
 
         # Calculate latent co-ordinates Xf
         # [BxR]  = [BxR] + [BxB] . [BxR]
-        self.Xf = self.mu_qX.T + T.exp(self.log_sigma_qX).T * self.alpha
+        self.Xf = self.mu_qX.T + T.exp(self.log_sigma_qX).T * alpha
         self.Xf_get_value = th.function([], self.Xf, no_default_updates=True)
         # Inducing points co-ordinates
         self.Xu = sharedZeroMatrix(self.M, self.R, 'Xu')
 
         # Kernels
-        self.Kzz = kfactory.kernel(self.Xf, None,    self.log_theta, 'Kff')
+        self.Kff = kfactory.kernel(self.Xf, None,    self.log_theta, 'Kff')
         self.Kuu = kfactory.kernel(self.Xu, None,    self.log_theta, 'Kuu')
         self.Kfu = kfactory.kernel(self.Xf, self.Xu, self.log_theta, 'Kfu')
         self.cKuu, self.iKuu, self.logDetKuu = cholInvLogDet(
@@ -151,21 +152,23 @@ class SGPDV(Printable):
             = cholInvLogDet(self.Sigma, self.B, jitterProtect.jitter)
         self.mu = dot(self.A, self.kappa, 'mu')
         # Sample f from q(f|X) = N(mu, Sigma)
-        self.f = plus(self.mu, (dot(self.cSigma, self.beta)), 'f')
+        self.f = plus(self.mu, (dot(self.cSigma, beta)), 'f')
 
         # Gradient variables - should be all the th.shared variables
-        self.gradientVariables.extend(self.mlp1_qX.params)
+        self.gradientVariables = [];
+        self.gradientVariables.extend(self.mlp_qX.params)
         self.gradientVariables.extend([self.kappa, self.Kappa_sqrt, self.Xu, self.kappa, self.log_theta])
 
         self.Kappa_conditionNumber = conditionNumber(self.kappa)
         self.Kuu_conditionNumber   = conditionNumber(self.Kuu)
         self.Sigma_conditionNumber = conditionNumber(self.Sigma)
 
-    def construct_rX(self, z):
+    def construct_rfXf(self, z):
 
-        self.rfXf_mlp = MLP_Network(self.Q + self.P, self.Q + self.R, 1, self.H, 'rfXf')
-        self.mu_rfXf, self.log_sigma_rfXf = self.rfXf_mlp.setup(T.concatenate((z.T, self.y_miniBatch.T)))
-        self.gradientVariables.extend(self.rfXf_mlp.params)
+        self.mlp_r_fXf = MLP_Network(self.Q + self.P, self.Q + self.R, 'rfXf',
+                                    num_units=self.H)
+        self.mu_r_fXf, self.log_sigma_r_fXf = self.mlp_r_fXf.setup(T.concatenate((z, self.y_miniBatch.T)))
+        self.gradientVariables.extend(self.mlp_r_fXf.params)
 
     def construct_L_terms(self):
 
@@ -180,13 +183,13 @@ class SGPDV(Printable):
         # [(Q+R)xB] = [[BxQ],[BxR]]^T
         fXf = T.concatenate((self.f, self.Xf), axis=1).T
 
-        fX_m_mu = minus(fXf, self.mu_rfXf)
+        fX_m_mu = minus(fXf, self.mu_r_fXf)
 
-        self.log_rfXf_zy = -0.5 * (self.R+self.Q) * self.B * log2pi \
-            - T.sum(self.log_sigma_rfXf) \
-            - 0.5 * T.sum( div(fX_m_mu**2, T.exp(2*self.log_sigma_rfXf)))
+        self.log_r_fXf_zy = -0.5 * (self.R+self.Q) * self.B * log2pi \
+            - T.sum(self.log_sigma_r_fXf) \
+            - 0.5 * T.sum( div(fX_m_mu**2, T.exp(2*self.log_sigma_r_fXf)))
 
-        self.log_rfXf_zy.name = 'log_rfXf_zy'
+        self.log_r_fXf_zy.name = 'log_r_fXf_zy'
 
         self.L_terms = plus(self.H_qX, plus(self.H_qf_Xf, self.log_r_fXf_zy))
 
@@ -196,16 +199,18 @@ class SGPDV(Printable):
             if type(var) == np.ndarray:
                 return np.asarray(sig * rnd.randn(*var.shape), dtype=precision)
             elif type(var) == T.sharedvar.TensorSharedVariable:
-                if var.name.endswith('sqrt'):
+                if var.name == 'theta':
+                    pass
+                elif var.name.endswith('sqrt'):
                     print 'setting ' + var.name + ' to Identity'
                     n = var.get_value().shape[0]
                     var.set_value(np.eye(n))
                 else:
                     print 'Randomising ' + var.name + ' normal random variables'
-                    var.set_value(rnd(var.get_value()))
+                    var.set_value(rndsub(var.get_value()))
             elif type(var) == T.sharedvar.ScalarSharedVariable:
                 print 'Randomising ' + var.name
-                var.set_value(rndsub(var.get_value()))
+                var.set_value(rnd.randn*sig)
             else:
                 raise RuntimeError('Unknown randomisation type')
 
@@ -217,8 +222,8 @@ class SGPDV(Printable):
                type(var) == T.sharedvar.TensorSharedVariable:
                 rndsub(var)
 
-        self.mlp_qX.randomise()
-        self.mlp_rfXf.randomise()
+        self.mlp_qX.randomise(rnd)
+        self.mlp_r_fXf.randomise(rnd)
 
     def setKernelParameters(self, theta, theta_min=-np.inf, theta_max=np.inf):
 
@@ -250,16 +255,11 @@ class SGPDV(Printable):
 
     def init_Xu_from_Xf(self):
 
-        Xf_min = np.zeros(self.R,)
-        Xf_max = np.zeros(self.R,)
         Xf_locations = th.function(
-            [], self.phi, no_default_updates=True)  # [B x R]
-        for b in range(self.numberofBatchesPerEpoch):
-            self.iterator.set_value(b)
-            Xf_batch = Xf_locations()
-            Xf_min = np.min((Xf_min, Xf_batch.min(axis=0)), axis=0)
-            Xf_max = np.max((Xf_min, Xf_batch.max(axis=0)), axis=0)
-
+            [], self.mu_qX.T, no_default_updates=True)  # [B x R]
+        Xf_batch = Xf_locations()
+        Xf_min = Xf_batch.min(axis=0)
+        Xf_max = Xf_batch.max(axis=0)
         Xf_min.reshape(-1, 1)
         Xf_max.reshape(-1, 1)
         Df = Xf_max - Xf_min
