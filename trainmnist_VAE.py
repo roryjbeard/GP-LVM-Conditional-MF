@@ -31,6 +31,8 @@ encoderParameters = {'Type':'MLP', 'numHiddenUnits_encoder' : 400, 'numHiddenLay
                      'dimX':dimX, 'numberOfInducingPoints':400, 'kernelType':'ARD', 'theta':np.ones((1,dimX+1)), 'theta_min':1e-3, 'theta_max':1e3}
 decoderParameters = {'Type':'MLP', 'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 1, 'continuous':False}
 
+evalTestLLhood = False
+
 print "Initialising"
 
 
@@ -39,9 +41,13 @@ vae = AutoEncoderModel(data, params, encoderParameters, decoderParameters)
 
 vae.construct_L_dL_functions()
 vae.constructUpdateFunction(learning_rate=learning_rate)
+if evalTestLLhood:
+    vae.construct_MCLogLikelihood()
+
 
 vae.train(numberOfEpochs=numberOfEpochs,
         maxIters=np.inf,
         constrain=False,
-        printDiagnostics=0
+        printDiagnostics=0,
+        evalTestLLhood
         )

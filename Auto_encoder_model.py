@@ -83,6 +83,7 @@ class AutoEncoderModel(Printable):
 
         self.lowerBound = -np.inf  # Lower bound
         self.lowerBounds = []
+        self.testLLhoods = []
 
         self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
 
@@ -134,7 +135,7 @@ class AutoEncoderModel(Printable):
         # Sample batch before randomisation
         self.sample_batchStream()
         self.sample_padStream()
-        
+
         # Initialise the variables in the networks
         rnd = np.random.RandomState(seed=numpyRandomSeed)
         self.encoder.randomise(rnd)
@@ -153,7 +154,8 @@ class AutoEncoderModel(Printable):
         fudgeFactor=1e-6,
         maxIters=np.inf,
         constrain=False,
-        printDiagnostics=0
+        printDiagnostics=0,
+        evalTestLLhood=False
         ):
 
         if not type(self.encoder) == Hybrid_variational_model:
@@ -197,6 +199,9 @@ class AutoEncoderModel(Printable):
 
                 self.lowerBounds.append((self.lowerBound, wallClock))
 
+                if evalTestLLhood:
+                    self.testLLhoods.append(self.MCLogLikelihoodFunction())
+
                 if ep * self.numberofBatchesPerEpoch + it > maxIters:
                     break
 
@@ -222,7 +227,7 @@ class AutoEncoderModel(Printable):
 #                                          no_default_updates=True,
 #                                          profile=profile),
 #                                          #mode=NanGuardMode(nan_is_error=True,
-#                                          #                  inf_is_error=True, 
+#                                          #                  inf_is_error=True,
 #                                          #                  big_is_error=True))
 ##
 
@@ -231,7 +236,7 @@ class AutoEncoderModel(Printable):
         max_norm = 5
         mgrads = lasagne.updates.total_norm_constraint(grads,max_norm=max_norm)
         cgrads = [T.clip(g,-clip_grad, clip_grad) for g in mgrads]
-        
+
         updates = lasagne.updates.adam(cgrads, self.gradientVariables, learning_rate=learning_rate)
 
         self.updateFunction = th.function([],
@@ -244,7 +249,7 @@ class AutoEncoderModel(Printable):
         self.L_func = th.function([], self.L, no_default_updates=True)
         self.dL_func = th.function([], self.dL, no_default_updates=True)
 
-    def getMCLogLikelihood(self, numberOfTestSamples=100):
+    def construct_MCLogLikelihood(self, numberOfTestSamples=5000):
 
         self.sample()
         ll = [0] * self.numberofBatchesPerEpoch * numberOfTestSamples
@@ -255,10 +260,10 @@ class AutoEncoderModel(Printable):
             self.jitterProtector.reset()
             for k in range(numberOfTestSamples):
                 self.sample()
-                ll[c] = self.jitterProtector.jitterProtect(self.L_func, reset=False)
+                ll[c] = self.jitterProtector.jitterProtect(self.decoder.log_pyz, reset=False)
                 c += 1
+        self.MCLogLikelihoodFunction = th.function([], np_log_mean_exp_stable(ll), no_default_updates=True)
 
-        return np_log_mean_exp_stable(ll)
 
 
 if __name__ == "__main__":
