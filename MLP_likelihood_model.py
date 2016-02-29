@@ -112,9 +112,13 @@ class MLP_likelihood_model(Printable):
                                                   self.log_sigma_decoder,
                                                   'log_pyz')
         else:
-            self.log_pyz = -T.nnet.binary_crossentropy(self.mu_decoder, y_miniBatch).sum()
+            self.log_pyz = -T.nnet.binary_crossentropy(self.yhat, self.y_miniBatch.T).sum()
+            self.log_pyz.name = 'log_pyz'            
+            
+        self.L_terms = minus(self.log_pyz, self.KL_qp)
 
-        self.L_terms = self.log_pyz - self.KL_qp
+    def sample(self):
+        pass
 
     def randomise(self, rng):
         self.mlp_decoder.randomise(rng)

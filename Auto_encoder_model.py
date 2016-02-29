@@ -31,20 +31,32 @@ class AutoEncoderModel(Printable):
                  data,
                  params,
                  encoderParameters,
-                 decoderParameters):
+                 decoderParameters,
+                 L_terms='Train'):
+
+        theanoRandomSeed = params['theanoRandomSeed']
+        numpyRandomSeed = params['numpyRandomSeed']
+        self.srng = createSrng(seed=theanoRandomSeed)
 
         # set the data
-        data = np.asarray(data, dtype=precision)
-        self.y = th.shared(data)
+        data = np.asarray(data, dtype=precision)                
+        if params['BinaryFromContinuous']:
+            self.binarise = True
+            self.data = th.shared(data, name='data')   
+            y_threshold = self.srng.uniform(size=self.data.shape, low=0.0, high=1.0, ndim=None)                     
+            self.y = self.data > y_threshold
+            self.sample_y_threshold = th.function([], y_threshold)
+            if decoderParameters['continuous'] == True:
+                raise RuntimeError('Incompatible optimstion BinaryFromContinuous & continuous')
+        else:
+            self.binarise = False
+            self.y = th.shared(data)
+            
         self.N = data.shape[0]
         self.P = data.shape[1]
         self.B = params['miniBatchSize']
         self.Q = params['dimZ']
-        theanoRandomSeed = params['theanoRandomSeed']
-        numpyRandomSeed = params['numpyRandomSeed']
-
-        self.srng = createSrng(seed=theanoRandomSeed)
-
+        
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
@@ -72,7 +84,6 @@ class AutoEncoderModel(Printable):
 
         self.lowerBound = -np.inf  # Lower bound
         self.lowerBounds = []
-        self.testLLhoods = []
 
         self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
 
@@ -114,7 +125,12 @@ class AutoEncoderModel(Printable):
         self.encoder.construct_L_terms()
         self.decoder.construct_L_terms(self.encoder)
 
-        self.L = self.encoder.L_terms + self.decoder.L_terms
+        if L_terms == 'Train':
+            self.L = self.encoder.L_terms + self.decoder.L_terms
+        elif L_terms == 'Test':
+            self.L = self.decoder.log_pyz
+        else:
+            raise RuntimeError('L_terms is in {''Train'',''Test''}')
         self.gradientVariables = self.encoder.gradientVariables + self.decoder.gradientVariables
 
         self.dL = T.grad(self.L, self.gradientVariables)
@@ -130,18 +146,20 @@ class AutoEncoderModel(Printable):
         self.encoder.randomise(rnd)
         self.decoder.randomise(rnd)
 
+        
     def sample(self):
         self.sample_batchStream()
         self.sample_padStream()
+        if self.binarise:
+            self.sample_y_threshold()
 
     def train(self,
         numberOfEpochs=1,
-        learningRate=1e-3,
-        fudgeFactor=1e-6,
         maxIters=np.inf,
         constrain=False,
         printDiagnostics=0,
-        evalTestLLhood=False
+        testModel=None,
+        numberOfTestSamples=5000
         ):
 
         if not type(self.encoder) == Hybrid_variational_model:
@@ -152,7 +170,7 @@ class AutoEncoderModel(Printable):
         wallClockOld = startTime
         # For each iteration...
 
-        print "training for {} epochs with {} learning rate".format(numberOfEpochs, learningRate)
+        print "training for {} epochs".format(numberOfEpochs)
 
         # pbar = progressbar.ProgressBar(maxval=numberOfIterations*numberOfEpochs).start()
 
@@ -165,6 +183,7 @@ class AutoEncoderModel(Printable):
 
                 # Sample from the encoder
                 self.encoder.sample()
+                self.decoder.sample()
                 self.iterator.set_value(it)
                 lbTmp = self.jitterProtector.jitterProtect(self.updateFunction, reset=False)
                 if constrain:
@@ -183,14 +202,15 @@ class AutoEncoderModel(Printable):
                 if printDiagnostics > 0 and (it % printDiagnostics) == 0:
                     self.encoder.gp_encoder.printDiagnostics()
 
-                self.lowerBounds.append((self.lowerBound, wallClock))
-
-                if evalTestLLhood:
-                    self.testLLhoods.append(self.MCLogLikelihoodFunction())
+                self.lowerBounds.append((self.lowerBound, ep, it, wallClock))
 
                 if ep * self.numberofBatchesPerEpoch + it > maxIters:
                     break
 
+            if testModel is not None:
+                testModel.copyGradientVariables(self)
+                testModel.lowerBounds.append((testModel.MCLogLikelihood(numberOfTestSamples),ep,it))
+     
             if ep * self.numberofBatchesPerEpoch + it > maxIters:
                 break
             # pbar.update(ep*numberOfIterations+it)
@@ -235,21 +255,31 @@ class AutoEncoderModel(Printable):
         self.L_func = th.function([], self.L, no_default_updates=True)
         self.dL_func = th.function([], self.dL, no_default_updates=True)
 
-    def construct_MCLogLikelihood(self, numberOfTestSamples=5000):
-
+    def MCLogLikelihood(self, numberOfSamples=5000):
+        
         self.sample()
-        ll = [0] * self.numberofBatchesPerEpoch * numberOfTestSamples
+        ll = [0] * self.numberofBatchesPerEpoch * numberOfSamples
         c = 0
         for i in range(self.numberofBatchesPerEpoch):
-            print '{} of {}, {} samples'.format(i, self.numberofBatchesPerEpoch, numberOfTestSamples)
+            print '{} of {}, {} samples'.format(i,
+                                                self.numberofBatchesPerEpoch,
+                                                numberOfSamples)
             self.iterator.set_value(i)
             self.jitterProtector.reset()
-            for k in range(numberOfTestSamples):
-                self.sample()
-                ll[c] = self.jitterProtector.jitterProtect(self.decoder.log_pyz, reset=False)
+            for k in range(numberOfSamples):
+                self.decoder.sample()
+                self.encoder.sample()
+                ll[c] = self.jitterProtector.jitterProtect(self.L_func, reset=False)
                 c += 1
-        self.MCLogLikelihoodFunction = th.function([], np_log_mean_exp_stable(ll), no_default_updates=True)
+        return np_log_mean_exp_stable(ll)
 
+
+    def copyGradientVariables(self, other):
+        for i in range(len(self.gradientVariables)):
+            if self.gradientVariables[i].name == other.gradientVariables[i].name:
+                self.gradientVariables[i].set_value(other.gradientVariables[i].get_value(), borrow=False)
+            else:
+                raise RuntimeError('Cannot copy gradient variables')
 
 
 if __name__ == "__main__":
