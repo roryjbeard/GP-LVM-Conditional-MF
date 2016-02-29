@@ -25,20 +25,13 @@ data = x_train
 dimZ = 40
 params = {'miniBatchSize' : 200, 'dimZ':400,
          'theanoRandomSeed':123, 'numpyRandomSeed':123}
-encoderType='MLP'
-decoderType='MLP'
-encoderParameters = {'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 1}
-decoderParameters = {'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 1, 'continuous':True}
+encoderParameters = {'Type':'MLP', 'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 1}
+decoderParameters = {'Type':'MLP', 'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 1, 'continuous':True}
 
 print "Initialising"
 
 
-vae = AutoEncoderModel(data,
-             params,
-             encoderType,        #MLP, Hybrid
-             encoderParameters,
-             decoderType,        #MLP_decoder_moder, IBP_factor
-             decoderParameters)
+vae = AutoEncoderModel(data, params, encoderParameters, decoderParameters)
 
 
 vae.construct_L_dL_functions()

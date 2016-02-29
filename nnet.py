@@ -83,7 +83,7 @@ class NNet():
             y = layer.setup(y, **kwargs)
         return y
 
-    def randomise(self, rnd, factor=1.0):
+    def randomise(self, rnd, factor=1):
         for i in range(len(self.layers)):
             if type(self.layers[i]) == Linear:
                 if i < len(self.layers):
@@ -137,4 +137,4 @@ class MLP_Network():
             self.muLinear.randomise(rnd)
             self.logsigmaLinear.randomise(rnd)
         else:
-            self.yhatLinear.randomise()
+            self.yhatLinear.randomise(rnd, nonlinearity=Sigmoid)

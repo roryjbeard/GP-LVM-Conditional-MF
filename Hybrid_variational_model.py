@@ -46,6 +46,11 @@ class Hybrid_variational_model(Printable):
 
         self.gradientVariables = self.mlp_encoder.params + self.gp_encoder.gradientVariables
 
+        self.gp_encoder.setKernelParameters(params['theta'],
+                                            params['theta_min'],
+                                            params['theta_max'])
+
+
     def construct_L_terms(self):
         self.gp_encoder.construct_L_terms()
         self.L_terms = self.gp_encoder.L_terms
@@ -58,6 +63,7 @@ class Hybrid_variational_model(Printable):
     def randomise(self, rnd):
         self.gp_encoder.randomise()
         self.mlp_encoder.randomise()
+        self.gp_encoder.init_Xu_from_Xf()
 
 
 if __name__ == "__main__":
