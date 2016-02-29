@@ -20,6 +20,7 @@ from printable import Printable
 import time as time
 import collections
 from theano.compile.nanguardmode import NanGuardMode
+import lasagne
 
 precision = th.config.floatX
 
@@ -117,12 +118,12 @@ class AutoEncoderModel(Printable):
         self.dL = T.grad(self.L, self.gradientVariables)
         for i in range(len(self.dL)):
             self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
-        
+
         # Initialise the variables in the networks
         rnd = np.random.RandomState(seed=numpyRandomSeed)
         self.encoder.randomise(rnd)
         self.decoder.randomise(rnd)
-            
+
     def sample(self):
         self.sample_batchStream()
         self.sample_padStream()
@@ -135,7 +136,7 @@ class AutoEncoderModel(Printable):
         constrain=False,
         printDiagnostics=0
         ):
-        
+
         if not type(self.encoder) == Hybrid_variational_model:
             constrain = False
             printDiagnostics=0
@@ -187,9 +188,16 @@ class AutoEncoderModel(Printable):
 
         return self.lowerBounds
 
-    def constructUpdateFunction(self, learning_rate=0.001, beta_1=0.99, beta_2=0.999, profile=False):
+    def constructUpdateFunction(self, learning_rate=0.0001, beta_1=0.99, beta_2=0.999, profile=False):
 
-        gradColl = collections.OrderedDict([(param, T.grad(self.L, param)) for param in self.gradientVariables])
+        grads = [T.grad(self.L, param) for param in self.gradientVariables]
+        clip_grad = 1
+        max_norm = 5
+        mgrads = lasagne.updates.total_norm_constraint(grads,max_norm=max_norm)
+        cgrads = [T.clip(g,-clip_grad, clip_grad) for g in mgrads]
+
+
+        gradColl = collections.OrderedDict([(param, cgrads[i]) for param, i in self.gradientVariables, T.arange(len(self.gradientVariables))])
 
         self.optimiser = Adam(self.gradientVariables, learning_rate, beta_1, beta_2)
 
@@ -201,9 +209,9 @@ class AutoEncoderModel(Printable):
                                           updates=updates,
                                           no_default_updates=True,
                                           profile=profile,
-                                          mode=NanGuardMode(nan_is_error=True,
-                                                            inf_is_error=True, 
-                                                            big_is_error=True))
+                                          mode=NanGuardMode(nan_is_error=False,
+                                                            inf_is_error=False,
+                                                            big_is_error=False))
 
     def construct_L_dL_functions(self):
         self.L_func = th.function([], self.L, no_default_updates=True)

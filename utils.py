@@ -169,6 +169,9 @@ def exp(A, name=None):
 def softplus(A, name=None):
     return namedFunction(A, T.nnet.softplus, 'softplus', name)
 
+def relu(A, name=None):
+    return namedFunction(A, T.nnet.relu, 'relu', name)
+
 def sigmoid(A, name=None):
     return namedFunction(A, T.nnet.sigmoid, 'sigmoid', name)
 
@@ -196,11 +199,11 @@ def conditionNumber(M):
 
 
 def log_elementwiseNormal(x, mu, log_sigma, name):
-    
+
     d = minus(x, mu)
     d2 = mul(d,d)
     sigma2 = exp(mul(log_sigma,2))
-    
+
     lg = T.sum( -0.5*log2pi - log_sigma - 0.5 * div(d2, sigma2) )
     lg.name = name
     return lg
@@ -209,6 +212,6 @@ def elementwiseNormalEntropy(log_sigma, name, numberOfElements):
     H = numberOfElements * 0.5 * (1+log2pi) + T.sum(log_sigma)
     H.name = name
     return H
-         
-         
-         
+
+
+
