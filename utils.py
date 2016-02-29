@@ -3,8 +3,12 @@ import theano as th
 from theano import tensor as T
 from theano.tensor import nlinalg, slinalg
 from fastlin.myCholesky import myCholesky
+from fastlin.myCond import myCond
 from theano.sandbox.rng_mrg import MRG_RandomStreams
 from theano.tensor.shared_randomstreams import RandomStreams
+
+log2pi = T.constant(np.log(2 * np.pi))
+log2pi.name = 'log(2pi)'
 
 def t_repeat(x, num_repeats, axis):
     '''Repeats x along an axis num_repeats times. Axis has to be 0 or 1, x has to be a matrix.'''
@@ -189,3 +193,22 @@ def conditionNumber(M):
     condNum = th.function(
             [], cond, no_default_updates=True)
     return condNum
+
+
+def log_elementwiseNormal(x, mu, log_sigma, name):
+    
+    d = minus(x, mu)
+    d2 = mul(d,d)
+    sigma2 = exp(mul(log_sigma,2))
+    
+    lg = T.sum( -0.5*log2pi - log_sigma - 0.5 * div(d2, sigma2) )
+    lg.name = name
+    return lg
+
+def elementwiseNormalEntropy(log_sigma, name):
+    H =  T.sum(0.5 * (1+log2pi) + log_sigma)
+    H.name = name
+    return H
+         
+         
+         

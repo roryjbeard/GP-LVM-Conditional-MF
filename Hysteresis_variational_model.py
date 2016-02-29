@@ -10,7 +10,7 @@ import theano as th
 import theano.tensor as T
 
 from printable import Printable
-from utils import plus, mul, createSrng
+from utils import plus, mul, createSrng, log_elementwiseNormal, elementwiseNormalEntropy
 from nnet import MLP_Network
 from jitterProtect import JitterProtect
 
@@ -25,6 +25,7 @@ class Hysteresis_variational_model(Printable):
         self.srng = srng
 
         self.B = minbatchSize
+        self.Q = dimZ
 
         num_units = params['numHiddenUnits_encoder']
         num_layers = params['numHiddenLayers_encoder']
@@ -59,8 +60,14 @@ class Hysteresis_variational_model(Printable):
 
     def construct_L_terms(self):
 
-        self.H_f_y = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_f_y)
-        self.L_terms =  self.H_f_y
+        self.H_f_y = elementwiseNormalEntropy(self.log_sigma_f_y, 'H_f_y')
+        
+        self.log_r_f_zy = log_elementwiseNormal(self.f,
+                                                self.mu_rf_yz,
+                                                self.log_sigma_rf_yz,
+                                                'log_sigma_rf_yz')
+        
+        self.L_terms = plus(self.log_r_f_zy, self.H_f_y)
 
     def sample(self):
         self.sample_alpha()

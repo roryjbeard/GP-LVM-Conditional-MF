@@ -19,7 +19,7 @@ class Linear():
     def setup(self, x_in, **kwargs):
         return plus(dot(self.W, x_in), self.b)
 
-    def randomise(self, rnd, factor=1., nonlinearity=None):
+    def randomise(self, rnd, factor=1.0, nonlinearity=None):
         '''A randomly initialized linear layer.
         When factor is 1, the initialization is uniform as in Glorot, Bengio, 2010,
         assuming the layer is intended to be followed by the tanh nonlinearity.'''
@@ -30,10 +30,11 @@ class Linear():
                                      size=(self.n_in, self.n_out)))
             self.b.set_value(np.zeros((1, self.n_out)))
         elif type(nonlinearity) == Softplus:
-            # Hidden layer weights are uniformly sampled from a symmetric interval
-            # following [Xavier, 2010] those for the sigmoid transform
-            pass
-
+            scale = factor * np.sqrt(6./(self.dim_in+self.dim_out))
+            self.W.set_value(rnd.uniform(low=-scale,
+                                     high=scale,
+                                     size=(self.n_in, self.n_out)))
+            self.b.set_value(np.zeros((1, self.n_out)))
         elif type(nonlinearity) == Linear:
             raise RuntimeError('Consecutive linear layers')
 
@@ -82,7 +83,7 @@ class NNet():
             y = layer.setup(y, **kwargs)
         return y
 
-    def randomise(self, factor, rnd):
+    def randomise(self, rnd, factor=1.0):
         for i in range(len(self.layers)):
             if type(self.layers[i]) == Linear:
                 if i < len(self.layers):
@@ -122,7 +123,7 @@ class MLP_Network():
             mu = self.muLinear.setup(h_outin, **kwargs)
             logsigma = 0.5 * self.logsigmaLinear.setup(h_outin, **kwargs)
             mu.name = 'mu_' + self.name
-            logsigma.name = 'logsimga' + self.name
+            logsigma.name = 'logsimga_' + self.name
             return (mu, logsigma)
         else:
             h2 = self.yhatLinear.setup(h_outin, **kwargs)
@@ -131,9 +132,9 @@ class MLP_Network():
             return yhat
 
     def randomise(self, rnd):
-        self.hidden.randomise()
+        self.hidden.randomise(rnd)
         if self.continuous:
-            self.muLinear.randomise()
-            self.logsigmaLinear.randomise()
+            self.muLinear.randomise(rnd)
+            self.logsigmaLinear.randomise(rnd)
         else:
             self.yhatLinear.randomise()

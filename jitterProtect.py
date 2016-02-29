@@ -22,4 +22,7 @@ class JitterProtect(object):
             self.jitter.set_value(self.jitterDefault)
         return val
 
+    def reset(self):
+        self.jitter.set_value(self.jitterDefault)
+
 

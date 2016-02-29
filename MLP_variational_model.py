@@ -22,6 +22,7 @@ class MLP_variational_model(Printable):
     def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng):
 
         self.B = miniBatchSize
+        self.Q = dimZ
         num_units  = params['numHiddenUnits_encoder']
         num_layers = params['numHiddenLayers_encoder']
 
@@ -39,12 +40,13 @@ class MLP_variational_model(Printable):
         self.gradientVariables = self.mlp_encoder.params
 
     def construct_L_terms(self):
-        self.H_qz = 0.5 * self.B * (1+log2pi) + T.sum(self.log_sigma_qz)
-
-        self.L_terms =  self.H_qz
+        self.L_terms = 0
 
     def sample(self):
         self.sample_alpha()
+        
+    def randomise(self, rng):
+        self.mlp_encoder.randomise(rng)
 
 if __name__ == "__main__":
     y_miniBatch = np.ones((2,2))

@@ -39,8 +39,10 @@ class AutoEncoderModel(Printable):
         self.P = data.shape[1]
         self.B = params['miniBatchSize']
         self.Q = params['dimZ']
+        theanoRandomSeed = params['theanoRandomSeed']
+        numpyRandomSeed = params['numpyRandomSeed']
 
-        self.srng = createSrng(seed=123)
+        self.srng = createSrng(seed=theanoRandomSeed)
 
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
@@ -116,7 +118,12 @@ class AutoEncoderModel(Printable):
         self.dL = T.grad(self.L, self.gradientVariables)
         for i in range(len(self.dL)):
             self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
-
+        
+        # Initialise the variables in the networks
+        rnd = np.random.RandomState(seed=numpyRandomSeed)
+        self.encoder.randomise(rnd)
+        self.decoder.randomise(rnd)
+            
     def sample(self):
         self.sample_batchStream()
         self.sample_padStream()
@@ -201,10 +208,10 @@ class AutoEncoderModel(Printable):
         for i in range(self.numberofBatchesPerEpoch):
             print '{} of {}, {} samples'.format(i, self.numberofBatchesPerEpoch, numberOfTestSamples)
             self.iterator.set_value(i)
-            self.jitter.set_value(self.jitterDefault)
+            self.jitterProtector.reset()
             for k in range(numberOfTestSamples):
                 self.sample()
-                ll[c] = self.jitterProtect(self.L_func, reset=False)
+                ll[c] = self.jitterProtector.jitterProtect(self.L_func, reset=False)
                 c += 1
 
         return np_log_mean_exp_stable(ll)

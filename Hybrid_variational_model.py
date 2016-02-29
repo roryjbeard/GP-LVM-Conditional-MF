@@ -55,7 +55,7 @@ class Hybrid_variational_model(Printable):
         self.gp_encoder.sample_beta()
         self.gamma.sample()
 
-    def randomise(self):
+    def randomise(self, rnd):
         self.gp_encoder.randomise()
         self.mlp_encoder.randomise()
 

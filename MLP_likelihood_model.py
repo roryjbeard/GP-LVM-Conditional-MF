@@ -8,7 +8,7 @@ Created on Thu Feb  4 20:44:40 2016
 import numpy as np
 import theano.tensor as T
 from printable import Printable
-from utils import plus, exp, minus
+from utils import plus, exp, minus, mul, log_elementwiseNormal
 from nnet import MLP_Network
 
 log2pi = np.log(2 * np.pi)
@@ -18,6 +18,7 @@ class MLP_likelihood_model(Printable):
     def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, encoder, params):
 
         self.B = miniBatchSize
+        self.Q = dimZ
         self.y_miniBatch = y_miniBatch
         
         num_units  = params['numHiddenUnits_decoder']
@@ -37,21 +38,23 @@ class MLP_likelihood_model(Printable):
 
     def construct_L_terms(self, encoder):
 
-        self.KL_qp = 0.5*(T.sum(exp(encoder.log_sigma_qz*2))) \
+        self.KL_qp = 0.5*(T.sum(exp(mul(encoder.log_sigma_qz,2)))) \
                    + 0.5 * T.sum(encoder.mu_qz**2) \
                    - T.sum(encoder.log_sigma_qz) \
-                   - self.B
+                   - 0.5*self.Q*self.B
 
         if self.continuous:
-            self.log_pyz = T.sum( -(0.5*log2pi + self.log_sigma_decoder) \
-            - 0.5 * ((self.y_miniBatch.T - self.mu_decoder) / T.exp(self.log_sigma_decoder))**2 )
+             self.log_pyz = log_elementwiseNormal(self.y_miniBatch.T,
+                                                  self.mu_decoder,
+                                                  self.log_sigma_decoder,
+                                                  'log_pyz')
         else:
             self.log_pyz = -T.nnet.binary_crossentropy(self.mu_decoder, y_miniBatch).sum()
 
-        self.L_terms = self.log_pyz + self.KL_qp
+        self.L_terms = self.log_pyz - self.KL_qp
 
-    def randomise(self, srng):
-        self.mlp_decoder.randomise(srng)
+    def randomise(self, rng):
+        self.mlp_decoder.randomise(rng)
 
 
 if __name__ == "__main__":
