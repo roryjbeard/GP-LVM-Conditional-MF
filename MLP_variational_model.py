@@ -40,10 +40,10 @@ class MLP_variational_model(Printable):
 
             self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), alpha), 'z')
 
-            self.gradientVariables = self.mlp_encoder1.params
+            self.gradientVariables = self.mlp_encoder.params
 
         elif self.sLayers == 2:
-            self.dimS = round(0.5 * (dimZ + dimY))
+            dimS = round(0.5 * (dimZ + dimY))
             self.mlp_encoder1 = MLP_Network(dimY, dimS, name='MLP_encoder1',
                 num_units=num_units, num_layers=num_layers)
 

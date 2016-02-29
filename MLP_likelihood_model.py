@@ -21,7 +21,7 @@ class MLP_likelihood_model(Printable):
         self.Q = dimZ
         self.y_miniBatch = y_miniBatch
         self.sLayers=sLayers
-        self.dimS = round(0.5 * (dimY + dimZ))
+        dimS = round(0.5 * (dimY + dimZ))
 
         num_units  = params['numHiddenUnits_decoder']
         num_layers = params['numHiddenLayers_decoder']
@@ -52,11 +52,14 @@ class MLP_likelihood_model(Printable):
                 self.mlp_decoder2 = MLP_Network(dimS, dimY, name='mlp_decoder2',
                     num_units=num_units, num_layers=num_layers, continuous=True)
                 self.mu_decoder2, self.log_sigma_decoder2 = self.mlp_decoder.setup2(self.z1_p)
-                gamma2 = srng.normal(size=(dimS, self.B), avg=0.0, std=1.0, ndim=None)
+                gamma2 = srng.normal(size=(dimY, self.B), avg=0.0, std=1.0, ndim=None)
                 gamma2.name = 'gamma2'
                 self.sample_gamma2 = th.function([], gamma2)
 
-                self.z2_p = plus(self.mu_decoder2, mul(exp(self.log_sigma_decoder2), gamma2), 'z2_p')
+                # generate imagined data
+                # self.y_p = ...
+
+                self.y_p = plus(self.mu_decoder2, mul(exp(self.log_sigma_decoder2), gamma2), 'y_p')
 
 
         else:
@@ -65,6 +68,8 @@ class MLP_likelihood_model(Printable):
                 self.mlp_decoder = MLP_Network(dimZ, dimY, name='mlp_decoder',
                     num_units=num_units, num_layers=num_layers, continuous=False)
                 self.yhat = self.mlp_decoder.setup(encoder.z)
+
+                self.gradientVariables = self.mlp_decoder.params
 
             elif self.sLayers == 2:
                 self.mlp_decoder1 = MLP_Network(dimZ, dimS, name='mlp_decoder1',
@@ -80,10 +85,12 @@ class MLP_likelihood_model(Printable):
                     num_units=num_units, num_layers=num_layers, continuous=False)
                 self.yhat = self.mlp_decoder2.setup(self.z1_p)
 
+                self.gradientVariables = self.mlp_decoder1.params = self.mlp_decoder2.params
+
                 # generate imagined data
                 # self.y_p = ...
 
-        self.gradientVariables = self.mlp_decoder.params
+
 
     def construct_L_terms(self, encoder):
 
@@ -95,33 +102,51 @@ class MLP_likelihood_model(Printable):
                        - 0.5*self.Q*self.B
 
         elif self.sLayers == 2:
-
+            # KL[q(z2|z1)||p(z2)]
             self.KL_qp2 = 0.5*(T.sum(exp(mul(encoder.log_sigma_qz2,2)))) \
                         + 0.5 * T.sum(encoder.mu_qz2**2) \
                         - T.sum(encoder.log_sigma_qz2) \
                         - 0.5*self.Q*self.B
 
+            # KL[q(z1|y)||p(z1|z2)]
             self.KL_qp1 = 0.5*(T.sum(exp(mul(minus(encoder.log_sigma_qz1, self.log_sigma_decoder1),2)))) \
-                        + 0.5 * T.sum(encoder.mu_qz2**2) \
-                        - T.sum(encoder.log_sigma_qz2) \
+                        + 0.5 * T.sum((minus(self.mu_decoder1 -  encoder.mu_qz1) / exp(self.log_sigma_decoder1,2))**2) \
+                        + T.sum(self.log_sigma_decoder1)
+                        - T.sum(encoder.log_sigma_qz1) \
                         - 0.5*self.dimS*self.B
 
         if self.continuous:
+            if self.sLayers == 1:
+                mu = self.mu_decoder
+                logsigma = self.log_sigma_decoder
+            elif self.sLayers == 2:
+                mu = self.mu_decoder2
+                logsigma = self.log_sigma_decoder2
+
+
              self.log_pyz = log_elementwiseNormal(self.y_miniBatch.T,
-                                                  self.mu_decoder,
-                                                  self.log_sigma_decoder,
+                                                  mu,
+                                                  logsigma,
                                                   'log_pyz')
         else:
             self.log_pyz = -T.nnet.binary_crossentropy(self.yhat, self.y_miniBatch.T).sum()
-            self.log_pyz.name = 'log_pyz'            
-            
+            self.log_pyz.name = 'log_pyz'
+
         self.L_terms = minus(self.log_pyz, self.KL_qp)
 
     def sample(self):
-        pass
+        if self.sLayers == 1:
+            self.sample_gamma()
+        elif self.sLayers == 2:
+            self.sample_gamma1()
+            self.sample_gamma2()
 
     def randomise(self, rng):
-        self.mlp_decoder.randomise(rng)
+        if self.sLayers == 1:
+            self.mlp_decoder.randomise(rng)
+        elif self.sLayers == 2:
+            self.mlp_decoder1.randomise(rng)
+            self.mlp_decoder2.ranodmise(rng)
 
 
 if __name__ == "__main__":
@@ -139,7 +164,7 @@ if __name__ == "__main__":
     decoder = MLP_likelihood_model(y_miniBatch, miniBatchSize, dimY, dimZ, encoder, dec_params)
 
     decoder.construct_L_terms()
-    decoder.randomis()
+    decoder.randomise()
 
 
 
