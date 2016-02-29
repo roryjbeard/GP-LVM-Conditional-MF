@@ -24,21 +24,21 @@ class Linear():
         When factor is 1, the initialization is uniform as in Glorot, Bengio, 2010,
         assuming the layer is intended to be followed by the tanh nonlinearity.'''
         scale = factor * np.sqrt(6./(self.dim_in+self.dim_out))
-        randoms = rnd.uniform(low=-scale,
+        randoms = np.asarray(rnd.uniform(low=-scale,
                                      high=scale,
-                                     size=(self.n_in, self.n_out))
-        self.b.set_value(np.zeros((1, self.n_out))
+                                     size=(self.dim_in, self.dim_out)), dtype=floatX)
+        self.b.set_value(np.zeros((self.dim_out,1), dtype=floatX))
         if type(nonlinearity) == Tanh:
             self.W.set_value(randoms)
-            self.b.set_value(np.zeros((1, self.n_out)))
+            self.b.set_value(np.zeros((self.dim_out,1), dtype=floatX))
         elif type(nonlinearity) == Softplus:
             self.W.set_value(4*randoms)
-            self.b.set_value(np.zeros((1, self.n_out)))
+            self.b.set_value(np.zeros((self.dim_out,1), dtype=floatX))
         elif type(nonlinearity) == Linear:
             raise RuntimeError('Consecutive linear layers')
         elif type(nonlinearity) == ReLU:
             self.W_set_value(randoms)
-            self.b.set_value(np.zeros((1, self.n_out)))
+            self.b.set_value(np.zeros((self.dim_out,1), dtype=floatX))
 
 
 class Tanh():

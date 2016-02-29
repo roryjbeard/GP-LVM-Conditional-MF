@@ -26,7 +26,7 @@ dimZ = 40
 dimX = 30
 params = {'miniBatchSize' : 200, 'dimZ':400,
          'theanoRandomSeed':123, 'numpyRandomSeed':123}
-encoderParameters = {'Type':'Hybrid', 'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 1,
+encoderParameters = {'Type':'MLP', 'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 1,
                      'dimX':dimX, 'numberOfInducingPoints':400, 'kernelType':'ARD', 'theta':np.ones((1,dimX+1)), 'theta_min':1e-3, 'theta_max':1e3}
 decoderParameters = {'Type':'MLP', 'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 1, 'continuous':True}
 
