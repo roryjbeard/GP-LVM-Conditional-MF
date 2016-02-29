@@ -18,11 +18,17 @@ from Hysteresis_variational_model import Hysteresis_variational_model
 from jitterProtect import JitterProtect
 from printable import Printable
 import time as time
+<<<<<<< HEAD
 #import collections
 #from theano.compile.nanguardmode import NanGuardMode
 import lasagne
 
 
+=======
+import collections
+from theano.compile.nanguardmode import NanGuardMode
+import lasagne
+>>>>>>> origin/uai
 
 precision = th.config.floatX
 
@@ -120,7 +126,8 @@ class AutoEncoderModel(Printable):
         self.dL = T.grad(self.L, self.gradientVariables)
         for i in range(len(self.dL)):
             self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
-        
+
+        # Sample batch before randomisation
         self.sample_batchStream()
         self.sample_padStream()
         
@@ -128,7 +135,7 @@ class AutoEncoderModel(Printable):
         rnd = np.random.RandomState(seed=numpyRandomSeed)
         self.encoder.randomise(rnd)
         self.decoder.randomise(rnd)
-            
+
     def sample(self):
         self.sample_batchStream()
         self.sample_padStream()
@@ -141,7 +148,7 @@ class AutoEncoderModel(Printable):
         constrain=False,
         printDiagnostics=0
         ):
-        
+
         if not type(self.encoder) == Hybrid_variational_model:
             constrain = False
             printDiagnostics=0
@@ -193,8 +200,16 @@ class AutoEncoderModel(Printable):
 
         return self.lowerBounds
 
-    def constructUpdateFunction(self, learning_rate=0.001, beta_1=0.99, beta_2=0.999, profile=False):
+    def constructUpdateFunction(self, learning_rate=0.0001, beta_1=0.99, beta_2=0.999, profile=False):
 
+        grads = [T.grad(self.L, param) for param in self.gradientVariables]
+        clip_grad = 1
+        max_norm = 5
+        mgrads = lasagne.updates.total_norm_constraint(grads,max_norm=max_norm)
+        cgrads = [T.clip(g,-clip_grad, clip_grad) for g in mgrads]
+
+
+<<<<<<< HEAD
 #        gradColl = collections.OrderedDict([(param, T.grad(self.L, param)) for param in self.gradientVariables])
 #
 #        self.optimiser = Adam(self.gradientVariables, learning_rate, beta_1, beta_2)
@@ -219,12 +234,29 @@ class AutoEncoderModel(Printable):
         cgrads = [T.clip(g,-clip_grad, clip_grad) for g in mgrads]
         
         updates = lasagne.updates.adam(cgrads, self.gradientVariables, learning_rate=learning_rate)
+=======
+        gradColl = collections.OrderedDict([(param, cgrads[i]) for param, i in self.gradientVariables, T.arange(len(self.gradientVariables))])
+
+        self.optimiser = Adam(self.gradientVariables, learning_rate, beta_1, beta_2)
+
+        updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
+>>>>>>> origin/uai
 
         self.updateFunction = th.function([],
+<<<<<<< HEAD
                                       self.L,
                                       updates=updates,
                                       no_default_updates=True)
 
+=======
+                                          self.L,
+                                          updates=updates,
+                                          no_default_updates=True,
+                                          profile=profile,
+                                          mode=NanGuardMode(nan_is_error=False,
+                                                            inf_is_error=False,
+                                                            big_is_error=False))
+>>>>>>> origin/uai
 
     def construct_L_dL_functions(self):
         self.L_func = th.function([], self.L, no_default_updates=True)

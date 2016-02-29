@@ -23,20 +23,23 @@ class Linear():
         '''A randomly initialized linear layer.
         When factor is 1, the initialization is uniform as in Glorot, Bengio, 2010,
         assuming the layer is intended to be followed by the tanh nonlinearity.'''
-        if type(nonlinearity) == Tanh:
-            scale = factor * np.sqrt(6./(self.dim_in+self.dim_out))
-            self.W.set_value(rnd.uniform(low=-scale,
+        scale = factor * np.sqrt(6./(self.dim_in+self.dim_out))
+        randoms = rnd.uniform(low=-scale,
                                      high=scale,
-                                     size=(self.n_in, self.n_out)))
+                                     size=(self.n_in, self.n_out))
+        self.b.set_value(np.zeros((1, self.n_out))
+        if type(nonlinearity) == Tanh:
+            self.W.set_value(randoms)
             self.b.set_value(np.zeros((1, self.n_out)))
         elif type(nonlinearity) == Softplus:
-            scale = factor * np.sqrt(6./(self.dim_in+self.dim_out))
-            self.W.set_value(rnd.uniform(low=-scale,
-                                     high=scale,
-                                     size=(self.n_in, self.n_out)))
+            self.W.set_value(4*randoms)
             self.b.set_value(np.zeros((1, self.n_out)))
         elif type(nonlinearity) == Linear:
             raise RuntimeError('Consecutive linear layers')
+        elif type(nonlinearity) == ReLU:
+            self.W_set_value(randoms)
+            self.b.set_value(np.zeros((1, self.n_out)))
+
 
 class Tanh():
     def __init__(self):
@@ -65,6 +68,10 @@ class Softplus():
 
     def setup(self, x_in, **kwargs):
         return softplus(x_in)
+
+class ReLU():
+    def __init__(self):
+        return relu(x_in)
 
 class NNet():
     def __init__(self):
