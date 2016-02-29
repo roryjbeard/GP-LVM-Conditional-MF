@@ -23,7 +23,8 @@ learning_rate = 1e-3
 
 data = x_train
 dimZ = 40
-params = {'miniBatchSize' : 200, 'dimZ':400}
+params = {'miniBatchSize' : 200, 'dimZ':400,
+         'theanoRandomSeed':123, 'numpyRandomSeed':123}
 encoderType='MLP'
 decoderType='MLP'
 encoderParameters = {'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 1}
