@@ -19,6 +19,7 @@ from jitterProtect import JitterProtect
 from printable import Printable
 import time as time
 import collections
+from theano.compile.nanguardmode import NanGuardMode
 
 precision = th.config.floatX
 
@@ -27,9 +28,7 @@ class AutoEncoderModel(Printable):
     def __init__(self,
                  data,
                  params,
-                 encoderType,        #MLP, Hybrid
                  encoderParameters,
-                 decoderType,        #MLP_decoder_moder, IBP_factor
                  decoderParameters):
 
         # set the data
@@ -75,7 +74,7 @@ class AutoEncoderModel(Printable):
         self.getCurrentBatch = th.function([], self.currentBatch, no_default_updates=True)
 
         self.jitterProtector = JitterProtect()
-        if encoderType == 'Hybrid':
+        if encoderParameters['Type'] == 'Hybrid':
             self.encoder = Hybrid_variational_model(
                 self.y_miniBatch,
                 self.B,
@@ -84,7 +83,7 @@ class AutoEncoderModel(Printable):
                 self.jitterProtector,
                 encoderParameters,
                 self.srng)
-        elif encoderType == 'MLP':
+        elif encoderParameters['Type'] == 'MLP':
             self.encoder = MLP_variational_model(
                 self.y_miniBatch,
                 self.B,
@@ -92,7 +91,7 @@ class AutoEncoderModel(Printable):
                 self.Q,
                 encoderParameters,
                 self.srng)
-        elif encoderType == 'Hysterisis':
+        elif encoderParameters['Type'] == 'Hysterisis':
                 self.encoder = Hysteresis_variational_model(
                 self.y_miniBatch,
                 self.B,
@@ -103,7 +102,7 @@ class AutoEncoderModel(Printable):
         else:
             raise RuntimeError('Unrecognised encoder type')
 
-        if decoderType == 'MLP':
+        if decoderParameters['Type'] == 'MLP':
             self.decoder = MLP_likelihood_model(self.y_miniBatch, self.B,
                 self.P, self.Q, self.encoder, decoderParameters)
         else:
@@ -136,6 +135,10 @@ class AutoEncoderModel(Printable):
         constrain=False,
         printDiagnostics=0
         ):
+        
+        if not type(self.encoder) == Hybrid_variational_model:
+            constrain = False
+            printDiagnostics=0
 
         startTime    = time.time()
         wallClockOld = startTime
@@ -157,7 +160,7 @@ class AutoEncoderModel(Printable):
                 self.iterator.set_value(it)
                 lbTmp = self.jitterProtector.jitterProtect(self.updateFunction, reset=False)
                 if constrain:
-                    self.constrainKernelParameters()
+                    self.encoder.gp_encoder.constrainKernelParameters()
 
                 lbTmp = lbTmp.flatten()
                 self.lowerBound = lbTmp[0]
@@ -170,7 +173,7 @@ class AutoEncoderModel(Printable):
                 print("\n Ep %d It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
                       % (ep, it, wallClock, stepTime, self.lowerBound))
                 if printDiagnostics > 0 and (it % printDiagnostics) == 0:
-                    self.printDiagnostics()
+                    self.encoder.gp_encoder.printDiagnostics()
 
                 self.lowerBounds.append((self.lowerBound, wallClock))
 
@@ -193,12 +196,18 @@ class AutoEncoderModel(Printable):
         updates = self.optimiser.updatesIgrad_model(gradColl, self.gradientVariables)
 
         # Get the update function to also return the bound!
-        self.updateFunction = th.function([], self.L, updates=updates, no_default_updates=True, profile=profile)
+        self.updateFunction = th.function([],
+                                          self.L,
+                                          updates=updates,
+                                          no_default_updates=True,
+                                          profile=profile,
+                                          mode=NanGuardMode(nan_is_error=True,
+                                                            inf_is_error=True, 
+                                                            big_is_error=True))
 
     def construct_L_dL_functions(self):
         self.L_func = th.function([], self.L, no_default_updates=True)
         self.dL_func = th.function([], self.dL, no_default_updates=True)
-
 
     def getMCLogLikelihood(self, numberOfTestSamples=100):
 

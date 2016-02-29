@@ -7,7 +7,7 @@ Created on Thu Feb  4 21:33:07 2016
 from utils import shared_zeros_like, shared_ones_like
 
 import numpy as np
-import theano
+import theano as th
 import theano.tensor as T
 
 import collections
@@ -20,7 +20,7 @@ class Adam():
         self.beta_2 = beta_2
         self.first_moments = collections.OrderedDict([(param, shared_zeros_like(param)) for param in params])
         self.second_moments = collections.OrderedDict([(param, shared_ones_like(param)) for param in params])
-        self.timestep = theano.shared(np.array(timestep).astype(theano.config.floatX))
+        self.timestep = th.shared(np.array(timestep).astype(th.config.floatX))
 
     def updatesIgrad_model(self, grad, params):
         timestep_update = collections.OrderedDict([(self.timestep, self.timestep+1)])
@@ -46,3 +46,27 @@ class Adam():
         new_ordered_dict.update(sgd_updates)
         
         return new_ordered_dict
+        
+        
+if __name__ == '__main__':
+    
+    x = th.shared(0.0)
+    y = -(x-5.0)*(x-10.0)
+
+    gradColl = collections.OrderedDict([(x, T.grad(y, x))])
+
+    optimiser = Adam([x],learning_rate=0.01, beta_1=0.99, beta_2=0.999)
+
+    updates = optimiser.updatesIgrad_model(gradColl, [x])
+
+    updateFunction = th.function([], y, updates=updates, no_default_updates=True)
+    
+    for i in range(10000):
+        print "{}) x = {}".format(i, x.get_value())
+        updateFunction()
+        
+            
+    
+    
+    
+

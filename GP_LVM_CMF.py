@@ -190,11 +190,11 @@ class SGPDV(Printable):
 
         self.L_terms = plus(self.H_qX, plus(self.H_qf_Xf, self.log_r_fXf_zy))
 
-    def randomise(self, sig=1):
+    def randomise(self, rnd, sig=1.0):
 
-        def rnd(var):
+        def rndsub(var):
             if type(var) == np.ndarray:
-                return np.asarray(sig * self.srng.random.randn(*var.shape), dtype=precision)
+                return np.asarray(sig * rnd.randn(*var.shape), dtype=precision)
             elif type(var) == T.sharedvar.TensorSharedVariable:
                 if var.name.endswith('sqrt'):
                     print 'setting ' + var.name + ' to Identity'
@@ -205,7 +205,7 @@ class SGPDV(Printable):
                     var.set_value(rnd(var.get_value()))
             elif type(var) == T.sharedvar.ScalarSharedVariable:
                 print 'Randomising ' + var.name
-                var.set_value(self.srng.random.randn())
+                var.set_value(rndsub(var.get_value()))
             else:
                 raise RuntimeError('Unknown randomisation type')
 
@@ -215,18 +215,12 @@ class SGPDV(Printable):
             var = getattr(self, name)
             if type(var) == T.sharedvar.ScalarSharedVariable or \
                type(var) == T.sharedvar.TensorSharedVariable:
-                rnd(var)
+                rndsub(var)
 
-        if hasattr(self, 'mlp_qX'):
-            self.mlp_qX.randomise()
-        if hasattr(self, 'mlp_rfXf'):
-            self.mlp_rfXf.randomise()
+        self.mlp_qX.randomise()
+        self.mlp_rfXf.randomise()
 
-    def setKernelParameters(self,
-                            theta,    theta_min=-np.inf, theta_max=np.inf,
-                            gamma=[], gamma_min=-np.inf, gamma_max=np.inf,
-                            omega=[], omega_min=-np.inf, omega_max=np.inf
-                            ):
+    def setKernelParameters(self, theta, theta_min=-np.inf, theta_max=np.inf):
 
         self.log_theta.set_value(np.asarray(np.log(theta), dtype=precision))
         self.log_theta_min = np.array(np.log(theta_min), dtype=precision)

@@ -60,7 +60,9 @@ class Hysteresis_variational_model(Printable):
 
     def construct_L_terms(self):
 
-        self.H_f_y = elementwiseNormalEntropy(self.log_sigma_f_y, 'H_f_y')
+        self.H_f_y = elementwiseNormalEntropy(self.log_sigma_f_y,
+                                              self.B*self.Q,
+                                              'H_f_y')
         
         self.log_r_f_zy = log_elementwiseNormal(self.f,
                                                 self.mu_rf_yz,
