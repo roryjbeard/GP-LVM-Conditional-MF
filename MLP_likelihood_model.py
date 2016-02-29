@@ -54,6 +54,9 @@ class MLP_likelihood_model(Printable):
             
         self.L_terms = minus(self.log_pyz, self.KL_qp)
 
+    def sample(self):
+        pass
+
     def randomise(self, rng):
         self.mlp_decoder.randomise(rng)
 

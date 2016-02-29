@@ -21,7 +21,6 @@ learning_rate = 1e-4
 
 [N,dimY] = x_train.shape
 
-data = x_train
 dimZ = 40
 dimX = 30
 params = {'miniBatchSize' : 200, 'dimZ':400,
@@ -57,23 +56,22 @@ elif experimentNumber == '6':
     encoderParameters['numStochasticLayers_encoder'] = 2
     decoderParameters['numStochasticLayers_decoder'] = 2
 
-evalTestLLhood = False
 print "Initialising"
 
-vae = AutoEncoderModel(data, params, encoderParameters, decoderParameters)
+vae_train = AutoEncoderModel(x_train, params, encoderParameters, decoderParameters, L_terms='Train')
+vae_test  = AutoEncoderModel(x_test,  params, encoderParameters, decoderParameters, L_terms='Test')
 
+vae_train.constructUpdateFunction(learning_rate=learning_rate)
+vae_test.construct_L_dL_functions()
 
-vae.construct_L_dL_functions()
-vae.constructUpdateFunction(learning_rate=learning_rate)
-if evalTestLLhood:
-    vae.construct_MCLogLikelihood()
-
-vae.train(numberOfEpochs=numberOfEpochs,
-        maxIters=np.inf,
+vae_train.train(numberOfEpochs=numberOfEpochs,
+        #maxIters=np.inf,
+        maxIters=10,                
         constrain=False,
         printDiagnostics=0,
-        evalTestLLhood
-        )
-
-
-
+        testModel=vae_test,
+        numberOfTestSamples=10)
+        
+        
+        
+        

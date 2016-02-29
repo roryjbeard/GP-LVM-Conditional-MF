@@ -2,6 +2,7 @@
 import numpy as np
 import theano as th
 import theano.tensor as T
+from theano.tensor.shared_randomstreams import RandomStreams
 # import progressbar
 from printable import Printable
 from nnet import MLP_Network
@@ -282,7 +283,7 @@ class SGPDV(Printable):
                 selfVar = getattr(self,  name)
                 otherVar = getattr(other, name)
                 if (type(selfVar) == T.sharedvar.ScalarSharedVariable or
-                        type(selfVar) == T.sharedvar.TensorSharedVariable) and\
+                        type(selfVar) == T.sharedvar.TensorSharedVariable) and \
                         type(selfVar) == type(otherVar):
                     print 'Copying ' + selfVar.name
                     selfVar.set_value(otherVar.get_value())
