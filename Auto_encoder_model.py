@@ -33,18 +33,29 @@ class AutoEncoderModel(Printable):
                  encoderParameters,
                  decoderParameters):
 
+        theanoRandomSeed = params['theanoRandomSeed']
+        numpyRandomSeed = params['numpyRandomSeed']
+        self.srng = createSrng(seed=theanoRandomSeed)
+
         # set the data
-        data = np.asarray(data, dtype=precision)
-        self.y = th.shared(data)
+        data = np.asarray(data, dtype=precision)                
+        if params['BinaryFromContinuous']:
+            self.binarise = True
+            self.data = th.shared(data, name='data')   
+            y_threshold = self.srng.uniform(size=self.data.shape, low=0.0, high=1.0, ndim=None)                     
+            self.y = self.data > y_threshold
+            self.sample_y_threshold = th.function([], y_threshold)
+            if decoderParameters['continuous'] == True:
+                raise RuntimeError('Incompatible optimstion BinaryFromContinuous & continuous')
+        else:
+            self.binarise = False
+            self.y = th.shared(data)
+            
         self.N = data.shape[0]
         self.P = data.shape[1]
         self.B = params['miniBatchSize']
         self.Q = params['dimZ']
-        theanoRandomSeed = params['theanoRandomSeed']
-        numpyRandomSeed = params['numpyRandomSeed']
-
-        self.srng = createSrng(seed=theanoRandomSeed)
-
+        
         self.numberofBatchesPerEpoch = int(np.ceil(np.float32(self.N) / self.B))
         numPad = self.numberofBatchesPerEpoch * self.B - self.N
 
@@ -129,9 +140,12 @@ class AutoEncoderModel(Printable):
         self.encoder.randomise(rnd)
         self.decoder.randomise(rnd)
 
+        
     def sample(self):
         self.sample_batchStream()
         self.sample_padStream()
+        if self.binarise:
+            self.sample_y_threshold()
 
     def train(self,
         numberOfEpochs=1,

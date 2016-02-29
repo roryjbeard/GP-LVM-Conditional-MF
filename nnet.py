@@ -120,7 +120,7 @@ class MLP_Network():
             self.logsigmaLinear = Linear(num_units, dim_out, 'logsigmaLinear_' + name)
             self.params = self.hidden.params + self.muLinear.params + self.logsigmaLinear.params
         else:
-            self.yhatLinear = Linear(num_units, dim_out, name, 'yhatLinear_' + name)
+            self.yhatLinear = Linear(num_units, dim_out, 'yhatLinear_' + name)
             self.yhatSigmoid = Sigmoid()
             self.params = self.hidden.params + self.yhatLinear.params
 
