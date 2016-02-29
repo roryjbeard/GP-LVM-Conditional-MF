@@ -2,7 +2,6 @@
 import numpy as np
 import theano as th
 import theano.tensor as T
-from theano.tensor.shared_randomstreams import RandomStreams
 # import progressbar
 from printable import Printable
 from nnet import MLP_Network
@@ -91,7 +90,9 @@ class SGPDV(Printable):
         self.B = miniBatchSize
         self.R = params['dimX']
         self.M = params['numberOfInducingPoints']
-        self.H = params['numHiddenUnits_encoder']
+        self.num_units = params['numHiddenUnits_encoder']
+        self.num_layers = params['numHiddenLayers_encoder']
+        
         kernelType = params['kernelType']
 
         if kernelType == 'RBF':
@@ -105,10 +106,10 @@ class SGPDV(Printable):
 
         kfactory = kernelFactory(kernelType)
 
-        # kernel parameters
-        self.log_theta = sharedZeroMatrix(
-            1, self.numberOfKernelParameters, 'log_theta', broadcastable=(True, False))  # parameters of Kuu, Kuf, Kff
-
+        # kernel parameters of Kuu, Kuf, Kff
+        self.log_theta = sharedZeroMatrix(1, self.numberOfKernelParameters,
+                                          'log_theta',
+                                          broadcastable=(True, False))
         # Random variables
         alpha = self.srng.normal(size=(self.B, self.R), avg=0.0, std=1.0, ndim=None)
         beta = self.srng.normal(size=(self.B, self.Q), avg=0.0, std=1.0, ndim=None)
@@ -118,8 +119,9 @@ class SGPDV(Printable):
         self.sample_alpha = th.function([], alpha)
         self.sample_beta = th.function([], beta)
 
-        self.mlp_qX = MLP_Network(self.P, self.R, 'qX',
-                                  num_units=self.H)
+        self.mlp_qX = MLP_Network(self.P, self.R, 'qX', 
+                                  num_units=self.num_units,
+                                  num_layers=self.num_layers)
         self.mu_qX, self.log_sigma_qX = self.mlp_qX.setup(self.y_miniBatch.T)
 
         # Variational distribution q(u)
@@ -155,9 +157,9 @@ class SGPDV(Printable):
         self.f = plus(self.mu, (dot(self.cSigma, beta)), 'f')
 
         # Gradient variables - should be all the th.shared variables
-        self.gradientVariables = [];
+        self.gradientVariables = [self.kappa, self.Kappa_sqrt,
+                                  self.Xu, self.log_theta]
         self.gradientVariables.extend(self.mlp_qX.params)
-        self.gradientVariables.extend([self.kappa, self.Kappa_sqrt, self.Xu, self.kappa, self.log_theta])
 
         self.Kappa_conditionNumber = conditionNumber(self.kappa)
         self.Kuu_conditionNumber   = conditionNumber(self.Kuu)
@@ -166,8 +168,10 @@ class SGPDV(Printable):
     def construct_rfXf(self, z):
 
         self.mlp_r_fXf = MLP_Network(self.Q + self.P, self.Q + self.R, 'rfXf',
-                                    num_units=self.H)
-        self.mu_r_fXf, self.log_sigma_r_fXf = self.mlp_r_fXf.setup(T.concatenate((z, self.y_miniBatch.T)))
+                                    num_units=self.num_units,
+                                    num_layers=self.num_layers)
+        self.mu_r_fXf, self.log_sigma_r_fXf \
+            = self.mlp_r_fXf.setup(T.concatenate((z, self.y_miniBatch.T)))
         self.gradientVariables.extend(self.mlp_r_fXf.params)
 
     def construct_L_terms(self):
@@ -269,7 +273,7 @@ class SGPDV(Printable):
 
     def copyParameters(self, other):
 
-        if not self.R == other.R or not self.Q == other.Q or not self.M == other.M:
+        if not (self.R == other.R and self.Q == other.Q and self.M == other.M):
             raise RuntimeError('In compatible model dimensions')
 
         members = [attr for attr in dir(self)]
@@ -278,7 +282,7 @@ class SGPDV(Printable):
                 selfVar = getattr(self,  name)
                 otherVar = getattr(other, name)
                 if (type(selfVar) == T.sharedvar.ScalarSharedVariable or
-                        type(selfVar) == T.sharedvar.TensorSharedVariable) and \
+                        type(selfVar) == T.sharedvar.TensorSharedVariable) and\
                         type(selfVar) == type(otherVar):
                     print 'Copying ' + selfVar.name
                     selfVar.set_value(otherVar.get_value())
