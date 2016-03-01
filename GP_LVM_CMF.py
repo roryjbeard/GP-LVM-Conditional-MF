@@ -80,9 +80,11 @@ class SGPDV(Printable):
                  dimZ,
                  jitterProtect,
                  params,
-                 srng
+                 srng,
+                 sLayers=1
                  ):
 
+        self.sLayers = sLayers
         self.srng = srng
 
         self.y_miniBatch = y_miniBatch
@@ -93,7 +95,7 @@ class SGPDV(Printable):
         self.M = params['numberOfInducingPoints']
         self.num_units = params['numHiddenUnits_encoder']
         self.num_layers = params['numHiddenLayers_encoder']
-        
+
         kernelType = params['kernelType']
 
         if kernelType == 'RBF':
@@ -120,10 +122,11 @@ class SGPDV(Printable):
         self.sample_alpha = th.function([], alpha)
         self.sample_beta = th.function([], beta)
 
-        self.mlp_qX = MLP_Network(self.P, self.R, 'qX', 
+        self.mlp_qX = MLP_Network(self.P, self.R, 'qX',
                                   num_units=self.num_units,
                                   num_layers=self.num_layers)
         self.mu_qX, self.log_sigma_qX = self.mlp_qX.setup(self.y_miniBatch.T)
+
 
         # Variational distribution q(u)
         self.kappa = sharedZeroMatrix(self.M, self.Q, 'kappa')
@@ -168,11 +171,20 @@ class SGPDV(Printable):
 
     def construct_rfXf(self, z):
 
-        self.mlp_r_fXf = MLP_Network(self.Q + self.P, self.Q + self.R, 'rfXf',
+        if self.sLayers == 1:
+            MLP_dim_in = self.Q + self.P
+            MLP_input = T.concatenate((z, self.y_miniBatch.T))
+        elif self.sLayers == 2:
+            self.S = round(0.5 * (self.Q + self.P))
+            MLP_dim_in = self.Q + self.P + self.S
+            MLP_input = T.concatenate((z, self.y_miniBatch.T, self.S))
+
+        self.mlp_r_fXf = MLP_Network(MLP_dim_in, self.Q + self.R, 'rfXf',
                                     num_units=self.num_units,
                                     num_layers=self.num_layers)
         self.mu_r_fXf, self.log_sigma_r_fXf \
-            = self.mlp_r_fXf.setup(T.concatenate((z, self.y_miniBatch.T)))
+            = self.mlp_r_fXf.setup(MLP_input)
+
         self.gradientVariables.extend(self.mlp_r_fXf.params)
 
     def construct_L_terms(self):

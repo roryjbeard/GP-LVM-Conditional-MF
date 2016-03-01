@@ -42,16 +42,16 @@ class MLP_likelihood_model(Printable):
             elif sLayers == 2:
                 self.mlp_decoder1 = MLP_Network(dimZ, dimS, name='mlp_decoder1',
                     num_units=num_units, num_layers=num_layers, continuous=True)
-                self.mu_decoder1, self.log_sigma_decoder1 = self.mlp_decoder.setup1(encoder.z2)
+                self.mu_decoder1, self.log_sigma_decoder1 = self.mlp_decoder.setup1(encoder.z)
                 gamma1 = srng.normal(size=(dimS, self.B), avg=0.0, std=1.0, ndim=None)
                 gamma1.name = 'gamma1'
                 self.sample_gamma1 = th.function([], gamma1)
 
-                self.z1_p = plus(self.mu_decoder1, mul(exp(self.log_sigma_decoder1), gamma1), 'z1_p')
+                self.S_p = plus(self.mu_decoder1, mul(exp(self.log_sigma_decoder1), gamma1), 'S_p')
 
                 self.mlp_decoder2 = MLP_Network(dimS, dimY, name='mlp_decoder2',
                     num_units=num_units, num_layers=num_layers, continuous=True)
-                self.mu_decoder2, self.log_sigma_decoder2 = self.mlp_decoder.setup2(self.z1_p)
+                self.mu_decoder2, self.log_sigma_decoder2 = self.mlp_decoder.setup2(self.S_p)
                 gamma2 = srng.normal(size=(dimY, self.B), avg=0.0, std=1.0, ndim=None)
                 gamma2.name = 'gamma2'
                 self.sample_gamma2 = th.function([], gamma2)
@@ -74,16 +74,16 @@ class MLP_likelihood_model(Printable):
             elif self.sLayers == 2:
                 self.mlp_decoder1 = MLP_Network(dimZ, dimS, name='mlp_decoder1',
                     num_units=num_units, num_layers=num_layers, continuous=True)
-                self.mu_decoder1, self.log_sigma_decoder1 = self.mlp_decoder.setup1(encoder.z2)
+                self.mu_decoder1, self.log_sigma_decoder1 = self.mlp_decoder.setup1(encoder.z)
                 gamma1 = srng.normal(size=(dimS, self.B), avg=0.0, std=1.0, ndim=None)
                 gamma1.name = 'gamma1'
                 self.sample_gamma1 = th.function([], gamma1)
 
-                self.z1_p = plus(self.mu_decoder1, mul(exp(self.log_sigma_decoder1), gamma1), 'z1_p')
+                self.S_p = plus(self.mu_decoder1, mul(exp(self.log_sigma_decoder1), gamma1), 'S_p')
 
                 self.mlp_decoder2 = MLP_Network(dimS, dimY, name='mlp_decoder2',
                     num_units=num_units, num_layers=num_layers, continuous=False)
-                self.yhat = self.mlp_decoder2.setup(self.z1_p)
+                self.yhat = self.mlp_decoder2.setup(self.S_p)
 
                 self.gradientVariables = self.mlp_decoder1.params = self.mlp_decoder2.params
 
@@ -102,17 +102,17 @@ class MLP_likelihood_model(Printable):
                        - 0.5*self.Q*self.B
 
         elif self.sLayers == 2:
-            # KL[q(z2|z1)||p(z2)]
-            self.KL_qp2 = 0.5*(T.sum(exp(mul(encoder.log_sigma_qz2,2)))) \
-                        + 0.5 * T.sum(encoder.mu_qz2**2) \
-                        - T.sum(encoder.log_sigma_qz2) \
+            # KL[q(z|S)||p(z)]
+            self.KL_qp2 = 0.5*(T.sum(exp(mul(encoder.log_sigma_qz,2)))) \
+                        + 0.5 * T.sum(encoder.mu_qz**2) \
+                        - T.sum(encoder.log_sigma_qz) \
                         - 0.5*self.Q*self.B
 
-            # KL[q(z1|y)||p(z1|z2)]
-            self.KL_qp1 = 0.5*(T.sum(exp(mul(minus(encoder.log_sigma_qz1, self.log_sigma_decoder1),2)))) \
-                        + 0.5 * T.sum((minus(self.mu_decoder1 -  encoder.mu_qz1) / exp(self.log_sigma_decoder1,2))**2) \
+            # KL[q(S|y)||p(S|z)]
+            self.KL_qp1 = 0.5*(T.sum(exp(mul(minus(encoder.log_sigma_qS, self.log_sigma_decoder1),2)))) \
+                        + 0.5 * T.sum((minus(self.mu_decoder1 -  encoder.mu_qS) / exp(self.log_sigma_decoder1,2))**2) \
                         + T.sum(self.log_sigma_decoder1)
-                        - T.sum(encoder.log_sigma_qz1) \
+                        - T.sum(encoder.log_sigma_qS) \
                         - 0.5*self.dimS*self.B
 
         if self.continuous:

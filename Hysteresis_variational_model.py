@@ -65,36 +65,36 @@ class Hysteresis_variational_model(Printable):
         elif self.sLayers == 2:
 
             dimS = round(0.5 * (dimY + dimZ))
-            self.mlp_z1_y = MLP_Network(dimY, dimS, name='stoch_hidden',
+            self.mlp_S_y = MLP_Network(dimY, dimS, name='stoch_hidden',
                 num_units=num_units, num_layers=num_layers)
-            self.mu_z1_y, self.log_sigma_z1_y = self.mlp_z1_y.setup(y_miniBatch.T)
+            self.mu_S_y, self.log_sigma_S_y = self.mlp_S_y.setup(y_miniBatch.T)
 
             gamma = self.srng.normal(size=(dimS, minbatchSize), avg=0.0, std=1.0, ndim=None)
             gamma.name = 'gamma'
             self.sample_gamma = th.function([], gamma)
 
-            self.z1 = plus(self.mu_f_y, mul(T.exp(self.log_sigma_f_y*0.5), gamma), 'z1')
+            self.S = plus(self.mu_f_y, mul(T.exp(self.log_sigma_f_y*0.5), gamma), 'S')
 
 
-            self.mlp_z2_z1f = MLP_Network(dimS+dimZ, dimZ, name='Hyster_output',
+            self.mlp_z_Sf = MLP_Network(dimS+dimZ, dimZ, name='Hyster_output',
                     num_units=num_units, num_layers=num_layers)
-            self.mu_qz2_z1f, self.log_sigma_qz2_z1f \
-                = self.mlp_z2_z1f.setup(T.concatenate((self.f, self.z1)))
+            self.mu_qz_Sf, self.log_sigma_qz_Sf \
+                = self.mlp_z_Sf.setup(T.concatenate((self.f, self.S)))
 
             beta = self.srng.normal(size=(dimZ, minbatchSize), avg=0.0, std=1.0, ndim=None)
             beta.name = 'beta'
             self.sample_beta = th.function([], beta)
 
-            self.z2 = plus(self.mu_qz2_z1f, mul(T.exp(self.log_sigma_qz2_z1f*0.5), beta), 'z2')
+            self.z = plus(self.mu_qz_Sf, mul(T.exp(self.log_sigma_qz_Sf*0.5), beta), 'z')
 
 
-            self.mlp_rf_yz1z2 = MLP_Network((dimY+dimZ+dimZ), dimZ, name='Hyster_backconstrain',
+            self.mlp_rf_ySz = MLP_Network((dimY+dimZ+dimZ), dimZ, name='Hyster_backconstrain',
                     num_units=num_units, num_layers=num_layers)
-            self.mu_rf_yz1z2, self.log_sigma_rf_yz1z2 \
-                = self.mlp_rf_yz1z2.setup(T.concatenate((y_miniBatch.T,self.z1,self.z2)))
+            self.mu_rf_ySz, self.log_sigma_rf_ySz \
+                = self.mlp_rf_ySz.setup(T.concatenate((y_miniBatch.T,self.S,self.z)))
 
-            self.gradientVariables = self.mlp_f_y.params + self.mlp_z1_y.params \
-                + self.mlp_z2_z1f.params + self.mlp_rf_yz1z2.params
+            self.gradientVariables = self.mlp_f_y.params + self.mlp_S_y.params \
+                + self.mlp_z_Sf.params + self.mlp_rf_ySz.params
 
 
 
@@ -110,15 +110,15 @@ class Hysteresis_variational_model(Printable):
             logsigma_rf = self.log_sigma_rf_yz
             name = 'log_rf_yz'
         elif self.sLayers == 2:
-            mu_rf = self.mu_rf_yz1z2
-            logsigma_rf = self.log_sigma_rf_yz1z2
-            name = 'log_rf_yz1z2'
+            mu_rf = self.mu_rf_ySz
+            logsigma_rf = self.log_sigma_rf_ySz
+            name = 'log_rf_ySz'
 
-            self.H_z1_y = elementwiseNormalEntropy(self.log_sigma_z1_y,
+            self.H_S_y = elementwiseNormalEntropy(self.log_sigma_S_y,
                                                    self.B*dimS,
                                                    'H_s_y')
 
-            self.L_terms += self.H_z1_y
+            self.L_terms += self.H_S_y
 
         self.log_r_f = log_elementwiseNormal(self.f,
                                                 mu_r,
@@ -137,9 +137,9 @@ class Hysteresis_variational_model(Printable):
             self.mlp_z_fy.randomise(rnd)
             self.mlp_rf_yz.randomise(rnd)
         elif self.sLayers == 2:
-            self.mlp_z1_y.randomise(rng)
-            self.mlp_z2_z1f.randomise(rng)
-            self.mlp_rf_yz1z2.randomise(rng)
+            self.mlp_S_y.randomise(rng)
+            self.mlp_z_Sf.randomise(rng)
+            self.mlp_rf_ySz.randomise(rng)
 
 
 if __name__ == "__main__":

@@ -17,8 +17,9 @@ from GP_LVM_CMF import SGPDV
 
 class Hybrid_variational_model(Printable):
 
-    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng, jitterProtect):
+    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng, jitterProtect, sLayers=1):
 
+        self.sLayers = sLayers
         num_units = params['numHiddenUnits_encoder']
         num_layers = params['numHiddenLayers_encoder']
 
@@ -28,17 +29,43 @@ class Hybrid_variational_model(Printable):
                                 dimZ,
                                 jitterProtect,
                                 params,
-                                srng)
+                                srng,
+                                sLayers=self.sLayers)
 
-        self.mlp_encoder = MLP_Network(dimY+dimZ, dimZ, name='Hybrid_encoder', 
+        if self.sLayers == 2:
+            dimS = round(0.5 * (dimY + dimZ))
+            # Y --> S
+            self.mlp_encoder_S = MLP_Network(dimY, dimS, name='Stoch_encoder',
+                num_units=num_units, num_layers=num_layers)
+
+            self.mu_S, self.log_sigma_S = self.mlp_encoder_S.setup(y_miniBatch.T)
+
+            delta = srng.normal(size=(dimS, miniBatchSize), avg=0.0, std=1.0, ndim=None)
+            delta.name = 'delta'
+            self.sample_delta = th.function([], delta)
+
+            self.S = plus(self.mu_S, mult(exp(self.log_sigma_S), delta), 'S')
+
+            hybrid_in_dim = dimS + dimZ
+            hybrid_input = T.concatenate((self.gp_encoder, self.S ),axis=1).T
+
+        elif self.sLayers == 1:
+            hybrid_in_dim = dimY + dimZ
+            hybrid_input = T.concatenate((self.gp_encoder.f, y_miniBatch),axis=1).T
+
+        # sLayers =1 : Y,f --> X  sLayers =2 : S,f --> X
+        self.mlp_encoder = MLP_Network(hybrid_in_dim, dimZ, name='Hybrid_encoder',
             num_units=num_units, num_layers=num_layers)
 
         self.mu_qz, self.log_sigma_qz \
-            = self.mlp_encoder.setup(T.concatenate((self.gp_encoder.f, y_miniBatch),axis=1).T)
+            = self.mlp_encoder.setup(T.concatenate(hybrid_input))
 
         gamma = srng.normal(size=(dimZ, miniBatchSize), avg=0.0, std=1.0, ndim=None)
         gamma.name = 'gamma'
         self.sample_gamma = th.function([], gamma)
+
+
+
 
         self.z = plus(self.mu_qz, mul(T.exp(self.log_sigma_qz), gamma), 'z')
 
@@ -59,11 +86,15 @@ class Hybrid_variational_model(Printable):
         self.gp_encoder.sample_alpha()
         self.gp_encoder.sample_beta()
         self.sample_gamma()
+        if self.sLayers == 2:
+            self.sample_delta()
 
     def randomise(self, rnd):
         self.gp_encoder.randomise(rnd)
         self.mlp_encoder.randomise(rnd)
         self.gp_encoder.init_Xu_from_Xf()
+        if self.sLayers == 2:
+            self.mlp_encoder_S.randomise(rnd)
 
 
 if __name__ == "__main__":
