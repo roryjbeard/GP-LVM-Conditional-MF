@@ -18,6 +18,7 @@ from Hysteresis_variational_model import Hysteresis_variational_model
 from jitterProtect import JitterProtect
 from printable import Printable
 import time as time
+import progressbar
 #import collections
 #from theano.compile.nanguardmode import NanGuardMode
 import lasagne
@@ -166,46 +167,41 @@ class AutoEncoderModel(Printable):
         if not type(self.encoder) == Hybrid_variational_model:
             constrain = False
             printDiagnostics=0
-
-        startTime    = time.time()
-        wallClockOld = startTime
-        # For each iteration...
-
+            
         print "training for {} epochs".format(numberOfEpochs)
-
-        # pbar = progressbar.ProgressBar(maxval=numberOfIterations*numberOfEpochs).start()
 
         for ep in range(numberOfEpochs):
 
             # Sample a new batch
             self.sample()
 
+            wallClock = 0.0
             for it in range(self.numberofBatchesPerEpoch):
 
                 # Sample from the encoder
+                start = time.time()
                 self.encoder.sample()
                 self.decoder.sample()
                 self.iterator.set_value(it)
                 lbTmp = self.jitterProtector.jitterProtect(self.updateFunction, reset=False)
                 if constrain:
                     self.encoder.gp_encoder.constrainKernelParameters()
+                stop = time.time()
 
                 lbTmp = lbTmp.flatten()
-                self.lowerBound = lbTmp[0]
+                self.lowerBound = lbTmp[0] / self.B
 
-                currentTime  = time.time()
-                wallClock    = currentTime - startTime
-                stepTime     = wallClock - wallClockOld
-                wallClockOld = wallClock
+                stepTime = stop - start
+                wallClock += stepTime
 
-                if it % printFrequency == 0
+                if it % printFrequency == 0:
                     print("\n Ep %d It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
                       % (ep, it, wallClock, stepTime, self.lowerBound))
                 if printDiagnostics > 0 and (it % printDiagnostics) == 0:
                     self.encoder.gp_encoder.printDiagnostics()
 
                 self.lowerBounds.append((self.lowerBound, ep, it, wallClock))
-
+                
                 if ep * self.numberofBatchesPerEpoch + it > maxIters:
                     break
 
@@ -215,8 +211,6 @@ class AutoEncoderModel(Printable):
      
             if ep * self.numberofBatchesPerEpoch + it > maxIters:
                 break
-            # pbar.update(ep*numberOfIterations+it)
-        # pbar.finish()
 
         return self.lowerBounds
 
@@ -233,11 +227,11 @@ class AutoEncoderModel(Printable):
 #                                          self.L,
 #                                          updates=updates,
 #                                          no_default_updates=True,
-#                                          profile=profile),
+#                                          profile=profile)
 #                                          #mode=NanGuardMode(nan_is_error=True,
 #                                          #                  inf_is_error=True,
 #                                          #                  big_is_error=True))
-##
+###
 
         grads = T.grad(-self.L, self.gradientVariables)
         clip_grad = 1
@@ -261,23 +255,27 @@ class AutoEncoderModel(Printable):
 
     def MCLogLikelihood(self, numberOfSamples=5000):
         
+        print 'Computing MC Likelihood'
         self.sample()
-        ll = [0] * self.numberofBatchesPerEpoch * numberOfSamples
-        c = 0
+        pbar = progressbar.ProgressBar(
+            maxval=(self.numberofBatchesPerEpoch*numberOfSamples)).start()
+        lbs = np.zeros((numberOfSamples,))
+        ll = 0
         for i in range(self.numberofBatchesPerEpoch):
-            print '{} of {}, {} samples'.format(i,
-                                                self.numberofBatchesPerEpoch,
-                                                numberOfSamples)
             self.iterator.set_value(i)
             self.jitterProtector.reset()
             for k in range(numberOfSamples):
                 self.decoder.sample()
                 self.encoder.sample()
-                ll[c] = self.jitterProtector.jitterProtect(self.L_func, reset=False)
-                c += 1
-        return np_log_mean_exp_stable(ll)
-
-
+                lbs[k] = self.jitterProtector.jitterProtect(self.L_func,
+                                                            reset=False)
+                pbar.update(i*numberOfSamples+k)
+            lb = np_log_mean_exp_stable(lbs)
+            ll += lb
+        pbar.finish()
+        print 'MC log-likelihood = {}'.format(ll) 
+        return ll
+        
     def copyGradientVariables(self, other):
         for i in range(len(self.gradientVariables)):
             if self.gradientVariables[i].name == other.gradientVariables[i].name:

@@ -2,7 +2,7 @@
 
 import theano
 import numpy as np
-from utils import tanh, sigmoid, softplus, exp, plus, dot
+from utils import tanh, sigmoid, softplus, exp, plus, dot, relu
 from utils import sharedZeroMatrix, sharedZeroVector
 
 floatX = theano.config.floatX
@@ -26,23 +26,32 @@ class Linear():
         scale = factor * np.sqrt(6./(self.dim_in+self.dim_out))
         randoms = np.asarray(rnd.uniform(low=-scale,
                                      high=scale,
-                                     size=(self.dim_in, self.dim_out)), dtype=floatX)
+                                     size=(self.dim_out, self.dim_in)), dtype=floatX)
         self.b.set_value(np.zeros((self.dim_out,1), dtype=floatX))
-        if type(nonlinearity) == Tanh:
+        if nonlinearity == None:
+            print 'randomising ' + self.W.name
+            self.W.set_value(randoms)            
+        elif nonlinearity.type == 'Tanh':
+            print 'randomising ' + self.W.name
             self.W.set_value(randoms)
-            self.b.set_value(np.zeros((self.dim_out,1), dtype=floatX))
-        elif type(nonlinearity) == Softplus:
-            self.W.set_value(4*randoms)
-            self.b.set_value(np.zeros((self.dim_out,1), dtype=floatX))
-        elif type(nonlinearity) == Linear:
+        elif nonlinearity.type == 'Softplus':
+            print 'randomising ' + self.W.name
+            self.W.set_value(randoms)
+        elif nonlinearity.type  == 'Linear':
             raise RuntimeError('Consecutive linear layers')
-        elif type(nonlinearity) == ReLU:
+        elif nonlinearity.type == 'ReLU':
+            print 'randomising ' + self.W.name
             self.W_set_value(randoms)
-            self.b.set_value(np.zeros((self.dim_out,1), dtype=floatX))
+        elif nonlinearity.type == 'Sigmoid':
+            print 'randomising ' + self.W.name
+            self.W.set_value(4*randoms)
+        else:
+            raise RuntimeError('Unrecognised non-linearity' + nonlinearity.type)
 
 
 class Tanh():
     def __init__(self):
+        self.type = 'Tanh'
         self.params = []
 
     def setup(self, x_in, **kwargs):
@@ -50,6 +59,7 @@ class Tanh():
 
 class Sigmoid():
     def __init__(self):
+        self.type = 'Sigmoid'
         self.params = []
 
     def setup(self, x_in, **kwargs):
@@ -57,6 +67,7 @@ class Sigmoid():
 
 class Exponential():
     def __init__(self):
+        self.type = 'Exponential'
         self.params = []
 
     def setup(self, x_in, **kwargs):
@@ -64,6 +75,7 @@ class Exponential():
 
 class Softplus():
     def __init__(self):
+        self.type = 'Softplus'
         self.params = []
 
     def setup(self, x_in, **kwargs):
@@ -71,6 +83,10 @@ class Softplus():
 
 class ReLU():
     def __init__(self):
+        self.type = 'ReLU'
+        self.params = []
+        
+    def setup(self, x_in, **kwargs):
         return relu(x_in)
 
 class NNet():
@@ -102,7 +118,7 @@ class NNet():
 
 class MLP_Network():
 
-    def __init__(self, dim_in, dim_out, name='', num_units=10, num_layers=1, continuous=True, nonlinearity=Softplus):
+    def __init__(self, dim_in, dim_out, name='', num_units=10, num_layers=1, continuous=True, nonlinearity=Tanh):
 
         self.nonlinearity = nonlinearity()
         self.name = name
@@ -144,4 +160,4 @@ class MLP_Network():
             self.muLinear.randomise(rnd)
             self.logsigmaLinear.randomise(rnd)
         else:
-            self.yhatLinear.randomise(rnd, nonlinearity=Sigmoid)
+            self.yhatLinear.randomise(rnd, nonlinearity=self.yhatSigmoid)
