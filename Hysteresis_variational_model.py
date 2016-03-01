@@ -20,17 +20,16 @@ log2pi = T.constant(np.log(2 * np.pi))
 
 class Hysteresis_variational_model(Printable):
 
-    def __init__(self, y_miniBatch, minbatchSize, dimY, dimZ, params, srng, sLayers=1):
+    def __init__(self, y_miniBatch, minbatchSize, dimY, dimZ, params, srng):
 
         self.srng = srng
 
         self.B = minbatchSize
         self.Q = dimZ
-        self.sLayers = sLayers
-
 
         num_units = params['numHiddenUnits_encoder']
         num_layers = params['numHiddenLayers_encoder']
+        self.sLayers = params['numStochasticLayers_encoder']
 
         self.mlp_f_y = MLP_Network(dimY, dimZ, name='Hyster_hidden',
                 num_units=num_units, num_layers=num_layers)
@@ -64,7 +63,7 @@ class Hysteresis_variational_model(Printable):
 
         elif self.sLayers == 2:
 
-            dimS = round(0.5 * (dimY + dimZ))
+            dimS = int(round(0.5 * (dimY + dimZ)))
             self.mlp_z1_y = MLP_Network(dimY, dimS, name='stoch_hidden',
                 num_units=num_units, num_layers=num_layers)
             self.mu_z1_y, self.log_sigma_z1_y = self.mlp_z1_y.setup(y_miniBatch.T)
@@ -121,7 +120,7 @@ class Hysteresis_variational_model(Printable):
             self.L_terms += self.H_z1_y
 
         self.log_r_f = log_elementwiseNormal(self.f,
-                                                mu_r,
+                                                mu_rf,
                                                 logsigma_rf,
                                                 name)
 

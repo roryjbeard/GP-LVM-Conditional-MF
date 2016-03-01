@@ -111,7 +111,7 @@ class MLP_likelihood_model(Printable):
             # KL[q(z1|y)||p(z1|z2)]
             self.KL_qp1 = 0.5*(T.sum(exp(mul(minus(encoder.log_sigma_qz1, self.log_sigma_decoder1),2)))) \
                         + 0.5 * T.sum((minus(self.mu_decoder1 -  encoder.mu_qz1) / exp(self.log_sigma_decoder1,2))**2) \
-                        + T.sum(self.log_sigma_decoder1)
+                        + T.sum(self.log_sigma_decoder1) \
                         - T.sum(encoder.log_sigma_qz1) \
                         - 0.5*self.dimS*self.B
 
@@ -124,7 +124,7 @@ class MLP_likelihood_model(Printable):
                 logsigma = self.log_sigma_decoder2
 
 
-             self.log_pyz = log_elementwiseNormal(self.y_miniBatch.T,
+            self.log_pyz = log_elementwiseNormal(self.y_miniBatch.T,
                                                   mu,
                                                   logsigma,
                                                   'log_pyz')

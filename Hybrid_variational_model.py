@@ -21,6 +21,7 @@ class Hybrid_variational_model(Printable):
 
         num_units = params['numHiddenUnits_encoder']
         num_layers = params['numHiddenLayers_encoder']
+        self.sLayers = params['numStochasticLayers_encoder']
 
         self.gp_encoder = SGPDV(y_miniBatch,
                                 miniBatchSize,

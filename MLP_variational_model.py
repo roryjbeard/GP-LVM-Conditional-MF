@@ -19,14 +19,14 @@ log2pi = T.constant(np.log(2 * np.pi))
 
 class MLP_variational_model(Printable):
 
-    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng, sLayers=1):
+    def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, params, srng):
 
-        self.sLayers = sLayers
         self.B = miniBatchSize
         self.Q = dimZ
         num_units  = params['numHiddenUnits_encoder']
         num_layers = params['numHiddenLayers_encoder']
-
+        self.slayers = params['numStochasticLayers_encoder']
+        
         if self.sLayers == 1:
 
             self.mlp_encoder = MLP_Network(dimY, dimZ, name='MLP_encoder',
