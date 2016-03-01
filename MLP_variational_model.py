@@ -23,89 +23,93 @@ class MLP_variational_model(Printable):
 
         self.B = miniBatchSize
         self.Q = dimZ
-        num_units  = params['numHiddenUnits_encoder']
+        num_units = params['numHiddenUnits_encoder']
         num_layers = params['numHiddenLayers_encoder']
-        self.slayers = params['numStochasticLayers_encoder']
-        
+        self.sLayers = params['numStochasticLayers_encoder']
+
         if self.sLayers == 1:
 
-            self.mlp_encoder = MLP_Network(dimY, dimZ, name='MLP_encoder',
-                    num_units=num_units, num_layers=num_layers)
+            self.mlp_qz = MLP_Network(dimY,
+                                      dimZ,
+                                      name='mlp_qz',
+                                      num_units=num_units,
+                                      num_layers=num_layers)
 
-            self.mu_qz, self.log_sigma_qz = self.mlp_encoder.setup(y_miniBatch.T)
+            self.mu_qz, self.log_sigma_qz = self.mlp_qz.setup(y_miniBatch.T)
 
-            alpha = srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
-            alpha.name = 'alpha'
-            self.sample_alpha = th.function([], alpha)
+            gamma = srng.normal(size=(dimZ, self.B),
+                                avg=0.0,
+                                std=1.0,
+                                ndim=None)
+                                
+            gamma.name = 'gamma'
+            self.sample_gamma = th.function([], gamma)
 
-            self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), alpha), 'z')
+            self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), gamma), 'z')
 
-            self.gradientVariables = self.mlp_encoder.params
+            self.gradientVariables = self.mlp_qz.params
 
         elif self.sLayers == 2:
-            dimS = round(0.5 * (dimZ + dimY))
-            self.mlp_encoder1 = MLP_Network(dimY, dimS, name='MLP_encoder1',
-                num_units=num_units, num_layers=num_layers)
 
-            self.mu_qz1, self.log_sigma_qz1 = self.mlp_encoder1.setup(y_miniBatch.T)
+            dimS = int(round(0.5 * (dimZ + dimY)))
+            self.mlp_qs = MLP_Network(dimY,
+                                      dimS,
+                                      name='mlp_qs',
+                                      num_units=num_units,
+                                      num_layers=num_layers)
 
-            alpha1 = srng.normal(size=(dimS, self.B), avg=0.0, std=1.0, ndim=None)
-            alpha1.name = 'alpha1'
-            self.sample_alpha1 = th.function([], alpha1)
+            self.mu_qs, self.log_sigma_qs = self.mlp_qs.setup(
+                y_miniBatch.T)
 
-            self.z1 = plus(self.mu_qz1, mult(exp(self.log_sigma_qz1), alpha1), 'z1')
+            eta = srng.normal(size=(dimS, self.B), avg=0.0, std=1.0, ndim=None)
+            eta.name = 'eta'
+            self.sample_eta = th.function([], eta)
 
-            self.mlp_encoder2 = MLP_Network(dimS, dimZ, name='MLP_encoder2',
-                num_units=num_units, num_layers=num_layers)
+            self.s = plus(self.mu_qs,
+                          mul(exp(self.log_sigma_qs),
+                              eta), 's~q(s)')
 
-            self.mu_qz2, self.log_sigma_qz2 = self.mlp_encoder2.setup(self.z1)
+            self.mlp_qz = MLP_Network(dimS,
+                                      dimZ,
+                                      name='mlp_qz',
+                                      num_units=num_units,
+                                      num_layers=num_layers)
 
-            alpha2 = srng.normal(size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
-            alpha2.name = 'alpha2'
-            self.sample_alpha2 = th.function([], alpha2)
+            self.mu_qz, self.log_sigma_qz = self.mlp_qz.setup(self.s)
 
-            self.z2 = plus(self.mu_qz2, mul(exp(self.log_sigma_qz2), alpha2), 'z2')
+            gamma = srng.normal(
+                size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
+            gamma.name = 'gamma'
+            self.sample_gamma = th.function([], gamma)
 
-            self.gradientVariables = self.mlp_encoder1.params + self.mlp_encoder2.params
+            self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), gamma), 'z')
 
-
-
+        self.gradientVariables = self.mlp_qz.params
+        if self.sLayers == 2:
+            self.gradientVariables.extend(self.mlp_qz.params)
 
     def construct_L_terms(self):
         self.L_terms = 0
 
     def sample(self):
-        if self.sLayers == 1:
-            self.sample_alpha()
-        elif self.sLayers == 2:
-            self.sample_alpha1()
-            self.sample_alpha2()
+        self.sample_gamma()
+        if self.sLayers == 2:
+            self.sample_eta()
 
     def randomise(self, rng):
-        if self.sLayers == 1:
-            self.mlp_encoder.randomise(rng)
-        elif self.sLayers == 2:
-            self.mlp_encoder1.randomise(rng)
-            self.mlp_encoder2.randomise(rng)
-
+        self.mlp_qz.randomise(rng)
+        if self.sLayers == 2:
+            self.mlp_qs.randomise(rng)
+            
 if __name__ == "__main__":
-    y_miniBatch = np.ones((2,2))
+    y_miniBatch = np.ones((2, 2))
     miniBatchSize = 2
     dimY = 2
     dimZ = 2
-    enc_params = {'numHiddenUnits_encoder' : 10, 'numHiddenLayers_encoder' : 1}
+    enc_params = {'numHiddenUnits_encoder': 10, 'numHiddenLayers_encoder': 1}
 
-    encoder = MLP_variational_model(y_miniBatch, miniBatchSize, dimY, dimZ, enc_params)
+    encoder = MLP_variational_model(
+        y_miniBatch, miniBatchSize, dimY, dimZ, enc_params)
 
     encoder.construct_L_terms()
     encoder.sample()
-
-
-
-
-
-
-
-
-
-

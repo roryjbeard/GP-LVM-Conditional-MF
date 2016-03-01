@@ -118,24 +118,24 @@ class AutoEncoderModel(Printable):
 
         if decoderParameters['Type'] == 'MLP':
             self.decoder = MLP_likelihood_model(self.y_miniBatch, self.B,
-                self.P, self.Q, self.encoder, decoderParameters)
+                self.P, self.Q, self.encoder, decoderParameters, self.srng)
         else:
             raise RuntimeError('Unrecognised decoder type')
 
         self.encoder.construct_L_terms()
         self.decoder.construct_L_terms(self.encoder)
 
+        self.gradientVariables = self.encoder.gradientVariables + self.decoder.gradientVariables
+
         if L_terms == 'Train':
             self.L = self.encoder.L_terms + self.decoder.L_terms
+            self.dL = T.grad(self.L, self.gradientVariables)
+            for i in range(len(self.dL)):
+                self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
         elif L_terms == 'Test':
             self.L = self.decoder.log_pyz
         else:
             raise RuntimeError('L_terms is in {''Train'',''Test''}')
-        self.gradientVariables = self.encoder.gradientVariables + self.decoder.gradientVariables
-
-        self.dL = T.grad(self.L, self.gradientVariables)
-        for i in range(len(self.dL)):
-            self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
 
         # Sample batch before randomisation
         self.sample_batchStream()
@@ -251,8 +251,10 @@ class AutoEncoderModel(Printable):
                                       no_default_updates=True)
 
 
-    def construct_L_dL_functions(self):
+    def construct_L_function(self):
         self.L_func = th.function([], self.L, no_default_updates=True)
+        
+    def construct_dL_function(self):
         self.dL_func = th.function([], self.dL, no_default_updates=True)
 
     def MCLogLikelihood(self, numberOfSamples=5000):

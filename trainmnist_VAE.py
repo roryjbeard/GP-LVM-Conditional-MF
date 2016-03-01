@@ -62,7 +62,7 @@ vae_train = AutoEncoderModel(x_train, params, encoderParameters, decoderParamete
 vae_test  = AutoEncoderModel(x_test,  params, encoderParameters, decoderParameters, L_terms='Test')
 
 vae_train.constructUpdateFunction(learning_rate=learning_rate)
-vae_test.construct_L_dL_functions()
+vae_test.construct_L_function()
 
 vae_train.train(numberOfEpochs=numberOfEpochs,
         #maxIters=np.inf,
