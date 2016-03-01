@@ -38,9 +38,9 @@ class MLP_likelihood_model(Printable):
                                          num_layers=num_layers,
                                          continuous=True)
 
-            self.mu_p_y_z, self.log_sigma_p_y_z = self.mlp_decoder.setup(encoder.z)
+            self.mu_p_y_z, self.log_sigma_p_y_z = self.mlp_p_y_z.setup(encoder.z)
 
-        if self.sLayers == 1 and not self.continuous:
+        elif self.sLayers == 1 and not self.continuous:
 
             self.mlp_p_y_z = MLP_Network(dimZ,
                                          dimY,
@@ -103,7 +103,7 @@ class MLP_likelihood_model(Printable):
             nu.name = 'nu'
             self.sample_nu = th.function([], nu)
             self.y_hat = plus(self.mu_p_y_z,
-                              mul(exp(self.log_sigma_decoder),
+                              mul(exp(self.log_sigma_p_y_z),
                                   nu), 'y_hat')
 
         else:

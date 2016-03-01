@@ -42,8 +42,8 @@ class AutoEncoderModel(Printable):
         data = np.asarray(data, dtype=precision)                
         if params['BinaryFromContinuous']:
             self.binarise = True
-            self.data = th.shared(data, name='data')   
-            y_threshold = self.srng.uniform(size=self.data.shape, low=0.0, high=1.0, ndim=None)                     
+            self.data = th.shared(data, name='data')
+            y_threshold = self.srng.uniform(size=self.data.shape, low=0.0, high=1.0, ndim=None) * 0.1 + 0.45                    
             self.y = self.data > y_threshold
             self.sample_y_threshold = th.function([], y_threshold)
             if decoderParameters['continuous'] == True:
@@ -158,6 +158,7 @@ class AutoEncoderModel(Printable):
         maxIters=np.inf,
         constrain=False,
         printDiagnostics=0,
+        printFrequency=1,
         testModel=None,
         numberOfTestSamples=5000
         ):
@@ -197,7 +198,8 @@ class AutoEncoderModel(Printable):
                 stepTime     = wallClock - wallClockOld
                 wallClockOld = wallClock
 
-                print("\n Ep %d It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
+                if it % printFrequency == 0
+                    print("\n Ep %d It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
                       % (ep, it, wallClock, stepTime, self.lowerBound))
                 if printDiagnostics > 0 and (it % printDiagnostics) == 0:
                     self.encoder.gp_encoder.printDiagnostics()

@@ -25,10 +25,10 @@ dimZ = 40
 dimX = 30
 params = {'miniBatchSize' : 200, 'dimZ':400,
          'theanoRandomSeed':123, 'numpyRandomSeed':123,
-         'BinaryFromContinuous':True}
+         'BinaryFromContinuous':False}
 encoderParameters = {'Type':None, 'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 2, 'numStochasticLayers_encoder':None,
                      'dimX':dimX, 'numberOfInducingPoints':400, 'kernelType':'ARD', 'theta':np.ones((1,dimX+1)), 'theta_min':1e-3, 'theta_max':1e3}
-decoderParameters = {'Type':'MLP', 'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 2, 'numStochasticLayers_encoder':None, 'continuous':False}
+decoderParameters = {'Type':'MLP', 'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 2, 'numStochasticLayers_encoder':None, 'continuous':True}
 
 experimentNumber = raw_input('Enter experiment number (1-6): ')
 if experimentNumber == '1':
@@ -65,10 +65,11 @@ vae_train.constructUpdateFunction(learning_rate=learning_rate)
 vae_test.construct_L_function()
 
 vae_train.train(numberOfEpochs=numberOfEpochs,
-        #maxIters=np.inf,
-        maxIters=10,                
+        maxIters=np.inf,
+        #maxIters=10,                
         constrain=False,
         printDiagnostics=0,
+        printFrequency=100,
         testModel=vae_test,
         numberOfTestSamples=10)
         
