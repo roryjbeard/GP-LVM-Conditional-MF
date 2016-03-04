@@ -19,11 +19,11 @@ from utils_RB import normalEntropy2
 #settings
 dataset = 'fixed'
 batch_size = 100
-nhidden = 200
+nhidden = 10
 nonlin_enc = T.nnet.softplus
 nonlin_dec = T.nnet.softplus
-latent_size = 100
-latent_ext_size = 50
+latent_size = 10
+latent_ext_size = 5
 analytic_kl_term = True
 lr = 0.0003
 num_epochs = 1000
@@ -119,7 +119,8 @@ l_dec_log_var_s = lasagne.layers.DenseLayer(l_dec_h1,
                                     nonlinearity=lasagne.nonlinearities.identity,
                                     name='DEC_LOG_VAR')
 
-l_dec_s = SimpleSampleLayer(mean=l_dec_mu_s, log_var=l_dec_log_var_s)
+# l_dec_s = SimpleSampleLayer(mean=l_dec_mu_s, log_var=l_dec_log_var_s)
+l_dec_s = lasagne.layers.GaussianNoiseLayer(l_dec_mu_s,)
 
 l_ext_dec_h1 = lasagne.layers.DenseLayer(l_dec_s,
                                     num_units=nhidden,
