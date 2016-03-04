@@ -5,12 +5,16 @@ theano.config.floatX = 'float32'
 import theano.tensor as T
 import numpy as np
 import lasagne
-from parmesan.distributions import log_stdnormal, log_normal2, log_bernoulli, kl_normal2_stdnormal, normalEntropy2
+from parmesan.distributions import log_stdnormal, log_normal2, log_bernoulli, kl_normal2_stdnormal
 from parmesan.layers import SimpleSampleLayer
 from parmesan.datasets import load_mnist_realval, load_mnist_binarized
-import time, shutil, os
+import time, shutil, os, sys
 
 filename_script = os.path.basename(os.path.realpath(__file__))
+
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
+
+from utils_RB import normalEntropy2
 
 #settings
 dataset = 'fixed'
@@ -73,8 +77,8 @@ l_in = lasagne.layers.InputLayer((batch_size, nfeatures))
 l_enc_h1 = lasagne.layers.DenseLayer(l_in, num_units=nhidden, nonlinearity=nonlin_enc, name='ENC_DENSE1')
 l_enc_h1 = lasagne.layers.DenseLayer(l_enc_h1, num_units=nhidden, nonlinearity=nonlin_enc, name='ENC_DENSE2')
 
-l_enc_mu_s = lasagne.layers.DenseLayer(l_enc_h1, num_units=latent_ext_size, nonlinearity=lasagne.nonlinearities.identity, name='ENC_Z_MU')
-l_enc_log_var_s = lasagne.layers.DenseLayer(l_enc_h1, num_units=latent_ext_size, nonlinearity=lasagne.nonlinearities.identity, name='ENC_Z_LOG_VAR')
+l_enc_mu_s = lasagne.layers.DenseLayer(l_enc_h1, num_units=latent_ext_size, nonlinearity=lasagne.nonlinearities.identity, name='ENC_S_MU')
+l_enc_log_var_s = lasagne.layers.DenseLayer(l_enc_h1, num_units=latent_ext_size, nonlinearity=lasagne.nonlinearities.identity, name='ENC_S_LOG_VAR')
 
 #sample the latent variables using mu(x) and log(sigma^2(x))
 l_enc_s = SimpleSampleLayer(mean=l_enc_mu_s, log_var=l_enc_log_var_s)
@@ -104,18 +108,18 @@ l_z = SimpleSampleLayer(mean=l_enc_mu_z, log_var=l_enc_log_var_z)
 ### GENERATIVE MODEL p(x|z)
 l_dec_h1 = lasagne.layers.DenseLayer(l_z, num_units=nhidden, nonlinearity=nonlin_dec, name='DEC_DENSE1')
 l_dec_h1 = lasagne.layers.DenseLayer(l_dec_h1, num_units=nhidden, nonlinearity=nonlin_dec, name='DEC_DENSE2')
-l_dec_mu = lasagne.layers.DenseLayer(l_dec_h1,
+l_dec_mu_s = lasagne.layers.DenseLayer(l_dec_h1,
                                 num_units=latent_ext_size,
                                 nonlinearity=lasagne.nonlinearities.identity,
                                 name='DEC_MU')
 
 #extend the generative model
-l_dec_log_var = lasagne.layers.DenseLayer(l_dec_h1,
+l_dec_log_var_s = lasagne.layers.DenseLayer(l_dec_h1,
                                     num_units=latent_ext_size,
                                     nonlinearity=lasagne.nonlinearities.identity,
                                     name='DEC_LOG_VAR')
 
-l_dec_s = SimpleSampleLayer(mean=l_dec_mu, log_var=l_dec_log_var)
+l_dec_s = SimpleSampleLayer(mean=l_dec_mu_s, log_var=l_dec_log_var_s)
 
 l_ext_dec_h1 = lasagne.layers.DenseLayer(l_dec_s,
                                     num_units=nhidden,
@@ -123,12 +127,12 @@ l_ext_dec_h1 = lasagne.layers.DenseLayer(l_dec_s,
                                     name='DEC_EXT_DENSE1')
 l_ext_dec_h2 = lasagne.layers.DenseLayer(l_ext_dec_h1,
                                     num_units=nhidden,
-                                    nonlinearity=nonlin_dec
+                                    nonlinearity=nonlin_dec,
                                     name='DEC_EXT_DENSE2')
 
 l_ext_dec_mu = lasagne.layers.DenseLayer(l_ext_dec_h2,
                                     num_units=nfeatures,
-                                    nonlinearity=lasagne.nonlineraties.identity,
+                                    nonlinearity=lasagne.nonlinearities.identity,
                                     name='DEC_EXT_MU')
 
 # Get outputs from model
@@ -137,14 +141,14 @@ z_enc_mu_train, z_enc_log_var_train, z_enc_train, \
 s_dec_mu_train, s_dec_log_var_train, s_dec_train, x_mu_train = lasagne.layers.get_output(
                                         [l_enc_mu_s, l_enc_log_var_s, l_enc_s,
                                         l_enc_mu_z, l_enc_log_var_z, l_z,
-                                        l_dec_s, l_dec_mu], sym_x, deterministic=False)
+                                        l_dec_mu_s, l_dec_log_var_s, l_dec_s, l_ext_dec_mu], sym_x, deterministic=False)
 
 s_enc_mu_eval, s_enc_log_var_eval, s_enc_eval, \
 z_enc_mu_eval, z_enc_log_var_eval, z_enc_eval, \
-s_dec_mu_eval, s_dec_log_var_eval, x_mu_eval, s_dec_eval = lasagne.layers.get_output(
+s_dec_mu_eval, s_dec_log_var_eval, s_dec_eval, x_mu_eval = lasagne.layers.get_output(
                                         [l_enc_mu_s, l_enc_log_var_s, l_enc_s,
                                         l_enc_mu_z, l_enc_log_var_z, l_z,
-                                        l_dec_s, l_dec_mu], sym_x, deterministic=True)
+                                        l_dec_mu_s, l_dec_log_var_s, l_dec_s, l_ext_dec_mu], sym_x, deterministic=True)
 
 
 #Calculate the loglikelihood(x) = E_q[ log p(x|s) + log p(s|z) + log p(z) - log q(z|s) - log q(s|x)]
@@ -163,9 +167,11 @@ def latent_gaussian_x_bernoulli(z, z_I_s_mu, z_I_s_log_var, s, s_mu, s_log_var, 
     """
     if analytic_kl_term:
         kl_term = kl_normal2_stdnormal(z_I_s_mu, z_I_s_log_var).sum(axis=1)
+        # kl_term = 1.
         log_px_given_s = log_bernoulli(x, x_I_s_mu).sum(axis=1)
-        log_ps_I_z = log_normal2(s, s_mu, s_log_var)
+        log_ps_I_z = log_normal2(s, s_mu, s_log_var).sum(axis=1)
         H_s = normalEntropy2(s_log_var)
+        # H_s = 1.
         LL = T.mean(-kl_term + log_px_given_s + log_ps_I_z + H_s)
     else:
         RuntimeError('case not implemented')
