@@ -27,10 +27,32 @@
 % Packages hyperref and algorithmic misbehave sometimes.  We can fix
 % this with the following command.
 \newcommand{\theHalgorithm}{\arabic{algorithm}}
+\newcommand{\chris}[1]{\textcolor{ForestGreen}{#1}}
+\newcommand{\Tau}{\mathcal{T}}
+\newcommand{\Kappa}{\mathcal{K}}
+\newcommand{\xb}{\mathbf{x}}
+\newcommand{\ub}{\mathbf{u}}
+\newcommand{\zb}{\mathbf{z}}
+\newcommand{\fb}{\mathbf{f}}
+\newcommand{\Cb}{\mathbf{C}}
+\newcommand{\Ab}{\mathbf{A}}
+\newcommand{\yb}{\mathbf{y}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\Lo}{\mathcal{L}_1}
+\newcommand{\Laux}{\mathcal{L}_{\mathrm{aux}}}
+\newcommand{\Kff}{\mathbf{K}_{ff}}
+\newcommand{\Kuu}{\mathbf{K}_{uu}}
+\newcommand{\Kuf}{\mathbf{K}_{uf}}
+\newcommand{\Kfu}{\mathbf{K}_{fu}}
 \newcommand{\Ex}{\mathbb{E}}
-\newcommand{\KL}{\textrm{KL}}
-% I would prefer f or \mathbf{f} rather than F()
-\newcommand{\f}{f}
+\newcommand{\KL}{\mathrm{KL}}
+\newcommand{\No}{\mathcal{N}}
+\newcommand{\chol}{\mathrm{chol}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\Wb}{\mathbf{W}}
+\newcommand{\hb}{\mathbf{h}}
+\newcommand{\bb}{\mathbf{b}}
+\newcommand{\bx}{\mathbf{x}}
 
 % Just a working title/suggestion
 \title{Black-box Auxiliary Variational Inference}
@@ -70,14 +92,18 @@ HOWEVER THE NECESSARY CRUCIAL DESIGN CHOICES MAKE THIS PROCEDURE DIFFICULT TO AU
 Rather than designing model specific, parametric variational priors..., we take inspiration from the Bayesian non-parametric dimensionality reduction method of.. GP-LVM... to learn a flexible, non-linear mapping from a shared latent auxiliary space to each conditionally independent variational factor.
 The dependence is induced by a fixed number of latent coordinates, the locations of which are learned so as to induce the optimal dependence structure. We refer to this scheme as GP-LVM-conditional mean field (GP-LVM-CMF) inference.
 
-In addition to the GP-LVM, we introduce an auxiliary neural net approach which naturally extends the variational auto-encoder to a hierarchical version which is able to the bottom-up stochastic message passing of the variational encoder with top-down stochastic messages from a variational auxiliary decoder.
-
-From the perspective of the variational principle, we propose a drop-in replacement for mean field inference in which a rich, variational distribution is specified in the expanded space of variables we wish to infer augmented with auxiliary inference variables.
+From the perspective of the variational principle, we propose a drop-in replacement for mean field inference in which a rich, variational distribution is specified in the expanded space of variables we wish to infer, augmented with auxiliary inference variables.
 This can be seen as specifying a non-parametric hierarchical variational model (CITE RANAGNATH 2015)... integrating over the auxiliary inference parameters recovers a marginal distribution as an infinite mixture of augmented distributions...
 
 From the perspective of recognition models and variational autoencoding, the GP-LVM-CMF scheme consists of a non-parametric inference network, or \emph{encoder}, which maps the augmented data-auxiliary variable space to the latent variable space. ... should be more flexible than rigidly encoding directly from the non-augmented data space (WHY EXACTLY???)
 
-The marginal variational distribution over the variables of interest, $q(Z,\eta)$, is itself intractable precluding the analyticity of the variational entropy... therefore we lower bound again...
+In addition to this encoder model, we introduce a framework for training variational auto-encoders and their more complex derived forms. Of particular interest are deep VAE architectures that consist of stacked stochastic hidden layers in both the decoding and encoding arms. While the depth of the generative model allows for richer latent representations and generative capacity, learning the model parameters via an equivalent deep encoder leads to returns which sharply diminish as more stochastic layers are added. We demonstrate that it is the unidirectional nature of the flow of information during training that hampers the learning process, causing the hidden layers closest to the data to fit rigidly to the data, rendering model hidden units further upstream effectively inactive. To remedy this pathology we propose an auxiliary inference scheme which combines the bottom-up stochastic message passing of the vanilla encoder with top-down flowing information. We show that this Auxiliary Variational Inference (AVI) scheme significantly outperform the now standard stochastic backpropagation procedure for architectures of varying depth.
+The focus of this work is to inform on how to correctly learn deep, expressive generative models, rather than on the design of such generative models themselves. Therefore the experiments documented here were designed to showcase the ability of the proposed inference scheme to boost the performance of a \emph{given} model.
+
+Pleasingly the technique of furnishing the variational encoder with an auxiliary model is not a heuristic or hack like e.g. the popular tricks of dropout, layer-wise pre-training, gradient clipping, and more recently batch normalisation, rather it is manifest as the result of natural application of the Bayesian variational principle. In particular the technique involves further lower bounding the variational lower bound of the model evidence in a way which recovers the auxiliary lower bound considered in RERERENCE SALIMANS.
+
+
+The marginal variational distribution over the variables of interest, $q(Z)$, is itself intractable precluding analyticity of the variational entropy in the lower bound therefore we lower bound again...
 
 SVI framework permits a learning procedure that requires only unbiased estimates of the lower bound (or rather its gradient), removing the issue of the lack of analyticity of the lower bound and, for no extra cost, granting a highly data-scalable mini-batch update scheme.
 There has been much recent work which empirically demonstrates the success of ... despite the presence of two sources of stochasticity.
@@ -104,6 +130,9 @@ Experiments:
 
 \subsubsection{Variational Auto-encoding}
 
+\begin{itemize}
+  \item Provide a Bayesian regularisation
+\end{itemize}
 The VAE (2 REFERENCES) was introduced as a framework to train (potentially) deep neural net generative models in a scalable, Bayesian manner. The important insight of these authors was to reparameterise the variational variables as a deterministic transformation of a random variable drawn from a standard (parameterless) distribution so that gradient information relating to the variational parameters can be included in the stochastic gradients used to optimise the bound. Importantly this allows for variance control of the stochastic gradients, permitting practical convergence profiles, unlike the previously proposed sleep wake algorithm (REFERENCES).
 \\ |
 \\ |
@@ -113,6 +142,34 @@ IMPORTANT VAE EQUATIONS
 \\ |
 \\ |
 
+Burda et al. REFERENCE extended the VAE by including one or more stochastic hidden layers between the data and the top layer latent variables, resulting in the following hierarchical specification:
+%
+\begin{align}
+  p_\theta(\zb_l|\zb_{l+1}) &= \No(\zb_l\mid \mu_l(\zb_{l+1}), \sigma^2_l(\zb_{l+1}))\quad l\in[1,L] \\
+  p_\theta(\zb_L) &= \No(\zb_L|0, I)
+\end{align}
+
+where $\mu_l$ and $\sigma^2_l$ are deterministic mappings consisting of a (often 2 hidden layer) MLP. Chaining together these simple dense mappings permits a highly correlated latent dependence structure without forgoing the computational efficiency and scalability of fully factorised models.
+
+The inference network (encoder) used in the IWAE has simply the same architecture as the generative network but with mappings in the reverse direction (figure FIGURE) i.e.
+%
+\begin{align}
+  q_\phi(\zb_1|\yb) &= \No(\zb_1\mid \mu(\yb), \sigma^2(\yb)) \\
+  q_\phi(\zb_l|\zb_{l-1}) &= \No(\zb_l\mid \mu(\zb_{l-1}), \sigma^2(\zb_{l-1}))\quad l\in[2,L].
+\end{align}
+%
+Applying the reparameterisation trick at each stochastic layer now amounts to first sampling from a standard normal $\boldsymbol{\xi}_l\sim\No(0,I)$ and then applying a deterministic mapping as follows:
+%
+\begin{equation}
+  \zb_l(\xi_l,\zb_{l-1},\phi) = \mu(\zb_{l-1},\phi) + \sigma(\zb_{l-1},\phi)\odot\boldsymbol{\xi}_l
+\end{equation}
+%
+Burda et al. optimise an evidence lower bound which differs from the traditional free energy in that it cannot be written as the difference between the evidence and a K-L divergence. This alternative bound highlights the fundamental similarity between variational inference and importance sampling, and in doing so begins to address the issues of the heavy penalisation under the standard bound of samples which poorly explain the data. However this penalisation worsens for layers which are further from the data as they do not receive a learning signal strong enough to overcome the K-L divergence penalisation that encourages variational posteriors towards their model priors.
+%
+\subsection{Auxiliary Variational Inference}\label{subsec:aux}
+
+To overcome the pathologies of the standard inference scheme, we introduce auxiliary variables $\xb$ into the inference model as shown in figure FIGURE, which mediate a direct forward pass sampling route from the data to the top level latent variables. Since these variables do not appear in the generative model their effect must be marginalised out of the inference model. This marginalisation is however intractable and so we must further lower the bound of equation EQUATION by substituting in the Bayesian identity $q_\phi(\zb_1,\zb_2|\yb) = \frac{q_\phi(\zb_1|\yb)q_\phi(\xb|\yb)q_\phi(\zb_2|\zb_1,\xb)}{q_\phi(\xb|\zb_1,\zb_2,\yb)}$
+%
 \subsection{The Bayesian GP-LVM}\label{subsec:gplvm}
 
 The GP-LVM was proposed by Lawrence as a Bayesian non-linear dimensionality reduction model and can be viewed as a multi-output GP regression model in which the inputs are unobserved and so treated as latent variables.
@@ -139,8 +196,7 @@ where the GPs are modelled as independent across the data dimensions.
 As is the case for the SVGP and the Bayesian GP-LVM, the inference model of the GP-LVM-CMF constructs a GP mapping to $N$ output values which is governed by a fixed number of auxiliary inducing variables.
 However the motivations for this conditional inducing structure are distinct in these three cases.
 For the sparse GP the desire is scalability; in particular to circumvent the costly $\mathcal{O}(N^3)$ complexity of the covariance matrix inversion, which is then limited to $\mathcal{O}(N^2M)$ through variational compression.
-For the Bayesian GP-LVM the motivation is to be able to tractably integrate over the uncertainty associated with the unknown latent input locations.
-For the GP-LVM-CMF however there are no observations of the GP function values since they do not exist in the generative model, so their purpose here is to act as \emph{variational (pseudo) data} upon which the rest of the function values can be conditioned in the standard GP formulation.
+For the Bayesian GP-LVM the motivation is to be able to tractably integrate over the uncertainty associated with the unknown latent input locations. For the GP-LVM-CMF however there are no observations of the GP function values since they do not exist in the generative model, so their purpose here is to act as \emph{pseudo-data} upon which the rest of the function values can be conditioned via the standard GP formulation.
 
 -------------THIS SHOULD POSSIBLY GO IN THE INTRO--------------
 
@@ -166,19 +222,19 @@ We begin by applying the standard variational principle to lower bound the margi
 where we denote the set of all fixed point generative (resp. inference) model parameters to be learned by $\theta$ (resp. $\phi$), and we denote the set of all latent variables and parameters subject to inference by $Z$ (though later we will use $\eta$ to ...).
 Integrating \ref{eq:bound1} with respect to the auxiliary variables, noting that the marginal variational distribution over $Z$ can be expressed as
 \begin{equation}
-q(Z) = \frac{q(Z|\f,U,X)q(\f,U,X)}{q(\f,U,X|Z)}
+q(Z) = \frac{q(Z|\fb,U,X)q(\fb,U,X)}{q(\fb,U,X|Z)}
 \end{equation}
 %
-and introducing an auxiliary model $r_\psi(\f,U,X)$, we arrive at the following \emph{auxiliary lower bound}:
+and introducing an auxiliary model $r_\psi(\fb,U,X)$, we arrive at the following \emph{auxiliary lower bound}:
 %
 \begin{align}
-\mathcal{L}_1 &\geq \Ex_{q(Z,\f,U,X)}\big[ \log p(Y|Z)p(Z)r(\f,U,X|Z) \notag \\
-&- \log q(Z|\f,X)q(\f,U,X) \big] \notag \\
-&+ \Ex_{q(Z)}\big[\KL[q(\f,U,X|Z)\Vert r(\f,U,X|Z)]\big] \label{eq:lowerlower} \\
+\mathcal{L}_1 &\geq \Ex_{q(Z,\fb,U,X)}\big[ \log p(Y|Z)p(Z)r(\fb,U,X|Z) \notag \\
+&- \log q(Z|\fb,X)q(\fb,U,X) \big] \notag \\
+&+ \Ex_{q(Z)}\big[\KL[q(\fb,U,X|Z)\Vert r(\fb,U,X|Z)]\big] \label{eq:lowerlower} \\
 &\triangleq \mathcal{L}_{aux}. \label{eq:L_aux}
 \end{align}
 %
-To explain this bound, we find it useful to refer to $q(\f,U,X)$ (resp. $q(\f,U,X|Z)$) as the \emph{variational prior} (resp.) \emph{variational posterior} distributions over the auxiliary inference variables, the latter of which constitutes a posterior belief over the auxiliary variables having observed a (set of) sample(s), $Z$, generated under the measure $q$ endowed by the inference network.
+To explain this bound, we find it useful to refer to $q(\fb,U,X)$ (resp. $q(\fb,U,X|Z)$) as the \emph{variational prior} (resp.) \emph{variational posterior} distributions over the auxiliary inference variables, the latter of which constitutes a posterior belief over the auxiliary variables having observed a (set of) sample(s), $Z$, generated under the measure $q$ endowed by the inference network.
 
 This lower bound is indistinguishable from the one we would arrive at if we were to apply the variational principle to the problem of trying to estimate (lower bound) the log evidence of the augmented model $p(Z)p(Y|Z)r(U|Z)$: getting r exactly right (i.e. choosing $r(U|Z)=q(U|Z)$) would recover $\mathcal{L}_1$ but intractability precludes knowing $q(U|Z)$ so we must replace it with a tractable surrogate, and perform inference in the augmented space rather than in the marginal $Z$ space.
 --> Find the form of the surrogate $r$ which leads to a variational inference task in an augmented space which is as equivalent as possible to performing variational inference in the collapsed space.
@@ -208,14 +264,14 @@ We can rearrange (\ref{eq:L_aux}) as follows:
 %
 \begin{align}
 \mathcal{L}_{aux} &= \Ex_{q(Z)}[ \log p(Y|Z) ] \notag \\
-&- \Ex_{q(\f,U,X)}[ \KL[q(Z|\f,U,X)\Vert p(Z)] ]\notag\\
-&- \Ex_{q(Z)}[ \KL[q(\f,U,X)\Vert r(\f,U,X|Z)] ].\label{eq:L_aux_ABC}
+&- \Ex_{q(\fb,U,X)}[ \KL[q(Z|\fb,U,X)\Vert p(Z)] ]\notag\\
+&- \Ex_{q(Z)}[ \KL[q(\fb,U,X)\Vert r(\fb,U,X|Z)] ].\label{eq:L_aux_ABC}
 \end{align}
 %
-As noted by Kingma and Welling, in the case of Gaussian $p(Z)$ and $q(Z|\f,U,X)$, the first K-L divergence can be evaluated analytically and, but the lower lower means we can get a second analytical term...
+As noted by Kingma and Welling, in the case of Gaussian $p(Z)$ and $q(Z|\fb,U,X)$, the first K-L divergence can be evaluated analytically and, but the lower lower means we can get a second analytical term...
 This was also noticed by Tran et al., in their lower lower bound...
 
-Variational compression ... sparse variational GPs ... set $r(\f|U,X,Z):=q(\f|U,X)$ which means that $r(\f,U,X|Z) = q(\f|U,X)r(U,X|Z)$.
+Variational compression ... sparse variational GPs ... set $r(\fb|U,X,Z):=q(\fb|U,X)$ which means that $r(\fb,U,X|Z) = q(\fb|U,X)r(U,X|Z)$.
 Full implications of this??? Reduces configuration space...
 The aptness of this hinges on the veracity of the assumption that ... are sufficient statistics for ... in expectation under ...
 
