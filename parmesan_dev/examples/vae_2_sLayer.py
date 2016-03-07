@@ -19,11 +19,11 @@ from utils_RB import normalEntropy2
 #settings
 dataset = 'fixed'
 batch_size = 100
-nhidden = 10
+nhidden = 200
 nonlin_enc = T.nnet.softplus
 nonlin_dec = T.nnet.softplus
-latent_size = 10
-latent_ext_size = 5
+latent_size = 50
+latent_ext_size = 100
 analytic_kl_term = True
 lr = 0.0003
 num_epochs = 1000
@@ -119,8 +119,8 @@ l_dec_log_var_s = lasagne.layers.DenseLayer(l_dec_h1,
                                     nonlinearity=lasagne.nonlinearities.identity,
                                     name='DEC_LOG_VAR')
 
-# l_dec_s = SimpleSampleLayer(mean=l_dec_mu_s, log_var=l_dec_log_var_s)
-l_dec_s = lasagne.layers.GaussianNoiseLayer(l_dec_mu_s,)
+l_dec_s = SimpleSampleLayer(mean=l_dec_mu_s, log_var=l_dec_log_var_s)
+# l_dec_s = lasagne.layers.GaussianNoiseLayer(l_dec_mu_s,)
 
 l_ext_dec_h1 = lasagne.layers.DenseLayer(l_dec_s,
                                     num_units=nhidden,
@@ -171,7 +171,7 @@ def latent_gaussian_x_bernoulli(z, z_I_s_mu, z_I_s_log_var, s, s_mu, s_log_var, 
         # kl_term = 1.
         log_px_given_s = log_bernoulli(x, x_I_s_mu).sum(axis=1)
         log_ps_I_z = log_normal2(s, s_mu, s_log_var).sum(axis=1)
-        H_s = normalEntropy2(s_log_var)
+        H_s = normalEntropy2(s_log_var).sum(axis=1)
         # H_s = 1.
         LL = T.mean(-kl_term + log_px_given_s + log_ps_I_z + H_s)
     else:
@@ -180,7 +180,7 @@ def latent_gaussian_x_bernoulli(z, z_I_s_mu, z_I_s_log_var, s, s_mu, s_log_var, 
         # log_pz = log_stdnormal(z).sum(axis=1)
         # log_px_given_z = log_bernoulli(x, x_mu).sum(axis=1)
         # LL = T.mean(log_pz + log_px_given_z - log_qz_given_x)
-    return LL
+    return LL, kl_term, log_px_given_s, log_ps_I_z, H_s
 
 # TRAINING LogLikelihood
 LL_train = latent_gaussian_x_bernoulli(
@@ -200,7 +200,7 @@ for p in params:
     print p, p.get_value().shape
 
 ### Take gradient of Negative LogLikelihood
-grads = T.grad(-LL_train, params)
+grads = T.grad(-LL_train[0], params)
 
 # Add gradclipping to reduce the effects of exploding gradients.
 # This speeds up convergence
@@ -219,16 +219,26 @@ updates = lasagne.updates.adam(cgrads, params, learning_rate=sym_lr)
 train_model = theano.function([sym_batch_index, sym_lr], LL_train, updates=updates,
                                   givens={sym_x: sh_x_train[batch_slice], },)
 
-test_model = theano.function([sym_batch_index], LL_eval,
+test_model = theano.function([sym_batch_index], LL_eval[0],
                                   givens={sym_x: sh_x_test[batch_slice], },)
 
 
 def train_epoch(lr):
     costs = []
+    kl_term, ps_term, px_term, H_term = [],[],[],[]
     for i in range(n_train_batches):
-        cost_batch = train_model(i, lr)
+        cost_terms_batch = train_model(i, lr)
+        cost_batch = cost_terms_batch[0]
         costs += [cost_batch]
-    return np.mean(costs)
+        kl_batch = cost_terms_batch[1]
+        kl_term += [kl_batch]
+        ps_batch = cost_terms_batch[2]
+        ps_term += [ps_batch]
+        px_batch = cost_terms_batch[3]
+        px_term += [px_batch]
+        H_batch = cost_terms_batch[4]
+        H_term += [H_batch]
+    return np.mean(costs), np.mean(kl_term), np.mean(ps_term), np.mean(px_term), np.mean(H_term)
 
 
 def test_epoch():
@@ -247,12 +257,13 @@ for epoch in range(num_epochs):
     np.random.shuffle(train_x)
     sh_x_train.set_value(preprocesses_dataset(train_x))
 
-    train_cost = train_epoch(lr)
+    train_cost, train_kl, train_ps, train_px, train_H = train_epoch(lr)
     test_cost = test_epoch()
 
     t = time.time() - start
 
     line =  "*Epoch: %i\tTime: %0.2f\tLR: %0.5f\tLL Train: %0.3f\tLL test: %0.3f\t" % ( epoch, t, lr, train_cost, test_cost)
     print line
+    print "\n kl_term: %0.3f\t px_term: %0.3f\t ps_term: %0.3f\t H_term: %0.3f\t" % (train_kl, train_ps, train_px, train_H)
     with open(logfile,'a') as f:
         f.write(line + "\n")
