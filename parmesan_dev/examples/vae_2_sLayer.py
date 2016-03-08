@@ -179,9 +179,9 @@ def latent_gaussian_x_bernoulli(z, z_I_s_mu, z_I_s_log_var, s, q_s_mu, q_s_log_v
         # H_s = 1.
         LL = T.mean(-kl_term + log_p_x_I_s + log_p_s_I_z + H_s)
     else:
-        log_q_z_I_x = log_normal2(z, z_I_s_mu, z_I_s_log_var, eps=1e-5).sum(axis=1)
+        log_q_z_I_s = log_normal2(z, z_I_s_mu, z_I_s_log_var, eps=1e-5).sum(axis=1)
         log_p_z = log_stdnormal(z).sum(axis=1)
-        kl_term = log_q_z_I_x - log_p_z
+        kl_term = log_q_z_I_s - log_p_z
         log_p_x_I_s = log_bernoulli(x, x_I_s_mu, eps=1e-5).sum(axis=1)
         log_q_s_I_x = log_normal2(s, q_s_mu, q_s_log_var, eps=1e-5).sum(axis=1)
         log_p_s_I_z = log_normal2(s, p_s_mu, p_s_log_var, eps=1e-5).sum(axis=1)
