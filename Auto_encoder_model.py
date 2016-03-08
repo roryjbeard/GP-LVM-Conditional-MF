@@ -127,10 +127,11 @@ class AutoEncoderModel(Printable):
         self.decoder.construct_L_terms(self.encoder)
 
         self.gradientVariables = self.encoder.gradientVariables + self.decoder.gradientVariables
+        self.L_components = self.encoder.L_components + self.decoder.L_components
 
         if L_terms == 'Train':
             self.L = self.encoder.L_terms + self.decoder.L_terms
-            self.dL = T.grad(self.L, self.gradientVariables)
+            self.dL = T.grad(-self.L, self.gradientVariables)
             for i in range(len(self.dL)):
                 self.dL[i].name = 'dL_d' + self.gradientVariables[i].name
         elif L_terms == 'Test':
@@ -188,7 +189,6 @@ class AutoEncoderModel(Printable):
                     self.encoder.gp_encoder.constrainKernelParameters()
                 stop = time.time()
 
-                lbTmp = lbTmp.flatten()
                 self.lowerBound = lbTmp[0] / self.B
 
                 stepTime = stop - start
@@ -197,6 +197,9 @@ class AutoEncoderModel(Printable):
                 if it % printFrequency == 0:
                     print("\n Ep %d It %d\tt = %.2fs\tDelta_t = %.2fs\tlower bound = %.2f"
                       % (ep, it, wallClock, stepTime, self.lowerBound))
+                    for i in range(0,len(self.L_components)):    
+                        print self.L_components[i].name + '=' + str(lbTmp[i+1])
+                      
                 if printDiagnostics > 0 and (it % printDiagnostics) == 0:
                     self.encoder.gp_encoder.printDiagnostics()
 
@@ -233,16 +236,18 @@ class AutoEncoderModel(Printable):
 #                                          #                  big_is_error=True))
 ###
 
-        grads = T.grad(-self.L, self.gradientVariables)
         clip_grad = 1
         max_norm = 5
-        mgrads = lasagne.updates.total_norm_constraint(grads,max_norm=max_norm)
+        mgrads = lasagne.updates.total_norm_constraint(self.dL,max_norm=max_norm)
         cgrads = [T.clip(g,-clip_grad, clip_grad) for g in mgrads]
 
         updates = lasagne.updates.adam(cgrads, self.gradientVariables, learning_rate=learning_rate)
 
+        computes = [self.L]
+        computes.extend(self.L_components)
+
         self.updateFunction = th.function([],
-                                      self.L,
+                                      computes,
                                       updates=updates,
                                       no_default_updates=True)
 
@@ -272,6 +277,7 @@ class AutoEncoderModel(Printable):
                 pbar.update(i*numberOfSamples+k)
             lb = np_log_mean_exp_stable(lbs)
             ll += lb
+        ll = ll / self.numberofBatchesPerEpoch / self.B
         pbar.finish()
         print 'MC log-likelihood = {}'.format(ll) 
         return ll

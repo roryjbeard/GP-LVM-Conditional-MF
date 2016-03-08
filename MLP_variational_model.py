@@ -47,8 +47,6 @@ class MLP_variational_model(Printable):
 
             self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), gamma), 'z')
 
-            self.gradientVariables = self.mlp_qz.params
-
         elif self.sLayers == 2:
 
             dimS = int(round(0.5 * (dimZ + dimY)))
@@ -58,8 +56,7 @@ class MLP_variational_model(Printable):
                                       num_units=num_units,
                                       num_layers=num_layers)
 
-            self.mu_qs, self.log_sigma_qs = self.mlp_qs.setup(
-                y_miniBatch.T)
+            self.mu_qs, self.log_sigma_qs = self.mlp_qs.setup(y_miniBatch.T)
 
             eta = srng.normal(size=(dimS, self.B), avg=0.0, std=1.0, ndim=None)
             eta.name = 'eta'
@@ -86,10 +83,11 @@ class MLP_variational_model(Printable):
 
         self.gradientVariables = self.mlp_qz.params
         if self.sLayers == 2:
-            self.gradientVariables.extend(self.mlp_qz.params)
+            self.gradientVariables.extend(self.mlp_qs.params)
 
     def construct_L_terms(self):
         self.L_terms = 0
+        self.L_components = []
 
     def sample(self):
         self.sample_gamma()

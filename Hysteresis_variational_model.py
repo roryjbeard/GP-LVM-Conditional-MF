@@ -48,7 +48,7 @@ class Hysteresis_variational_model(Printable):
         self.sample_alpha = th.function([], alpha)
 
         self.f = plus(self.mu_q_f_y,
-                      mul(T.exp(self.log_sigma_q_f_y * 0.5),
+                      mul(T.exp(self.log_sigma_q_f_y),
                           alpha), 'f')
 
         if self.sLayers == 1:
@@ -70,7 +70,7 @@ class Hysteresis_variational_model(Printable):
             self.sample_beta = th.function([], beta)
 
             self.z = plus(self.mu_qz,
-                          mul(T.exp(self.log_sigma_qz * 0.5),
+                          mul(T.exp(self.log_sigma_qz),
                               beta), 'z')
 
             self.mlp_r_f_yz = MLP_Network(dimY + dimZ,
@@ -104,7 +104,7 @@ class Hysteresis_variational_model(Printable):
             self.sample_gamma = th.function([], gamma)
 
             self.s = plus(self.mu_qs,
-                          mul(T.exp(self.log_sigma_qs * 0.5),
+                          mul(T.exp(self.log_sigma_qs),
                               gamma), 'q~q(s)')
 
             self.mlp_q_z_sf = MLP_Network(self.dimS + dimZ,
@@ -124,7 +124,7 @@ class Hysteresis_variational_model(Printable):
             self.sample_beta = th.function([], beta)
 
             self.z = plus(self.mu_qz,
-                          mul(T.exp(self.log_sigma_qz * 0.5),
+                          mul(T.exp(self.log_sigma_qz),
                               beta), 'z')
 
             self.mlp_r_f_yzs = MLP_Network(dimY + dimZ + self.dimS,
@@ -156,8 +156,8 @@ class Hysteresis_variational_model(Printable):
 
         if self.sLayers == 2:
             self.H_q_s_y = elementwiseNormalEntropy(self.log_sigma_qs,
-                                                   self.B * self.dimS,
-                                                   'H_q_s_y')
+                                                    self.B * self.dimS,
+                                                    'H_q_s_y')
             self.L_terms += self.H_q_s_y
 
     def sample(self):

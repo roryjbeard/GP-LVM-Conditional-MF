@@ -55,7 +55,7 @@ class MLP_likelihood_model(Printable):
 
             self.mlp_p_s_z = MLP_Network(dimZ,
                                          self.dimS,
-                                         name='mlp_p_s_y',
+                                         name='mlp_p_s_z',
                                          num_units=num_units,
                                          num_layers=num_layers,
                                          continuous=True)
@@ -76,18 +76,18 @@ class MLP_likelihood_model(Printable):
             if self.continuous:
                 self.mlp_p_y_z = MLP_Network(self.dimS,
                                              dimY,
-                                             name='mlp_p_y_s',
+                                             name='mlp_p_y_z',
                                              num_units=num_units,
                                              num_layers=num_layers,
                                              continuous=True)
 
-                self.mu_p_y_z, self.log_sigma_p_y_z = self.mlp_py.setup(self.s)
+                self.mu_p_y_z, self.log_sigma_p_y_z = self.mlp_p_y_z.setup(self.s)
 
             else:
 
                 self.mlp_p_y_z = MLP_Network(self.dimS,
                                              dimY,
-                                             name='mlp_p_y_s',
+                                             name='mlp_p_y_z',
                                              num_units=num_units,
                                              num_layers=num_layers,
                                              continuous=False)
@@ -111,6 +111,8 @@ class MLP_likelihood_model(Printable):
             nu.name = 'nu'
             self.sample_nu = th.function([], nu)
             self.y_hat = nu < self.sigmoid_p_y_z
+            
+        self.get_y_hat = th.function([], self.y_hat, no_default_updates=True)
 
         self.gradientVariables = self.mlp_p_y_z.params
         if self.sLayers == 2:
@@ -123,15 +125,7 @@ class MLP_likelihood_model(Printable):
                    + 0.5 * T.sum(encoder.mu_qz ** 2) \
                    - T.sum(encoder.log_sigma_qz) \
                    - 0.5 * self.Q * self.B
-
-        if self.sLayers == 2:
-            
-            # KL[q(S|y)||p(S|z)]
-            self.KL_qp_s = 0.5 * (T.sum(exp(mul(minus(encoder.log_sigma_qs, self.log_sigma_p_s_z), 2)))) \
-                + 0.5 * T.sum((minus(self.mu_p_s_z, encoder.mu_qs) / exp(self.log_sigma_p_s_z, 2)) ** 2) \
-                + T.sum(self.log_sigma_p_s_z) \
-                - T.sum(encoder.log_sigma_qs) \
-                - 0.5 * self.dimS * self.B
+        self.KL_qp.name = 'KL_qp'
 
         if self.continuous:
             self.log_pyz = log_elementwiseNormal(self.y_miniBatch.T,
@@ -142,8 +136,28 @@ class MLP_likelihood_model(Printable):
             self.log_pyz = -T.nnet.binary_crossentropy(self.sigmoid_p_y_z,
                                                        self.y_miniBatch.T).sum()
             self.log_pyz.name = 'log_pyz'
-
+    
         self.L_terms = minus(self.log_pyz, self.KL_qp)
+        self.L_components = [self.log_pyz, self.KL_qp]
+        
+        if self.sLayers == 2:
+            
+            # KL[q(S|y)||p(S|z)]
+            self.KL_qp_s = 0.5 * (T.sum(exp(mul(minus(encoder.log_sigma_qs,
+                                                      self.log_sigma_p_s_z),
+                                                2)
+                                            )
+                                        )                               
+                                   ) \
+                + 0.5 * T.sum((minus(self.mu_p_s_z, encoder.mu_qs) / exp(self.log_sigma_p_s_z)) ** 2) \
+                + T.sum(self.log_sigma_p_s_z) \
+                - T.sum(encoder.log_sigma_qs) \
+                - 0.5 * self.dimS * self.B
+            self.KL_qp_s.name = 'KL_qp_s'
+
+            self.L_terms = minus(self.L_terms, self.KL_qp_s)
+            self.L_components.extend([self.KL_qp_s])
+
 
     def sample(self):
         if self.sLayers == 2:
@@ -151,6 +165,8 @@ class MLP_likelihood_model(Printable):
 
     def sample_y_hat(self):
         self.sample_nu()
+        return self.get_y_hat()
+        
 
     def randomise(self, rng):
         self.mlp_p_y_z.randomise(rng)

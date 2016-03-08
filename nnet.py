@@ -10,6 +10,7 @@ floatX = theano.config.floatX
 class Linear():
 
     def __init__(self, dim_in, dim_out, name):
+        self.type = 'Linear'
         self.dim_in  = dim_in
         self.dim_out = dim_out
         self.W = sharedZeroMatrix(dim_out, dim_in, 'W_' + name)
@@ -108,17 +109,17 @@ class NNet():
 
     def randomise(self, rnd, factor=1):
         for i in range(len(self.layers)):
-            if type(self.layers[i]) == Linear:
-                if i < len(self.layers):
+            if self.layers[i].type == 'Linear':
+                if i < len(self.layers)-1:
                     # Randomisation of the lay depends of what the
                     # non-linearity in the next layer is
-                    self.layers[i].randomise(factor, rnd, self.layers[i+1])
+                    self.layers[i].randomise(rnd, factor, nonlinearity=self.layers[i+1])
                 else:
-                    self.layers[i].randomise(factor, rnd)
+                    self.layers[i].randomise(rnd, factor)
 
 class MLP_Network():
 
-    def __init__(self, dim_in, dim_out, name='', num_units=10, num_layers=1, continuous=True, nonlinearity=Tanh):
+    def __init__(self, dim_in, dim_out, name='', num_units=10, num_layers=1, continuous=True, nonlinearity=Softplus):
 
         self.nonlinearity = nonlinearity()
         self.name = name

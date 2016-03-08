@@ -280,7 +280,7 @@ class SGPDV(Printable):
         Xf_min.reshape(-1, 1)
         Xf_max.reshape(-1, 1)
         Df = Xf_max - Xf_min
-        Xu = np.random.rand(self.M, self.R) * Df + Xf_min  # [M x R]
+        Xu = np.asarray(np.random.rand(self.M, self.R) * Df + Xf_min, dtype=precision)  # [M x R]
 
         self.Xu.set_value(Xu, borrow=True)
 

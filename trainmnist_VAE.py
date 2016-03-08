@@ -20,17 +20,17 @@ else:
     x_test = np.loadtxt('binarized_mnist_test.amat')
     datatype = 'binary'
 
-numberOfEpochs = 2000
+numberOfEpochs = 10
 learning_rate = 1e-4
 
 dimZ = 40
-dimX = 30
-params = {'miniBatchSize' : 200, 'dimZ':400,
+dimX = 300
+params = {'miniBatchSize' : 200, 'dimZ':300,
          'theanoRandomSeed':123, 'numpyRandomSeed':123,
          'BinaryFromContinuous':False}
-encoderParameters = {'Type':None,  'numHiddenUnits_encoder' : 400, 'numHiddenLayers_encoder' : 2, 'numStochasticLayers_encoder':None,
+encoderParameters = {'Type':None,  'numHiddenUnits_encoder' : 500, 'numHiddenLayers_encoder' : 2, 'numStochasticLayers_encoder':None,
                      'dimX':dimX, 'numberOfInducingPoints':400, 'kernelType':'ARD', 'theta':np.ones((1,dimX+1)), 'theta_min':1e-3, 'theta_max':1e3}
-decoderParameters = {'Type':'MLP', 'numHiddenUnits_decoder' : 400, 'numHiddenLayers_decoder' : 2, 'numStochasticLayers_encoder':None, 'continuous':continuous}
+decoderParameters = {'Type':'MLP', 'numHiddenUnits_decoder' : 500, 'numHiddenLayers_decoder' : 2, 'numStochasticLayers_encoder':None, 'continuous':continuous}
 
 experimentNumber = raw_input('Enter experiment number (1-6): ')
 if experimentNumber == '1':
