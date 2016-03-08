@@ -135,3 +135,38 @@ class SampleLayer(lasagne.layers.MergeLayer):
             self.nonlinearity( log_var.dimshuffle(0,'x','x',1)) * eps
 
         return z.reshape((-1,num_latent))
+
+class DecoderSimpleSampleLayer(lasagne.layers.MergeLayer):
+    """ log_var not var!!! -RB
+    """
+
+    def __init__(self, z_enc, mu, log_var,
+                nonlinearity=lambda x: T.exp(0.5*x),
+                **kwargs):
+        super(DecoderSimpleSampleLayer, self).__init__([z_enc, mu, log_var], **kwargs)
+
+        self.nonlinearity = nonlinearity
+
+        self._srng = RandomStreams(
+            lasagne.random.get_rng().randint(1, 2147462579))
+
+    def get_output_shape_for(self, input_shapes):
+        return input_shapes[0]
+
+    def get_output_for(self, input, drawdecsample=False, **kwargs):
+
+        z_enc, mu, log_var = input
+
+        if drawdecsample:
+            batch_size, num_latent = mu.shape
+            eps = self._srng.normal(
+                mu.shape,
+                 dtype=theano.config.floatX)
+
+            z = mu + self.nonlinearity( log_var) * eps
+
+            # return z.reshape((-1,num_latent))
+            return z
+        else:
+            return z_enc
+
