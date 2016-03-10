@@ -396,11 +396,10 @@ def bernoullisample(x):
 #load dataset
 regularize_var = False
 if dataset == 'mnistfixedbin':
-    train_x, train_t, valid_x, valid_t, test_x, test_t = load_mnist_binarized()
+    train_x, valid_x, test_x = load_mnist_binarized()
     train_x = np.concatenate([train_x,valid_x])
     idx = np.random.permutation(test_x.shape[0])
     test_x = test_x[idx]
-    test_t = test_t[idx]
     pcaplot = True
     num_class = 10
     h,w = 28,28
