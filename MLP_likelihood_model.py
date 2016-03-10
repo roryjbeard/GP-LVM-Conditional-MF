@@ -9,14 +9,13 @@ import numpy as np
 import theano.tensor as T
 import theano as th
 from printable import Printable
-from utils import plus, exp, minus, mul, log_elementwiseNormal
+from utils import exp, minus, mul, log_elementwiseNormal, sampleNormalFunction, sampleNormal
 from nnet import MLP_Network
 
 log2pi = np.log(2 * np.pi)
 
 
 class MLP_likelihood_model(Printable):
-
     def __init__(self, y_miniBatch, miniBatchSize, dimY, dimZ, encoder, params, srng):
 
         self.B = miniBatchSize
@@ -62,16 +61,12 @@ class MLP_likelihood_model(Printable):
 
             self.mu_p_s_z, self.log_sigma_p_s_z = self.mlp_p_s_z.setup(encoder.z)
 
-            omega = srng.normal(size=(self.dimS, self.B),
-                                avg=0.0,
-                                std=1.0,
-                                ndim=None)
-            omega.name = 'omega'
-            self.sample_omega = th.function([], omega)
+            omega, self.sample_omega = sampleNormalFunction(self.dimS,
+                                                            self.B,
+                                                            srng,
+                                                            'omega')
 
-            self.s = plus(self.mu_p_s_z,
-                          mul(exp(self.log_sigma_p_s_z),
-                              omega), 's')
+            self.s = sampleNormal(self.mu_p_s_z, self.log_sigma_p_s_z, omega, 's')
 
             if self.continuous:
                 self.mlp_p_y_z = MLP_Network(self.dimS,
@@ -99,12 +94,15 @@ class MLP_likelihood_model(Printable):
         # For the generation of imagined data
         if self.continuous:
 
-            nu = srng.normal(size=(dimY, self.B), avg=0.0, std=1.0, ndim=None)
-            nu.name = 'nu'
-            self.sample_nu = th.function([], nu)
-            self.y_hat = plus(self.mu_p_y_z,
-                              mul(exp(self.log_sigma_p_y_z),
-                                  nu), 'y_hat')
+            nu, self.sample_nu = sampleNormalFunction(dimY,
+                                                      self.B,
+                                                      srng,
+                                                      'nu')
+
+            self.y_hat = sampleNormal(self.mu_p_y_z,
+                                      self.log_sigma_p_y_z,
+                                      nu,
+                                      'y_hat')
 
         else:
             nu = srng.uniform(size=(dimY, self.B), low=0.0, high=1.0, ndim=None)

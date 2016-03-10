@@ -11,7 +11,7 @@ import theano.tensor as T
 from printable import Printable
 
 from nnet import MLP_Network
-from utils import plus, mul, exp
+from utils import sampleNormalFunction, sampleNormal
 
 precision = th.config.floatX
 log2pi = T.constant(np.log(2 * np.pi))
@@ -37,15 +37,12 @@ class MLP_variational_model(Printable):
 
             self.mu_qz, self.log_sigma_qz = self.mlp_qz.setup(y_miniBatch.T)
 
-            gamma = srng.normal(size=(dimZ, self.B),
-                                avg=0.0,
-                                std=1.0,
-                                ndim=None)
-                                
-            gamma.name = 'gamma'
-            self.sample_gamma = th.function([], gamma)
+            gamma, self.sample_gamma = sampleNormalFunction(dimZ,
+                                                            self.B,
+                                                            srng,
+                                                            'gamma')
 
-            self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), gamma), 'z')
+            self.z = sampleNormal(self.mu_qz, self.log_sigma_qz, 'z')
 
         elif self.sLayers == 2:
 
@@ -58,13 +55,12 @@ class MLP_variational_model(Printable):
 
             self.mu_qs, self.log_sigma_qs = self.mlp_qs.setup(y_miniBatch.T)
 
-            eta = srng.normal(size=(dimS, self.B), avg=0.0, std=1.0, ndim=None)
-            eta.name = 'eta'
-            self.sample_eta = th.function([], eta)
+            eta, self.sample_eta = sampleNormalFunction(dimS,
+                                                        self.B,
+                                                        srng,
+                                                        'eta')
 
-            self.s = plus(self.mu_qs,
-                          mul(exp(self.log_sigma_qs),
-                              eta), 's~q(s)')
+            self.s = sampleNormal(self.mu_qs, self.log_sigma_qs, eta, 's~q(s)')
 
             self.mlp_qz = MLP_Network(dimS,
                                       dimZ,
@@ -74,12 +70,12 @@ class MLP_variational_model(Printable):
 
             self.mu_qz, self.log_sigma_qz = self.mlp_qz.setup(self.s)
 
-            gamma = srng.normal(
-                size=(dimZ, self.B), avg=0.0, std=1.0, ndim=None)
-            gamma.name = 'gamma'
-            self.sample_gamma = th.function([], gamma)
+            gamma, self.sample_gamma = sampleNormalFunction(dimZ,
+                                                            self.B,
+                                                            srng,
+                                                            'gamma')
 
-            self.z = plus(self.mu_qz, mul(exp(self.log_sigma_qz), gamma), 'z')
+            self.z = sampleNormal(self.mu_qz, self.log_sigma_qz, gamma, 'z')
 
         self.gradientVariables = self.mlp_qz.params
         if self.sLayers == 2:

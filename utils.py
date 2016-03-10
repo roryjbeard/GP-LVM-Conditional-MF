@@ -214,4 +214,15 @@ def elementwiseNormalEntropy(log_sigma, numberOfElements, name):
     return H
 
 
+def sampleNormalFunction(dim0, dim1, srng, name):
+    rv = srng.normal(size=(dim0, dim1), avg=0.0, std=1.0, ndim=None)
+    rv.name = name
+    rv_sample = th.function([], rv)
+    return (rv, rv_sample)    
+    
+
+def sampleNormal(mu, log_sigma, rv, name):
+    s = plus(mu, mul(exp(log_sigma), rv), name)
+    return s
+    
 

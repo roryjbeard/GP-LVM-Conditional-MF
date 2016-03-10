@@ -1,0 +1,13 @@
+
+examples/mnist.pkl.gz
+examples/results/
+examples/data/
+examples/outfolder/
+
+Parmesan.egg-info/
+.idea/
+*.egg-info/
+
+*.log
+*.pyc
+

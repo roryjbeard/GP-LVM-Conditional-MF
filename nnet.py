@@ -145,7 +145,7 @@ class MLP_Network():
         h_outin = self.hidden.setup(x_in)
         if self.continuous:
             mu = self.muLinear.setup(h_outin, **kwargs)
-            logsigma = 0.5 * self.logsigmaLinear.setup(h_outin, **kwargs)
+            logsigma = self.logsigmaLinear.setup(h_outin, **kwargs)
             mu.name = 'mu_' + self.name
             logsigma.name = 'logsimga_' + self.name
             return (mu, logsigma)
