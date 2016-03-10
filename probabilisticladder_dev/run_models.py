@@ -396,6 +396,9 @@ def bernoullisample(x):
 #load dataset
 regularize_var = False
 if dataset == 'mnistfixedbin':
+    drawsamples = True
+    print "Using fixed binarised mnist dataset"
+    process_data = lambda x: x
     train_x, valid_x, test_x = load_mnist_binarized()
     train_x = np.concatenate([train_x,valid_x])
     idx = np.random.permutation(test_x.shape[0])
