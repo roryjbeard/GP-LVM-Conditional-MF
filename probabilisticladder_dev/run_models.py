@@ -1,3 +1,5 @@
+# coding=utf-8
+
 # Code used to run the experiments in
 # Soenderby, C.K., Raiko, T., Maaloe, L., Sønderby, S.K. and Winther, O., 2016.
 # How to Train Deep Variational Autoencoders and Probabilistic Ladder Networks.
@@ -7,20 +9,20 @@
 # The MIT License (MIT)
 # Copyright (c) 2016 Casper Kaae Soenderby
 
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this 
-# software and associated documentation files (the "Software"), to deal in the Software 
-# without restriction, including without limitation the rights to use, copy, modify, 
-# merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this
+# software and associated documentation files (the "Software"), to deal in the Software
+# without restriction, including without limitation the rights to use, copy, modify,
+# merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
 # permit persons to whom the Software is furnished to do so, subject to the following conditions:
 #
-# The above copyright notice and this permission notice shall be included in all copies 
+# The above copyright notice and this permission notice shall be included in all copies
 # or substantial portions of the Software.
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
-# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
-# PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE 
-# FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, 
-# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+# PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+# FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import theano
 theano.config.floatX = 'float32'
@@ -280,7 +282,7 @@ parser.add_argument("-num_epochs", type=int,
 parser.add_argument("-eval_epochs", type=str,
         help="eval_epochs", default='1,10,100')
 parser.add_argument("-dataset", type=str,
-        help="mnistresample|omniglot_iwae|norb_small", default='mnistresample')
+        help="mnistresample|omniglot_iwae|norb_small", default='mnistfixedbin')
 parser.add_argument("-only_mu_up", type=str,
         help="only_mu_up (only applies to ladder)", default="True")
 parser.add_argument("-modeltype", type=str,
@@ -393,6 +395,21 @@ def bernoullisample(x):
 
 #load dataset
 regularize_var = False
+if dataset == 'mnistfixedbin':
+    train_x, valid_x, test_x = load_mnist_binarized()
+    train_x = np.concatenate([train_x,valid_x])
+    idx = np.random.permutation(test_x.shape[0])
+    test_x = test_x[idx]
+    test_t = test_t[idx]
+    pcaplot = True
+    num_class = 10
+    h,w = 28,28
+    ntrain = train_x.shape[0]
+    ntest = train_x.shape[0]
+    num_features = h*w
+    outputdensity = 'bernoulli'
+    outputnonlin = lasagne.nonlinearities.sigmoid
+    imgshp = [h,w]
 if dataset == 'mnistresample':
     drawsamples = True
     print "Using resampled mnist dataset"
