@@ -33,7 +33,7 @@ import numpy as np
 import lasagne
 from parmesan.distributions import log_stdnormal, log_normal2
 from parmesan.layers import NormalizeLayer, ScaleAndShiftLayer, ListIndexLayer
-from parmesan.datasets import load_mnist_realval, load_omniglot, load_omniglot_iwae, load_norb_small
+from parmesan.datasets import load_mnist_realval, load_omniglot, load_omniglot_iwae, load_norb_small, load_mnist_binarized
 import matplotlib.pyplot as plt
 import shutil, gzip, os, cPickle, time, operator, argparse
 from helpers import plotKLs, init_res, add_res
@@ -396,7 +396,7 @@ def bernoullisample(x):
 #load dataset
 regularize_var = False
 if dataset == 'mnistfixedbin':
-    train_x, valid_x, test_x = load_mnist_binarized()
+    train_x, train_t, valid_x, valid_t, test_x, test_t = load_mnist_binarized()
     train_x = np.concatenate([train_x,valid_x])
     idx = np.random.permutation(test_x.shape[0])
     test_x = test_x[idx]
@@ -410,7 +410,7 @@ if dataset == 'mnistfixedbin':
     outputdensity = 'bernoulli'
     outputnonlin = lasagne.nonlinearities.sigmoid
     imgshp = [h,w]
-if dataset == 'mnistresample':
+elif dataset == 'mnistresample':
     drawsamples = True
     print "Using resampled mnist dataset"
     process_data = bernoullisample
