@@ -1,6 +1,6 @@
 
 examples/mnist.pkl.gz
-examples/results/
+# examples/results/
 examples/data/
 examples/outfolder/
 

@@ -170,3 +170,65 @@ class DecoderSimpleSampleLayer(lasagne.layers.MergeLayer):
         else:
             return z_enc
 
+class DecoderSampleLayer(lasagne.layers.MergeLayer):
+    """
+    """
+
+    def __init__(self, z_enc, mu, var, eq_samples=1, iw_samples=1, **kwargs):
+        super(DecoderSampleLayer, self).__init__([z_enc, mu, var], **kwargs)
+
+        self.eq_samples = eq_samples
+        self.iw_samples = iw_samples
+
+        self._srng = RandomStreams(
+            lasagne.random.get_rng().randint(1, 2147462579))
+
+    def get_output_shape_for(self, input_shapes):
+        return input_shapes[0]
+
+    def get_output_for(self, input, drawdecsample=False, **kwargs):
+
+        z_enc, mu, var = input
+
+        if drawdecsample:
+            batch_size, num_latent = mu.shape
+            eps = self._srng.normal(
+                [batch_size, self.eq_samples, self.iw_samples, num_latent],
+                 dtype=theano.config.floatX)
+
+            z = mu.dimshuffle(0,'x','x',1) + \
+                 T.sqrt(var).dimshuffle(0,'x','x',1) * eps
+
+            return z.reshape((-1,num_latent))
+        else:
+            return z_enc
+
+class LadderMergeLayer(lasagne.layers.MergeLayer):
+    def __init__(self, mu_t, var_t, mu_l, var_l,  eq_samples, iw_samples, **kwargs):
+        super(LadderMergeLayer, self).__init__([mu_t, var_t, mu_l, var_l], **kwargs)
+
+        self.eq_samples =  eq_samples
+        self.iw_samples = iw_samples
+
+        self.num_inputs = self.input_shapes[0][-1]
+
+    def get_output_shape_for(self, input_shapes):
+        output_shape = list(input_shapes[0])  # make a mutable copy
+        return tuple(output_shape)
+
+    def get_output_for(self, inputs, **kwargs):
+        mu_t, var_t, mu_l, var_l = inputs
+
+        mu_t = mu_t.reshape((-1,self.eq_samples, self.iw_samples,self.num_inputs))
+        var_t = var_t.reshape((-1,self.eq_samples, self.iw_samples,self.num_inputs))
+        mu_l = mu_l.reshape((-1,1,1,self.num_inputs))
+        var_l = var_l.reshape((-1,1,1,self.num_inputs))
+
+        prec_t = var_t**(-1)
+        prec_l = var_l**(-1)
+
+        mu_est =  (mu_t*prec_t + mu_l*prec_l) / (prec_l+prec_t)
+        var_est = ( prec_t + prec_l)**(-1)
+
+        return mu_est.reshape((-1,self.num_inputs)), var_est.reshape((-1,self.num_inputs))
+

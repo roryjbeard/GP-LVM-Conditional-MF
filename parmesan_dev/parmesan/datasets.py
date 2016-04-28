@@ -219,7 +219,7 @@ def _download_mnist_binarized(datapath):
     for split in datafiles.keys():
         print "Downloading %s data..." %(split)
         local_file = datapath + '/binarized_mnist_%s.npy'%(split)
-        datasplits[split] = np.loadtxt(urllib.urlretrieve(datafiles[split])[0])
+        datasplits[split] = np.loadtxt(urllib.urlretrieve(datafiles[split])[0]).astype('float32')
 
     f = gzip.open(datapath +'/mnist.pkl.gz', 'w')
     pkl.dump([datasplits['train'],datasplits['valid'],datasplits['test']],f)
