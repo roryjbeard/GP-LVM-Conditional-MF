@@ -19,11 +19,11 @@ from utils_RB import normalEntropy2
 #settings
 dataset = 'fixed'
 batch_size = 100
-nhidden = 200
+nhidden = 500
 nonlin_enc = T.nnet.softplus
 nonlin_dec = T.nnet.softplus
 nonlin_aux = T.nnet.softplus
-latent_size = 50
+latent_size = 100
 latent_ext_size = 100
 analytic_kl_term = True
 lr = 0.0003
@@ -111,10 +111,10 @@ l_enc_log_var_z = lasagne.layers.DenseLayer(l_ext_enc_h2,
 l_z = SimpleSampleLayer(mean=l_enc_mu_z, log_var=l_enc_log_var_z)
 
 ### GENERATIVE MODEL p(x|z)
-l_dec_mu_in = lasagne.layers.InputLayer((None, latent_size))
-l_dec_log_var_in = lasagne.layers.InputLayer((None, latent_size))
-l_dec_z = DecoderSimpleSampleLayer(l_z, mu=l_dec_mu_in, log_var=l_dec_log_var_in)
-l_dec_h1 = lasagne.layers.DenseLayer(l_dec_z, num_units=nhidden, nonlinearity=nonlin_dec, name='DEC_DENSE1')
+# l_dec_mu_in = lasagne.layers.InputLayer((None, latent_size))
+# l_dec_log_var_in = lasagne.layers.InputLayer((None, latent_size))
+# l_dec_z = DecoderSimpleSampleLayer(l_z, mu=l_dec_mu_in, log_var=l_dec_log_var_in)
+l_dec_h1 = lasagne.layers.DenseLayer(l_z, num_units=nhidden, nonlinearity=nonlin_dec, name='DEC_DENSE1')
 l_dec_h1 = lasagne.layers.DenseLayer(l_dec_h1, num_units=nhidden, nonlinearity=nonlin_dec, name='DEC_DENSE2')
 l_dec_mu_x = lasagne.layers.DenseLayer(l_dec_h1,
                                 num_units=nfeatures,
@@ -153,14 +153,14 @@ z_enc_mu_train, z_enc_log_var_train, z_enc_train, \
 s_aux_mu_train, s_aux_log_var_train, s_aux_train, x_mu_train = lasagne.layers.get_output(
                                         [l_enc_mu_s, l_enc_log_var_s, l_enc_s,
                                         l_enc_mu_z, l_enc_log_var_z, l_z,
-                                        l_aux_mu, l_aux_log_var, l_aux_s, l_dec_mu_x], {l_in:sym_x, l_dec_mu_in:sym_mu, l_dec_log_var_in:sym_var}, deterministic=False)
+                                        l_aux_mu, l_aux_log_var, l_aux_s, l_dec_mu_x], {l_in:sym_x}, deterministic=False)
 
 s_enc_mu_eval, s_enc_log_var_eval, s_enc_eval, \
 z_enc_mu_eval, z_enc_log_var_eval, z_enc_eval, \
 s_aux_mu_eval, s_aux_log_var_eval, s_aux_eval, x_mu_eval = lasagne.layers.get_output(
                                         [l_enc_mu_s, l_enc_log_var_s, l_enc_s,
                                         l_enc_mu_z, l_enc_log_var_z, l_z,
-                                        l_aux_mu, l_aux_log_var, l_aux_s, l_dec_mu_x], {l_in:sym_x, l_dec_mu_in:sym_mu, l_dec_log_var_in:sym_var}, deterministic=True)
+                                        l_aux_mu, l_aux_log_var, l_aux_s, l_dec_mu_x], {l_in:sym_x}, deterministic=True)
 
 
 #Calculate the loglikelihood(x) = E_q[ log p(x|z)  + log p(z) + log r(s|z,x) - log q(z|s,x) - log q(s|x)]

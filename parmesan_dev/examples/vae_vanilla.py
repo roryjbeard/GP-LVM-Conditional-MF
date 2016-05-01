@@ -15,7 +15,7 @@ filename_script = os.path.basename(os.path.realpath(__file__))
 #settings
 dataset = 'fixed'
 batch_size = 100
-nhidden = 200
+nhidden = 500
 nonlin_enc = T.nnet.softplus
 nonlin_dec = T.nnet.softplus
 latent_size = 100
@@ -112,12 +112,12 @@ def latent_gaussian_x_bernoulli(z, z_mu, z_log_var, x_mu, x, analytic_kl_term):
     """
     if analytic_kl_term:
         kl_term = kl_normal2_stdnormal(z_mu, z_log_var).sum(axis=1)
-        log_p_x_I_z = log_bernoulli(x, x_mu).sum(axis=1)
+        log_p_x_I_z = log_bernoulli(x, x_mu, eps=1e-5).sum(axis=1)
         LL = T.mean(-kl_term + log_p_x_I_z)
     else:
-        log_qz_given_x = log_normal2(z, z_mu, z_log_var).sum(axis=1)
+        log_qz_given_x = log_normal2(z, z_mu, z_log_var, eps=1e-5).sum(axis=1)
         log_pz = log_stdnormal(z).sum(axis=1)
-        log_p_x_I_z = log_bernoulli(x, x_mu).sum(axis=1)
+        log_p_x_I_z = log_bernoulli(x, x_mu, eps=1e-5).sum(axis=1)
         kl_term = log_qz_given_x - log_pz
         LL = T.mean(log_pz + log_p_x_I_z - log_qz_given_x)
     return LL, kl_term, log_p_x_I_z
