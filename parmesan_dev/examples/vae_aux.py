@@ -284,6 +284,6 @@ for epoch in range(num_epochs):
 
     line =  "*Epoch: %i\tTime: %0.2f\tLR: %0.5f\tLL Train: %0.3f\tLL test: %0.3f\t" % ( epoch, t, lr, train_cost, test_cost)
     print line
-    print "\n kl_term: %0.3f\t px_term: %0.3f\t rs_term: %0.3f\t H_term: %0.3f\t" % (train_kl, train_rs, train_px, train_H)
+    print "\n kl_term: %0.3f\t px_term: %0.3f\t rs_term: %0.3f\t H_term: %0.3f\t" % (train_kl, train_px, train_rs, train_H)
     with open(logfile,'a') as f:
         f.write(line + "\n")
