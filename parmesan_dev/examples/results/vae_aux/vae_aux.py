@@ -25,7 +25,7 @@ nonlin_dec = T.nnet.softplus
 nonlin_aux = T.nnet.softplus
 latent_size = 50
 latent_ext_size = 100
-analytic_kl_term = False
+analytic_kl_term = True
 lr = 0.0003
 num_epochs = 1000
 results_out = os.path.join("results", os.path.splitext(filename_script)[0])
@@ -87,7 +87,7 @@ l_enc_log_var_s = lasagne.layers.DenseLayer(l_enc_h1, num_units=latent_ext_size,
 l_enc_s = SimpleSampleLayer(mean=l_enc_mu_s, log_var=l_enc_log_var_s)
 
 #concatenate x with s to give z
-l_enc_sx = lasagne.layers.ConcatLayer([l_enc_s, l_in], axis=1, cropping=None)
+l_enc_sx = lasagne.layers.ConcatLayer([l_enc_s, l_in], axis=1)
 
 l_ext_enc_h1 = lasagne.layers.DenseLayer(l_enc_sx,
                                         num_units=nhidden,
@@ -126,7 +126,7 @@ l_dec_mu_x = lasagne.layers.DenseLayer(l_dec_h1,
 ### AUXILIARY MODEL r(s\z,y)
 
 # merge layer to merge x with z's sampled from encdoer
-l_aux_zx = lasagne.layers.ConcatLayer([l_z, l_in], axis=1, cropping=None)
+l_aux_zx = lasagne.layers.ConcatLayer([l_z, l_in], axis=1)
 
 l_aux_h1 = lasagne.layers.DenseLayer(l_aux_zx,
                                 num_units=nhidden,
@@ -179,22 +179,22 @@ def latent_gaussian_x_bernoulli(z, z_I_sx_mu, z_I_sx_log_var, s, q_s_mu, q_s_log
     """
     if analytic_kl_term:
         # TO DO
-        kl_term = kl_normal2_stdnormal(z_I_s_mu, z_I_s_log_var).sum(axis=1)
+        kl_term = kl_normal2_stdnormal(z_I_sx_mu, z_I_sx_log_var).sum(axis=1)
         # kl_term = 1.
-        log_p_x_I_s = log_bernoulli(x, x_I_s_mu, eps=1e-5).sum(axis=1)
-        log_p_s_I_z = log_normal2(s, p_s_mu, p_s_log_var, eps=1e-5).sum(axis=1)
+        log_p_x_I_z = log_bernoulli(x, x_I_z_mu, eps=1e-5).sum(axis=1)
+        log_r_s_I_zx = log_normal2(s, r_s_mu, r_s_log_var, eps=1e-5).sum(axis=1)
         H_s = normalEntropy2(q_s_log_var).sum(axis=1)
         # H_s = 1.
-        LL = T.mean(-kl_term + log_p_x_I_s + log_p_s_I_z + H_s)
+        LL = T.mean(-kl_term + log_p_x_I_z + log_r_s_I_zx + H_s)
     else:
         log_q_z_I_sx = log_normal2(z, z_I_sx_mu, z_I_sx_log_var, eps=1e-5).sum(axis=1)
         log_p_z = log_stdnormal(z).sum(axis=1)
-        kl_term = log_q_z_I_sx - log_p_z
         log_p_x_I_z = log_bernoulli(x, x_I_z_mu, eps=1e-5).sum(axis=1)
         log_q_s_I_x = log_normal2(s, q_s_mu, q_s_log_var, eps=1e-5).sum(axis=1)
         log_r_s_I_zx = log_normal2(s, r_s_mu, r_s_log_var, eps=1e-5).sum(axis=1)
         H_s = -log_q_s_I_x
-        LL = T.mean(-kl_term + log_p_x_I_z + log_r_s_I_zx - log_q_s_I_x)
+        kl_term = log_q_z_I_sx - log_p_z
+        LL = T.mean(-kl_term + log_p_x_I_z + log_r_s_I_zx + H_s)
 
     return LL, kl_term, log_p_x_I_z, log_r_s_I_zx, H_s
 
@@ -252,9 +252,9 @@ def train_epoch(lr):
         costs += [cost_batch]
         kl_batch = cost_terms_batch[1]
         kl_term += [kl_batch]
-        rs_batch = cost_terms_batch[2]
+        rs_batch = cost_terms_batch[3]
         rs_term += [rs_batch]
-        px_batch = cost_terms_batch[3]
+        px_batch = cost_terms_batch[2]
         px_term += [px_batch]
         H_batch = cost_terms_batch[4]
         H_term += [H_batch]
@@ -284,6 +284,6 @@ for epoch in range(num_epochs):
 
     line =  "*Epoch: %i\tTime: %0.2f\tLR: %0.5f\tLL Train: %0.3f\tLL test: %0.3f\t" % ( epoch, t, lr, train_cost, test_cost)
     print line
-    print "\n kl_term: %0.3f\t px_term: %0.3f\t rs_term: %0.3f\t H_term: %0.3f\t" % (train_kl, train_rs, train_px, train_H)
+    print "\n kl_term: %0.3f\t px_term: %0.3f\t rs_term: %0.3f\t H_term: %0.3f\t" % (train_kl, train_px, train_rs, train_H)
     with open(logfile,'a') as f:
         f.write(line + "\n")
