@@ -295,6 +295,8 @@ parser.add_argument("-lv_eps_z", type=float,
         help="small constant added to z-variance to avoid underflow", default=1e-5)
 parser.add_argument("-lv_eps_out", type=float,
         help="small constant added to x-variance to avoid underflow", default=1e-5)
+parser.add_argument("-num_Gibbs", type=int,
+        help="number of full Gibbs steps (applies only to GibbsVAE", default=2)
 
 
 args = parser.parse_args()
@@ -630,10 +632,77 @@ elif modeltype == 'ladderVAE':
     denselayerout = batchnormlayer if batch_norm_output else lasagne.layers.DenseLayer
     l_dec_x_mu = denselayerout(ldec_h, num_units=num_features, W=w_init_mu, nonlinearity=outputnonlin, name='DEC_DENSE_MU')
     l_dec_x_var = denselayerout(ldec_h, num_units=num_features, W=lasagne.init.Constant(0.), b=b_init_var, nonlinearity=lasagne.nonlinearities.softplus, name='DEC_DENSE_var')
+
+elif modeltype == 'GibbsVAE':
+
+    latent_size_q = latent_sizes[0]
+    latent_size_p = num_features
+    hidden_size_q = latent_sizes[0]
+    hidden_size_p = latent_sizes[0]
+    num_layers = num_Gibbs
+
+    reversed_z = False
+    lenc_z_mu = [[] for i in range(2*num_layers)]
+    lenc_z_var = [[] for i in range(2*num_layers)]
+    l_z = [[] for i in range(2*num_layers)]
+    lenc_z_mu = [[] for i in range(2*num_layers)]
+    lenc_z_var = [[] for i in range(2*num_layers)]
+    lenc_zt_mu = [[] for i in range(2*num_layers)]
+    lenc_zt_var = [[] for i in range(2*num_layers)]
+    ldec_z_mu = [[] for i in range(2*num_layers)]
+    ldec_z_var = [[] for i in range(2*num_layers)]
+
+
+    #RECOGNITION MODEL
+    l_in = lasagne.layers.InputLayer((None, num_features))
+    l_enc_h_q= mlp(l_in, num_units=hidden_size_q, W=w_init_mlp, name='ENC_q_DENSE%i'%0, nonlinearity=nonlin_enc, num_mlp_layers=num_mlp_layers)
+    lenc_z_mu[0] = denselayer(l_enc_h_q, num_units=latent_size_q, W=w_init_mu, nonlinearity=lasagne.nonlinearities.identity, name='ENC_q_MU%i'%0)
+    lenc_z_var[0] = denselayer(l_enc_h_q, num_units=latent_size_q, W=w_init_var, nonlinearity=lasagne.nonlinearities.softplus, b=b_init_var, name='ENC_q_var%i'%0)
+    l_z[0] = SampleLayer(mu=lenc_z_mu[0], var=lenc_z_var[0], eq_samples=sym_eq_samples, iw_samples=sym_iw_samples)
+    l_enc_h_p = mlp(l_z[0], num_units=hidden_size_p, W=w_init_mlp, name='ENC_p_DENSE%i'%0, nonlinearity=nonlin_enc, num_mlp_layers=num_mlp_layers)
+    lenc_z_mu[1] = denselayer(l_enc_h_p, num_units=latent_size_p, W=w_init_mu, nonlinearity=lasagne.nonlinearities.identity, name='ENC_p_MU%i'%0)
+    lenc_z_var[1] = denselayer(l_enc_h_p, num_units=latent_size_p, W=w_init_var, nonlinearity=lasagne.nonlinearities.softplus, b=b_init_var, name='ENC_p_var%i'%0)
+    l_z[1] = SampleLayer(mu=lenc_z_mu[1], var=lenc_z_var[1], eq_samples=sym_eq_samples, iw_samples=sym_iw_samples)
+
+    for i in range(2,num_layers,2):
+        l_enc_h_q= mlp(l_z[i-1], num_units=hidden_size_q, W=l_enc_h_q.W, b=l_enc_h_q.b, name='ENC_q_DENSE%i'%i, nonlinearity=nonlin_enc, num_mlp_layers=num_mlp_layers)
+        lenc_z_mu[i] = denselayer(l_enc_h_q, num_units=latent_size_q, W=lenc_z_mu[0].W, b=lenc_z_mu[0].b, nonlinearity=lasagne.nonlinearities.identity, name='ENC_A_MU%i'%i)
+        lenc_z_var[i] = denselayer(l_enc_h_q, num_units=latent_size_q, W=lenc_z_var[0].W, b=lenc_z_var[0].b, nonlinearity=lasagne.nonlinearities.softplus, b=b_init_var, name='ENC_A_var%i'%i)
+        l_z[i] = SampleLayer(mu=lenc_z_mu[i], var=lenc_z_var[i], eq_samples=1, iw_samples=1)
+        l_enc_h_p= mlp(l_z[i], num_units=hidden_size_p, W=l_enc_h_p.W, b=l_enc_h_p.b, name='ENC_p_DENSE%i'%i, nonlinearity=nonlin_enc, num_mlp_layers=num_mlp_layers)
+        lenc_z_mu[i+1] = denselayer(l_enc_h_p, num_units=latent_size_p, W=lenc_z_mu[1].W, b=lenc_z_mu[1].b, nonlinearity=lasagne.nonlinearities.identity, name='ENC_A_MU%i'%i)
+        lenc_z_var[i+1] = denselayer(l_enc_h_p, num_units=latent_size_p, W=lenc_z_var[1].W, b=lenc_z_var[1].b, nonlinearity=lasagne.nonlinearities.softplus, b=b_init_var, name='ENC_A_var%i'%i)
+        l_z[i+1] = SampleLayer(mu=lenc_z_mu[i+1], var=lenc_z_var[i+1], eq_samples=1, iw_samples=1)
+
+
+    #DECODER MODEL
+    ldec_mu_in = lasagne.layers.InputLayer((None,latent_size_p))
+    ldec_var_in = lasagne.layers.InputLayer((None,latent_size_p))
+    ldec_z = DecoderSampleLayer(l_z[-1],mu=ldec_mu_in,var=ldec_var_in)
+    ldec_h_p = mlp(ldec_z, num_units=hidden_size_p, W=l_enc_h_p.W, b=l_enc_h_p.b, name='DEC_Z_p%i'%i, nonlinearity=nonlin_enc, num_mlp_layers=num_mlp_layers)
+
+    for i in range(0,num_layers-1,2)[::-1]:
+        ldec_z_mu[i] = denselayer(ldec_h_p, num_units=latent_size_p, W=lenc_z_mu[1].W, b=lenc_z_mu[1].b, nonlinearity=lasagne.nonlinearities.identity, name='ENC_Z_MU%i'%i)
+        ldec_z_var[i] = denselayer(ldec_h_p, num_units=latent_size_p, W=lenc_z_mu[1].W, b=lenc_z_mu[1].b, nonlinearity=lasagne.nonlinearities.softplus, b=b_init_var, name='ENC_Z_LOG_VAR%i'%i)
+        ldec_z = DecoderSampleLayer(l_z[i],mu=ldec_z_mu[i],var=ldec_z_var[i])
+        ldec_h_q = mlp(ldec_z, num_units=hidden_size_q, W=l_enc_h_q.W, b=l_enc_h_q.b, name='DEC_Z_q%i'%i+1, nonlinearity=nonlin_enc, num_mlp_layers=num_mlp_layers)
+        ldec_z_mu[-1] = denselayer(ldec_h_q, num_units=latent_size_q, W=lenc_z_mu[0].W, b=lenc_z_mu[0].b, nonlinearity=lasagne.nonlinearities.identity, name='ENC_Z_MU%i'%i)
+        ldec_z_var[-1] = denselayer(ldec_h_q, num_units=latent_size_q, W=lenc_z_mu[0].W, b=lenc_z_mu[0].b, nonlinearity=lasagne.nonlinearities.softplus, b=b_init_var, name='ENC_Z_LOG_VAR%i'%i)
+        ldec_z = DecoderSampleLayer(l_z[i-1],mu=ldec_z_mu[i-1],var=ldec_z_var[i-1])
+        ldec_h_p = mlp(ldec_z, num_units=hidden_size_p, W=l_enc_h_p.W, b=l_enc_h_p.b, name='DEC_Z_p%i'%i, nonlinearity=nonlin_enc, num_mlp_layers=num_mlp_layers)
+
+
+    denselayerout = batchnormlayer if batch_norm_output else lasagne.layers.DenseLayer
+    l_dec_x_mu = denselayerout(ldec_h_p, num_units=num_features, W=lenc_z_mu[0], b=lenc_z_mu[0].b, nonlinearity=outputnonlin, name='DEC_DENSE_MU')
+    l_dec_x_var = denselayerout(ldec_h_p, num_units=num_features, W=lenc_z_mu[0], b=lenc_z_mu[0].b, nonlinearity=lasagne.nonlinearities.softplus, name='DEC_DENSE_var')
+    #note that the var layer is not used for anything if the density is set to bernoulli
 else:
     raise ValueError()
 
 # get output needed for evaluating model with noise if present
+if modeltype == 'GibbsVAE':
+    num_layers = num_layers*2
+
 train_layers = lasagne.layers.get_output(l_z + lenc_z_mu + lenc_z_var + ldec_z_mu[:-1] + ldec_z_var[:-1] + [l_dec_x_mu, l_dec_x_var], {l_in:sym_x, ldec_mu_in:sym_mu, ldec_var_in:sym_var}, deterministic=False)
 z_train = train_layers[:num_layers*1]
 z_mu_q_train = train_layers[1*num_layers:2*num_layers]
