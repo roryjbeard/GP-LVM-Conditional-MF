@@ -105,6 +105,12 @@ def sharedZeroMatrix(M, N, name, dtype=th.config.floatX, broadcastable=[]):
     else:
         return th.shared(np.asarray(np.zeros((M, N)), dtype), name=name, broadcastable=broadcastable)
 
+def sharedZero3Tensor(M, N, P, name, dtype=th.config.floatX, broadcastable=[]):
+    if len(broadcastable) == 0:
+        return th.shared(np.asarray(np.zeros((M, N, P)), dtype), name=name)
+    else:
+        return th.shared(np.asarray(np.zeros((M, N, P)), dtype), name=name, broadcastable=broadcastable)
+
 def sharedZeroVector(M, name, dtype=th.config.floatX, broadcastable=[]):
     return sharedZeroMatrix(M, 1, name, dtype, broadcastable)
 
@@ -218,11 +224,11 @@ def sampleNormalFunction(dim0, dim1, srng, name):
     rv = srng.normal(size=(dim0, dim1), avg=0.0, std=1.0, ndim=None)
     rv.name = name
     rv_sample = th.function([], rv)
-    return (rv, rv_sample)    
-    
+    return (rv, rv_sample)
+
 
 def sampleNormal(mu, log_sigma, rv, name):
     s = plus(mu, mul(exp(log_sigma), rv), name)
     return s
-    
+
 

@@ -165,7 +165,7 @@ class SGPDV(Printable):
                                   self.Xu, self.log_theta]
         self.gradientVariables.extend(self.mlp_qX.params)
 
-        self.Kappa_conditionNumber = conditionNumber(self.kappa)
+        self.Kappa_conditionNumber = conditionNumber(self.Kappa)
         self.Kuu_conditionNumber   = conditionNumber(self.Kuu)
         self.Sigma_conditionNumber = conditionNumber(self.Sigma)
 
